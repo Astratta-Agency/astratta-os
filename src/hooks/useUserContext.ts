@@ -39,6 +39,7 @@ export function useUserContext() {
     enabled: !!user?.id && isSupabaseConfigured && !authLoading,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
+      console.log("[useUserContext] fetching for user", user?.id);
       if (!user) return { workspaces: [], clients: [] };
 
       const [{ data: wm, error: wmErr }, { data: cu, error: cuErr }] = await Promise.all([
@@ -57,13 +58,18 @@ export function useUserContext() {
           .eq("user_id", user.id),
       ]);
 
+      console.log("[useUserContext] Workspace members query:", { data: wm, error: wmErr });
+      console.log("[useUserContext] Client users query:", { data: cu, error: cuErr });
+
       if (wmErr) throw wmErr;
       if (cuErr) throw cuErr;
 
-      return {
+      const ctx = {
         workspaces: (wm ?? []) as unknown as WorkspaceMembership[],
         clients: (cu ?? []) as unknown as ClientMembership[],
       };
+      console.log("[useUserContext] Final context:", ctx);
+      return ctx;
     },
   });
 }

@@ -12,6 +12,8 @@ export function TopBar() {
       <WorkspaceSwitcher />
 
       <div className="flex-1" />
+
+      <div className="flex items-center gap-1">
         <Button variant="ghost" size="icon" className="relative" aria-label="Notificaciones">
           <Bell className="h-5 w-5 text-muted-foreground" />
           <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-secondary" aria-hidden />

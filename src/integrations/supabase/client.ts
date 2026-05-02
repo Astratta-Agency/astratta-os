@@ -5,22 +5,16 @@ import { createClient } from "@supabase/supabase-js";
  *
  * The URL and anon (publishable) key are safe to expose in the browser; protection
  * relies on Row-Level Security policies in the Supabase project.
- *
- * Configure them via Vite env vars:
- *   VITE_SUPABASE_URL=https://xxxx.supabase.co
- *   VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
  */
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const SUPABASE_URL = "https://vdnblnrwkkychxzbixam.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_MFPp01GR2S8XqWsiuxtJnw_EuJ4L4S5";
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-export const supabase = isSupabaseConfigured
-  ? createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        storage: typeof window !== "undefined" ? window.localStorage : undefined,
-      },
-    })
-  : (null as unknown as ReturnType<typeof createClient>);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    storage: typeof window !== "undefined" ? window.localStorage : undefined,
+  },
+});

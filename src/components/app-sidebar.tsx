@@ -2,8 +2,8 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
-  FolderKanban,
-  Calendar,
+  Briefcase,
+  CalendarDays,
   CheckSquare,
   DollarSign,
   BarChart3,
@@ -19,15 +19,17 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/brand/Logo";
+import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 
 const mainItems = [
   { title: "Dashboard", url: "/app/dashboard", icon: LayoutDashboard },
   { title: "Clientes", url: "/app/clientes", icon: Users },
-  { title: "Proyectos", url: "/app/proyectos", icon: FolderKanban },
-  { title: "Calendario", url: "/app/calendario", icon: Calendar },
+  { title: "Proyectos", url: "/app/proyectos", icon: Briefcase },
+  { title: "Calendario de contenido", url: "/app/calendario", icon: CalendarDays },
   { title: "Tareas", url: "/app/tareas", icon: CheckSquare },
   { title: "Finanzas", url: "/app/finanzas", icon: DollarSign },
   { title: "Reportes", url: "/app/reportes", icon: BarChart3 },
@@ -88,8 +90,10 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border bg-sidebar">
+      <SidebarFooter className="border-t border-sidebar-border bg-sidebar gap-1">
         <SidebarMenu>{footerItems.map(renderItem)}</SidebarMenu>
+        <SidebarSeparator className="bg-sidebar-border" />
+        <SidebarUserMenu />
       </SidebarFooter>
     </Sidebar>
   );

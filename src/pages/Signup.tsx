@@ -56,7 +56,11 @@ export default function Signup() {
     }
 
     // Create the workspace via RPC (owner membership is auto-created by trigger)
-    const { error: rpcError } = await supabase.rpc("create_workspace", {
+    // Cast: RPC is defined in migration 002 and not yet present in generated types.
+    const { error: rpcError } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ error: { message: string } | null }>)("create_workspace", {
       _name: agencyName,
       _slug: null,
     });

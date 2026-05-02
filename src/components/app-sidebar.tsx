@@ -90,8 +90,10 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border bg-sidebar">
+      <SidebarFooter className="border-t border-sidebar-border bg-sidebar gap-1">
         <SidebarMenu>{footerItems.map(renderItem)}</SidebarMenu>
+        <SidebarSeparator className="bg-sidebar-border" />
+        <SidebarUserMenu />
       </SidebarFooter>
     </Sidebar>
   );

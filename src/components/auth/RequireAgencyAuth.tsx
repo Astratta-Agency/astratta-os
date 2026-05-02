@@ -12,8 +12,8 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
   const { loading, session, user, configured } = useAuth();
   const { data, isLoading, isFetched } = useUserContext();
   const location = useLocation();
-  const ctxLoading = isLoading || (!!user?.id && !isFetched);
   const workspaceMembers = data?.workspaces;
+  const ctxLoading = isLoading || (!!user?.id && (!isFetched || workspaceMembers === undefined));
 
   console.log(
     "[RequireAgencyAuth] mounted, user:",
@@ -45,7 +45,8 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
 
   const workspaces = workspaceMembers ?? [];
   const clients = data?.clients ?? [];
-  const shouldRedirectToLogin = !ctxLoading && !!user?.id && isFetched && workspaces.length === 0;
+  const shouldRedirectToLogin =
+    !ctxLoading && !!user?.id && isFetched && workspaceMembers !== undefined && workspaces.length === 0;
   console.log(
     "[RequireAgencyAuth] Decision time. user:",
     user?.id,

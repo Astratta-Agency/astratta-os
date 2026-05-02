@@ -32,15 +32,16 @@ export type UserContext = {
 };
 
 export function useUserContext() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
 
   return useQuery<UserContext>({
     queryKey: ["user-context", user?.id],
-    enabled: !!user?.id && isSupabaseConfigured && !authLoading,
+    enabled: !!user?.id && isSupabaseConfigured,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       console.log("[useUserContext] fetching for user", user?.id);
       if (!user) return { workspaces: [], clients: [] };
+      console.log("[useUserContext] Firing workspace_members query for user:", user.id);
 
       const [{ data: wm, error: wmErr }, { data: cu, error: cuErr }] = await Promise.all([
         supabase
@@ -58,6 +59,7 @@ export function useUserContext() {
           .eq("user_id", user.id),
       ]);
 
+      console.log("[useUserContext] Result:", { data: wm, error: wmErr });
       console.log("[useUserContext] Workspace members query:", { data: wm, error: wmErr });
       console.log("[useUserContext] Client users query:", { data: cu, error: cuErr });
 

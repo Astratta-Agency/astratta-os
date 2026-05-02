@@ -9,9 +9,11 @@ interface Props {
 }
 
 export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props) {
-  const { loading, session, configured } = useAuth();
-  const { data, isLoading } = useUserContext();
+  const { loading, session, user, configured } = useAuth();
+  const { data, isLoading, isFetched } = useUserContext();
   const location = useLocation();
+  const workspaceMembers = data?.workspaces;
+  const ctxLoading = isLoading || (!!user?.id && (!isFetched || workspaceMembers === undefined));
 
   console.log(
     "[RequireAgencyAuth] mounted, user:",
@@ -19,17 +21,17 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
     "loading:",
     loading,
     "ctxLoading:",
-    isLoading,
+    ctxLoading,
   );
 
   // Backend not connected — let the team preview the shell
   if (!configured) return <>{children}</>;
 
-  if (session && isLoading) {
+  if (session && ctxLoading) {
     console.log("[RequireAgencyAuth] Loading workspace_members...");
   }
 
-  if (loading || isLoading) {
+  if (loading || ctxLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
@@ -41,8 +43,20 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  const workspaces = data?.workspaces ?? [];
+  const workspaces = workspaceMembers ?? [];
   const clients = data?.clients ?? [];
+  const shouldRedirectToLogin =
+    !ctxLoading && !!user?.id && isFetched && workspaceMembers !== undefined && workspaces.length === 0;
+  console.log(
+    "[RequireAgencyAuth] Decision time. user:",
+    user?.id,
+    "ctxLoading:",
+    ctxLoading,
+    "memberships:",
+    workspaceMembers,
+    "willRedirect:",
+    shouldRedirectToLogin,
+  );
   console.log(
     `[RequireAgencyAuth] Found ${workspaces.length} workspace memberships, ${clients.length} client memberships`,
   );
@@ -55,10 +69,10 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
 
   // No memberships at all → onboarding (likely a fresh signup whose RPC
   // hasn't run yet, or a stale session). Send to login as a safe default.
-  if (workspaces.length === 0) {
+  if (shouldRedirectToLogin) {
     console.log(
       "[RequireAgencyAuth] no agency membership, redirecting to /login. Memberships:",
-      workspaces,
+      workspaceMembers,
     );
     return <Navigate to="/login" replace />;
   }

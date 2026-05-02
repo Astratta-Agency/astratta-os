@@ -10,8 +10,6 @@ export function RequireAuth({ children, redirectTo = "/login" }: RequireAuthProp
   const { loading, session, configured } = useAuth();
   const location = useLocation();
 
-  console.log("[RequireAuth] mounted, user:", session?.user?.id, "loading:", loading);
-
   // Until Supabase is connected, allow access so the team can preview the shell.
   if (!configured) return <>{children}</>;
 

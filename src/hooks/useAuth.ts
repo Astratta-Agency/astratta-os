@@ -20,13 +20,11 @@ export function useAuth(): AuthState {
     }
 
     // Set up listener BEFORE getSession (per Supabase auth best practice)
-    const { data: subscription } = supabase.auth.onAuthStateChange((event, newSession) => {
-      console.log("[useAuth] Auth state:", newSession ? "signed in" : "signed out", "(event:", event + ")", newSession?.user?.email ?? "");
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
     });
 
     supabase.auth.getSession().then(({ data }) => {
-      console.log("[useAuth] Initial getSession:", data.session ? "signed in" : "no session", data.session?.user?.email ?? "");
       setSession(data.session);
       setLoading(false);
     });

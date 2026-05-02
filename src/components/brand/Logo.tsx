@@ -4,15 +4,16 @@ interface LogoProps {
 }
 
 export function Logo({ variant = "dark", className = "" }: LogoProps) {
-  const color = variant === "light" ? "text-white" : "text-foreground";
+  const src = variant === "light" ? "/astratta-logo-white.png" : "/astratta-logo.png";
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-        <span className="font-display text-lg font-extrabold leading-none text-primary-foreground">A</span>
-      </div>
-      <span className={`font-display text-lg font-extrabold tracking-tight ${color}`}>
-        Astratta<span className="text-secondary">.</span>
-      </span>
+    <div className={`flex items-center ${className}`}>
+      <img
+        src={src}
+        alt="Astratta Agency"
+        className="h-8 w-auto object-contain"
+        loading="eager"
+        decoding="async"
+      />
     </div>
   );
 }

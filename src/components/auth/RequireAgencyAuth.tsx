@@ -16,6 +16,10 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
   // Backend not connected — let the team preview the shell
   if (!configured) return <>{children}</>;
 
+  if (session && isLoading) {
+    console.log("[RequireAgencyAuth] Loading workspace_members...");
+  }
+
   if (loading || isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -30,23 +34,30 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
 
   const workspaces = data?.workspaces ?? [];
   const clients = data?.clients ?? [];
+  console.log(
+    `[RequireAgencyAuth] Found ${workspaces.length} workspace memberships, ${clients.length} client memberships`,
+  );
 
   // Pure client user → portal
   if (workspaces.length === 0 && clients.length > 0) {
+    console.log("[RequireAgencyAuth] Redirecting to /portal/login (client-only user)");
     return <Navigate to="/portal/login" replace />;
   }
 
   // No memberships at all → onboarding (likely a fresh signup whose RPC
   // hasn't run yet, or a stale session). Send to login as a safe default.
   if (workspaces.length === 0) {
+    console.log("[RequireAgencyAuth] Redirecting to /login (no memberships)");
     return <Navigate to="/login" replace />;
   }
 
   // Force onboarding if no workspace has been onboarded yet
   const anyOnboarded = workspaces.some((w) => w.workspace.onboarded_at);
   if (!anyOnboarded && !allowUnonboarded) {
+    console.log("[RequireAgencyAuth] Redirecting to /onboarding (no workspace onboarded yet)");
     return <Navigate to="/onboarding" replace />;
   }
 
+  console.log("[RequireAgencyAuth] Redirecting to /app/dashboard (auth + workspace OK)");
   return <>{children}</>;
 }

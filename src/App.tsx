@@ -6,11 +6,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import AppShell from "@/layouts/AppShell";
 import PortalShell from "@/layouts/PortalShell";
-import { RequireAuth } from "@/components/require-auth";
+import { RequireAgencyAuth } from "@/components/auth/RequireAgencyAuth";
+import { RequireClientAuth } from "@/components/auth/RequireClientAuth";
 
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
+import Onboarding from "@/pages/Onboarding";
 
 import Dashboard from "@/pages/app/Dashboard";
 import Clientes from "@/pages/app/Clientes";
@@ -42,15 +45,26 @@ const App = () => (
           {/* Agency auth */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Onboarding (gated, but allowed before onboarded_at is set) */}
+          <Route
+            path="/onboarding"
+            element={
+              <RequireAgencyAuth allowUnonboarded>
+                <Onboarding />
+              </RequireAgencyAuth>
+            }
+          />
 
           {/* Agency app shell */}
           <Route
             path="/app"
             element={
-              <RequireAuth>
+              <RequireAgencyAuth>
                 <AppShell />
-              </RequireAuth>
+              </RequireAgencyAuth>
             }
           >
             <Route index element={<Navigate to="/app/dashboard" replace />} />
@@ -72,12 +86,13 @@ const App = () => (
           <Route
             path="/portal"
             element={
-              <RequireAuth redirectTo="/portal/login">
+              <RequireClientAuth>
                 <PortalShell />
-              </RequireAuth>
+              </RequireClientAuth>
             }
           >
             <Route index element={<PortalHome />} />
+            <Route path=":slug" element={<PortalHome />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

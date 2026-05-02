@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,43 +9,29 @@ import { Check } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
 import { translateAuthError } from "@/lib/auth-errors";
 
-/**
- * Recovery landing page — opened via the link from the password reset email.
- * Sets a new password using the recovery session that Supabase auto-applies.
- */
-export default function ResetPassword() {
-  const navigate = useNavigate();
-  const [recoveryReady, setRecoveryReady] = useState(false);
-  const [password, setPassword] = useState("");
+export default function ForgotPassword() {
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    // Supabase emits a PASSWORD_RECOVERY event when the user lands from the email link.
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") setRecoveryReady(true);
-    });
-    // Also accept an existing session (e.g. user already in recovery flow)
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) setRecoveryReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
+  const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!isSupabaseConfigured) {
+      setError("Backend no conectado.");
+      return;
+    }
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
     setLoading(false);
     if (error) {
       setError(translateAuthError(error.message));
       return;
     }
-    setDone(true);
-    setTimeout(() => navigate("/login", { replace: true }), 1500);
+    setSent(true);
   };
 
   return (
@@ -56,40 +42,34 @@ export default function ResetPassword() {
         </div>
         <Card className="p-8">
           <h1 className="font-display text-2xl font-bold text-foreground">
-            Define tu nueva contraseña
+            Recupera tu acceso
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Elige una contraseña nueva para tu cuenta.
+            Te enviaremos un enlace para restablecer tu contraseña.
           </p>
 
-          {done ? (
+          {sent ? (
             <div className="mt-6 flex items-start gap-3 rounded-input bg-muted p-4 text-sm">
               <span className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                 <Check className="h-3.5 w-3.5" strokeWidth={3} />
               </span>
               <div>
-                <p className="font-semibold text-foreground">Listo</p>
+                <p className="font-semibold text-foreground">Revisa tu correo</p>
                 <p className="mt-0.5 text-muted-foreground">
-                  Tu contraseña fue actualizada. Te llevamos al inicio de sesión.
+                  Si esa dirección está registrada, recibirás un correo en unos minutos.
                 </p>
               </div>
             </div>
-          ) : !recoveryReady && isSupabaseConfigured ? (
-            <p className="mt-6 rounded-input bg-muted p-4 text-sm text-muted-foreground">
-              Abre este enlace desde el correo de recuperación para continuar.
-            </p>
           ) : (
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="password">Nueva contraseña</Label>
+                <Label htmlFor="email">Correo</Label>
                 <Input
-                  id="password"
-                  type="password"
+                  id="email"
+                  type="email"
                   required
-                  minLength={8}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               {error && (
@@ -98,7 +78,7 @@ export default function ResetPassword() {
                 </p>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Guardando…" : "Actualizar contraseña"}
+                {loading ? "Enviando…" : "Enviar enlace"}
               </Button>
             </form>
           )}

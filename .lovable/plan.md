@@ -1,219 +1,160 @@
-# Astratta OS — Foundational Schema (Migration 001)
+# Authentication Flows — Astratta OS
 
-This plan provisions the multi-tenant core in Lovable Cloud (Supabase under the hood) with strict, recursion-safe Row Level Security. Every table has RLS on, with separate policy paths for **agency members** and **client portal users**.
+This is a **Vite + React Router** project (not Next.js), so I'll implement the equivalent using Supabase Auth + a route-level guard component (`RequireAuth`) instead of Next.js middleware. Functionality and UX will match what was requested.
+
+Several pieces already exist (`/login`, `/signup`, `/reset-password`, `/portal/login`, `/portal/forgot-password`, `RequireAuth`, `useAuth`). They need polishing, missing flows added, and stricter role-based gating.
+
+---
 
 ## Architectural decisions
 
-1. **Two access realms, one database.** Agency staff access via `workspace_members`. Clients access the portal via `client_users`. Policies branch on which realm the caller belongs to — never both.
-2. **All membership/role checks go through `SECURITY DEFINER` helper functions.** This is mandatory: a policy on `workspace_members` that re-queries `workspace_members` causes infinite recursion. Helpers are marked `STABLE`, owned by `postgres`, and pinned to `search_path = public, pg_temp`.
-3. **Profiles table added** (`profiles`, mirrors `auth.users`) so we can join names/avatars in UI without exposing `auth.users`. Auto-populated via `on_auth_user_created` trigger. *(Small addition beyond the brief; needed for any UI that shows assignees.)*
-4. **Roles stored only in `workspace_members.role` and `client_users.role**` — never on profiles. This matches Lovable's RBAC guidance.
-5. **Generated types** are produced automatically by Lovable Cloud after the migration applies (`src/integrations/supabase/types.ts`). The hand-written client at `src/integrations/supabase/client.ts` will be updated to import the generated `Database` type so all queries become typed.
-6. Brand fields live on `clients` (logo + colors) so the client portal can theme dynamically per tenant. Defaults match Astratta brand.
+1. **Keep** `/app/*` **prefix — do NOT flatten URLs.** This is intentional: when we split into subdomains later (`app.astrattaos.com` / `portal.astrattaos.com`) via Vercel rewrites, the prefix maps trivially without URL changes. Flat URLs would require a refactor.
+2. **Workspace creation uses an RPC, not direct insert.** A `create_workspace(_name text, _slug text)` SECURITY DEFINER function wraps insert + future business logic (welcome emails, default tags, default disclaimers). Owner membership is auto-created by the trigger from migration 001.
+3. **Trial defaults**: every newly created workspace defaults to `subscription_status = 'trialing'` with `trial_ends_at = now() + interval '14 days'`. Schema field `trial_ends_at` added in migration 002.
+4. **Dual-role users (rare but real)**: a user who is both `workspace_member` and `client_user` defaults to agency context after login, with a banner option to "Switch to client portal" (UI deferred — context detection live now).
+5. **Magic link UX**: after submission, show a confirmation screen ("Te enviamos un enlace a tu correo") instead of silently redirecting. Don't reveal whether the email exists in DB (security best practice).
+6. **All auth forms must show explicit loading states** (Supabase auth can take 1–2s on cold start). Use shadcn `Button` `disabled + loading spinner` pattern.  
 
-## Enums to create
+  What I'll build
 
-```text
-subscription_status : trialing | active | past_due | canceled
-workspace_role      : owner | team_member | collaborator
-member_status       : active | invited | suspended
-client_status       : prospect | active | paused | churned
-client_user_role    : client_admin | client_viewer
-project_type        : web_dev | social_media | paid_ads | graphic_design | branding | audit
-project_status      : planning | in_progress | paused | delivered | closed
-task_status         : todo | doing | review | done
-task_priority       : p0 | p1 | p2 | p3
+### 1. Agency auth (`/login`, `/signup`, `/forgot-password`)
+
+- Add magic link option to `/login` (toggle: password ↔ magic link).
+- Magic link submission → confirmation screen "Revisa tu correo. Te enviamos un enlace para iniciar sesión." → no auto-redirect.
+- Rename existing `/reset-password` route to also be reachable via `/forgot-password` (alias) — keep `/reset-password` for the recovery landing (after clicking the email link, with token).
+- Refresh signup headline to "Crea tu workspace y empieza a operar tu agencia como un studio".
+- Signup form fields: full name, email, password, **agency name** (becomes workspace name).
+- Signup flow:
+  1. `auth.signUp()` with metadata `{ full_name }`
+  2. On success, call RPC `create_workspace(_name => agencyName, _slug => generate_slug(agencyName))`
+  3. Trigger from migration 001 auto-creates owner membership
+  4. Workspace defaults: `subscription_status = 'trialing'`, `trial_ends_at = now() + 14 days`
+  5. Redirect to `/onboarding`
+
+### 2. Onboarding (`/onboarding`)
+
+New page, gated by `RequireAgencyAuth`. 3-step wizard in a single card with progress dots at top.
+
+**Step 1 — Workspace identity**
+
+- Workspace logo upload (Supabase Storage bucket `workspace-logos`, public read)
+- Agency display name (pre-filled from signup, editable)
+- **Agency website** (optional, validated as URL)
+- **Location** (text input, default `Dallas-Fort Worth, TX`)
+
+**Step 2 — Primary services** Multi-select chips. Stored on `workspaces.services` (jsonb) as structured data (not just strings) for future per-service config:
+
+json
+
+```json
+[
+  { "key": "web_dev", "label": "Web Development", "enabled": true },
+  { "key": "social_media", "label": "Social Media Management", "enabled": true },
+  { "key": "paid_ads", "label": "Paid Ads", "enabled": false },
+  { "key": "graphic_design", "label": "Graphic Design", "enabled": false },
+  { "key": "branding", "label": "Branding", "enabled": false },
+  { "key": "audit", "label": "Auditoría / Diagnóstico", "enabled": false }
+]
 ```
 
-## Tables
+**Step 3 — Done** Confetti-light moment + "Listo, tu workspace está activo." → redirect to `/app/dashboard`.
 
-All tables get `id uuid pk default gen_random_uuid()`, `created_at timestamptz default now()`, and (where listed) `updated_at timestamptz default now()` with a shared `set_updated_at()` BEFORE UPDATE trigger.
+A flag `workspaces.onboarded_at timestamptz` decides whether to force-redirect users to `/onboarding` after login. If null → onboarding required.
 
-```text
-workspaces           — exactly per spec
-workspace_members    — unique(workspace_id, user_id); index on user_id
-profiles             — id (= auth.users.id), full_name, avatar_url, email
-clients              — per spec; unique(workspace_id, slug); health_score CHECK 0..100
-client_contacts      — per spec; index on client_id
-client_users         — unique(client_id, user_id); index on user_id
-projects             — per spec; CHECK end_date >= start_date
-tasks                — per spec; related_post_id stays nullable (social_posts comes later)
-```
+### 3. Client portal auth (`/portal/login`, `/portal/forgot-password`)
 
-`workspaces.slug` gets a unique index. FKs cascade on workspace/client delete so a workspace teardown is clean.
+- Keep invite-only (no signup link).
+- Add magic link toggle (same UX as agency).
+- After login: look up the user's `client_users` row(s):
+  - If exactly one → redirect to `/portal/{client.slug}`.
+  - If multiple → render a "Selecciona el portal" chooser card with each client's logo + name.
+  - If zero → 403 page "No tienes acceso a ningún portal. Contacta a tu agencia."
+- For now `/portal/:slug` renders the existing `PortalHome`.
 
-## Brand fields on `clients`
+### 4. Route protection
 
-Add to `clients` table for portal theming per tenant:
+Replace the single `RequireAuth` with two role-aware guards:
 
-```text
-brand_primary_color   text  DEFAULT '#5140f2'
-brand_secondary_color text  DEFAULT '#ff7503'
-logo_url              text  NULL
-```
+- `RequireAgencyAuth` — requires session and at least one `workspace_members` row. If user is only a `client_users` member → redirect to `/portal/login`. If neither → redirect to `/login`.
+- `RequireClientAuth` — requires session and a `client_users` row matching the slug param. If the user is agency-only → redirect to `/login`. If trying to access a slug they don't have → 403.
 
-## Defaults and CHECK constraints
+Both use a `useUserContext` hook that fetches both memberships once and caches them in React Query (staleTime 5 min).
 
-```text
-clients.status            DEFAULT 'prospect'
-clients.health_score      CHECK (health_score >= 0 AND health_score <= 100)
-projects.status           DEFAULT 'planning'
-projects.retainer_monthly DEFAULT false
-projects.budget_amount    CHECK (budget_amount IS NULL OR budget_amount >= 0)
-projects                  CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date)
-tasks.status              DEFAULT 'todo'
-tasks.priority            DEFAULT 'p2'
-```
+**Dual-role users**: if a user has both, agency context wins by default. A banner appears at the top: "También tienes acceso a [Client Name] portal — Cambiar".
 
-## Performance indexes (created with the migration)
+Protected agency routes: `/app/dashboard`, `/app/clientes`, `/app/proyectos`, `/app/calendario`, `/app/tareas`, `/app/finanzas`, `/app/reportes`, `/app/configuracion`, `/onboarding`.
 
-```text
-idx_clients_workspace_status         on clients (workspace_id, status)
-idx_projects_workspace_client_status on projects (workspace_id, client_id, status)
-idx_projects_client                  on projects (client_id)
-idx_tasks_workspace_status_due       on tasks (workspace_id, status, due_date)
-idx_tasks_assigned_status            on tasks (assigned_to, status)
-idx_workspace_members_user_workspace on workspace_members (user_id, workspace_id)
-idx_client_users_user_client         on client_users (user_id, client_id)
-```
+Protected portal routes: `/portal`, `/portal/:slug`.
 
-## Helper functions
+### 5. Logout
 
-### Security definer helpers (RLS, recursion-safe)
+Add explicit logout handler in user menu (top bar): calls `supabase.auth.signOut()` and redirects to `/login`. Same for portal user menu → `/portal/login`.
 
-```text
-is_workspace_member(_workspace_id uuid)              → boolean
-has_workspace_role(_workspace_id uuid, _role workspace_role) → boolean
-is_workspace_owner(_workspace_id uuid)               → boolean
-is_client_user(_client_id uuid)                      → boolean
-is_client_admin(_client_id uuid)                     → boolean
-client_belongs_to_member_workspace(_client_id uuid)  → boolean
-```
+#### 6. Design polish
 
-All take `auth.uid()` implicitly, are `SECURITY DEFINER STABLE`, and live in `public`.
+- Centered card on white background (already in place); enforce `#5140f2` primary CTA via existing CSS tokens.
+- Inline error text in `text-destructive` (already `#ef4444` via tokens).
+- Success states: small `Check` icon (lucide) tinted with primary.
+- Mulish font: confirm `tailwind.config.ts` / `index.css` font tokens — if missing, add `Mulish` import and set as default sans + `font-display` (Bold).
+- All buttons get loading state (spinner + disabled) during async auth ops.
+- Error mapping: translate Supabase auth errors to Spanish ("Invalid login credentials" → "Correo o contraseña incorrectos").
 
-## Slug helper
+---
 
-A non-security utility for app-side and trigger use:
+## Files to create
 
-```text
-generate_slug(_input text) → text
-```
+- `src/pages/Onboarding.tsx` — 3-step wizard
+- `src/pages/portal/ClientHome.tsx` — slug-aware version of `PortalHome` (or rename + accept `:slug`)
+- `src/pages/portal/ClientChooser.tsx` — when user has multiple client memberships
+- `src/pages/auth/MagicLinkSent.tsx` — confirmation screen post magic-link request
+- `src/components/auth/RequireAgencyAuth.tsx`
+- `src/components/auth/RequireClientAuth.tsx`
+- `src/components/auth/MagicLinkForm.tsx` — shared form fragment
+- `src/components/auth/AuthErrorMessage.tsx` — Spanish-mapped error display
+- `src/hooks/useUserContext.ts` — fetches `workspace_members` + `client_users` for current user, with React Query caching
+- `docs/migrations/002_workspace_onboarding.sql` — adds `services jsonb`, `onboarded_at timestamptz`, `trial_ends_at timestamptz` to `workspaces`; creates `workspace-logos` storage bucket + RLS; creates `create_workspace(_name text, _slug text)` SECURITY DEFINER RPC
 
-- Lowercases input
-- Replaces non-alphanumeric runs with single hyphens
-- Trims leading/trailing hyphens
-- Collapses duplicate hyphens
-- Returns deterministic slug (e.g. `"180 Grados Med Spa!" → "180-grados-med-spa"`)
+## Files to edit
 
-Marked `IMMUTABLE`. Used as default candidate when the application doesn't supply a slug for `clients.slug` or `workspaces.slug`. App layer can still override.
+- `src/App.tsx` — add `/forgot-password` alias, `/onboarding`, `/portal/:slug`, `/portal/select` (chooser), swap guards
+- `src/pages/Login.tsx` — add magic-link toggle, loading states, Spanish error mapping
+- `src/pages/Signup.tsx` — new headline, agency name field, post-signup workspace creation via RPC, redirect to `/onboarding`
+- `src/pages/ResetPassword.tsx` — keep (handles recovery landing & new password set)
+- `src/pages/portal/Login.tsx` — add magic-link toggle, redirect by client slug or to chooser
+- `src/components/require-auth.tsx` — keep as base or remove (replaced by role-aware guards)
+- `src/components/user-menu.tsx` (and portal equivalent) — wire up logout
+- `tailwind.config.ts` / `src/index.css` — ensure Mulish is loaded
 
-## RLS policy summary
+## Storage bucket — `workspace-logos`
 
-For every table: `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` (so even table owners obey policies via PostgREST).
+- Public read (logos are not sensitive and may render on unauthenticated pages later)
+- Write: only `workspace_members` with role `owner` of the matching workspace. Path convention: `/{workspace_id}/logo.{ext}`
+- Max file size 2 MB, allowed types: `image/png`, `image/jpeg`, `image/svg+xml`, `image/webp`
 
-```text
-workspaces
-  SELECT  : is_workspace_member(id)
-  UPDATE  : is_workspace_owner(id)
-  INSERT  : auth.uid() IS NOT NULL  (creator becomes owner via trigger)
-  DELETE  : is_workspace_owner(id)
+## Required user actions after I implement
 
-workspace_members
-  SELECT  : is_workspace_member(workspace_id)
-            OR user_id = auth.uid()           -- self-row, needed to bootstrap helper
-  INSERT/UPDATE/DELETE : is_workspace_owner(workspace_id)
-
-profiles
-  SELECT  : id = auth.uid()
-            OR EXISTS shared workspace via helper
-            OR EXISTS (
-                 SELECT 1 FROM client_users cu
-                 JOIN clients c ON c.id = cu.client_id
-                 JOIN workspace_members wm ON wm.workspace_id = c.workspace_id
-                 WHERE cu.user_id = auth.uid()
-                   AND wm.user_id = profiles.id
-               )                              -- portal "Tu equipo en Astratta"
-  UPDATE  : id = auth.uid()
-
-clients
-  SELECT  : is_workspace_member(workspace_id)
-            OR is_client_user(id)             -- portal read of own client
-  INSERT/UPDATE/DELETE : is_workspace_member(workspace_id)
-                         AND role in (owner, team_member)
-
-client_contacts
-  SELECT  : agency member of client's workspace
-            OR client_user of this client
-  WRITE   : agency member (team_member+)
-
-client_users
-  SELECT  : agency member of client's workspace
-            OR user_id = auth.uid()           -- self
-  WRITE   : agency member (team_member+)
-
-projects
-  SELECT  : is_workspace_member(workspace_id)
-            OR is_client_user(client_id)
-  WRITE   : is_workspace_member(workspace_id) AND role in (owner, team_member)
-
-tasks
-  SELECT  : is_workspace_member(workspace_id) -- internal only, NOT exposed to portal
-  WRITE   : is_workspace_member(workspace_id)
-            AND (assigned_to = auth.uid() OR role in (owner, team_member))
-```
-
-Collaborators (freelancers) get read-everywhere within the workspace but only write on tasks assigned to them and on their own task updates. Owners + team_members are the writers for clients/projects.
-
-## Triggers
-
-```text
-set_updated_at()       → BEFORE UPDATE on workspaces, clients, projects, tasks
-handle_new_user()      → AFTER INSERT on auth.users → inserts profile row
-handle_new_workspace() → AFTER INSERT on workspaces → inserts workspace_members
-                          row (creator, role=owner, status=active)
-```
-
-The workspace-creation trigger is what makes the `INSERT` policy on `workspaces` safe: the creator is auto-promoted to owner so subsequent SELECT/UPDATE policies see them.
-
-## TypeScript / app integration
-
-1. Lovable Cloud regenerates `src/integrations/supabase/types.ts` from the live schema after migration. No hand-written type file.
-2. Update `src/integrations/supabase/client.ts` to:
-  ```ts
-   import type { Database } from "./types";
-   createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, { ... })
-  ```
-3. No UI wiring in this step — pages stay as placeholders. Hooking the sidebar/workspace switcher to real data is the **next** iteration.
-
-## Files changed
-
-```text
-supabase/migrations/<timestamp>_astratta_core_schema.sql   (new — full migration)
-src/integrations/supabase/types.ts                         (regenerated)
-src/integrations/supabase/client.ts                        (typed Database)
-docs/security-tests.sql                                    (new — regression smoke tests)
-docs/decisions.md                                          (append schema decisions)
-```
-
-## Out of scope (future migrations)
-
-- `social_posts`, `content_calendar`, approvals (referenced by `tasks.related_post_id` but not yet created)
-- Finance: invoices, expenses, time entries
-- Reports / analytics snapshots
-- Storage buckets and signed-URL policies for `logo_url` uploads
-- Audit log table
-- Med-spa specifics: `disclaimers`, `media_assets` consent flag
+1. Run `docs/migrations/002_workspace_onboarding.sql` in the Supabase SQL editor.
+2. In Supabase dashboard → Auth → URL Configuration, add redirect URLs:
+  - `{origin}/reset-password`
+  - `{origin}/app/dashboard`
+  - `{origin}/portal`
+3. Enable **Email** provider (already default) and confirm magic links are allowed.
+4. **Heads up on email rate limits**: default Supabase email service caps at 4 emails/hour during dev. For real beta with 180 Grados, configure custom SMTP (Resend) before inviting users.
 
 ## Verification after apply
 
-- Run `security--run_security_scan` to confirm RLS is enabled on every new table and no policy is missing.
-- Cross-tenant isolation smoke tests (save in `/docs/security-tests.sql` for regression):
-  - **Test 1**: User A creates workspace W1 + client C1. User B creates workspace W2 + client C2. Confirm User B cannot SELECT C1 from clients table.
-  - **Test 2**: A client_user attached to C1 cannot SELECT C2 even when C1 and C2 belong to the same workspace.
-  - **Test 3**: A collaborator on W1 cannot DELETE clients (only read).
-  - **Test 4**: A client_user can SELECT profiles of agency team_members in their workspace (needed for portal "Tu equipo en Astratta") but cannot SELECT profiles of users outside that workspace.
-- Confirm `generate_slug('180 Grados Med Spa!')` returns `'180-grados-med-spa'`.
-- Confirm a freshly inserted workspace auto-creates a `workspace_members` row with `role = owner`.
+1. **Signup smoke test**: create a brand new user → confirm `auth.users` row, `profiles` row, `workspaces` row with `trial_ends_at = now() + 14 days`, and `workspace_members` row with `role = owner` all exist.
+2. **Magic link flow**: request magic link → confirmation screen renders → email arrives → click link → land on `/app/dashboard` (or `/onboarding` if first time).
+3. **Onboarding gate**: a fresh signup must be redirected to `/onboarding` until `onboarded_at` is set.
+4. **Cross-realm redirect**: an agency-only user hitting `/portal/{slug}` → redirected to `/login`. A client-only user hitting `/app/dashboard` → redirected to `/portal/login`.
+5. **Dual-role banner**: manually insert a `client_users` row for an existing agency owner → confirm banner appears in `/app/dashboard` offering switch.
+6. **Logout**: click logout → session cleared → redirected to correct login page.
+7. **Storage RLS**: confirm a non-owner of a workspace cannot upload to `workspace-logos/{other_workspace_id}/`.
 
-Approve to apply the migration and regenerate types.
+## Out of scope / clarification
+
+- The original request mentions Next.js middleware and routes like `/dashboard`, `/clients`, `/projects`, etc. This project uses Vite + React Router with the `/app/*` prefix already wired (`/app/dashboard`, `/app/clientes`, …). **Confirmed: keep** `/app/*` **prefix** for future subdomain split.
+- No subdomain split (`app.` vs `portal.`) yet — both live under one origin with `/portal` prefix.
+- Custom SMTP via Resend — out of scope for this iteration, flagged as required before pilot launch with 180 Grados.
+
+Approve and I'll implement.

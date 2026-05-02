@@ -13,6 +13,15 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
   const { data, isLoading } = useUserContext();
   const location = useLocation();
 
+  console.log(
+    "[RequireAgencyAuth] mounted, user:",
+    session?.user?.id,
+    "loading:",
+    loading,
+    "ctxLoading:",
+    isLoading,
+  );
+
   // Backend not connected — let the team preview the shell
   if (!configured) return <>{children}</>;
 
@@ -47,7 +56,10 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
   // No memberships at all → onboarding (likely a fresh signup whose RPC
   // hasn't run yet, or a stale session). Send to login as a safe default.
   if (workspaces.length === 0) {
-    console.log("[RequireAgencyAuth] Redirecting to /login (no memberships)");
+    console.log(
+      "[RequireAgencyAuth] no agency membership, redirecting to /login. Memberships:",
+      workspaces,
+    );
     return <Navigate to="/login" replace />;
   }
 
@@ -58,6 +70,6 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
     return <Navigate to="/onboarding" replace />;
   }
 
-  console.log("[RequireAgencyAuth] Redirecting to /app/dashboard (auth + workspace OK)");
+  console.log("[RequireAgencyAuth] agency membership found, allowing render");
   return <>{children}</>;
 }

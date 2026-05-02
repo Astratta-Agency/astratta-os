@@ -6,50 +6,72 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Logo } from "@/components/brand/Logo";
 import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
+import { translateAuthError } from "@/lib/auth-errors";
 import { toast } from "@/hooks/use-toast";
 
 export default function Signup() {
   const navigate = useNavigate();
-  const [workspaceName, setWorkspaceName] = useState("");
+  const [agencyName, setAgencyName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     if (!isSupabaseConfigured) {
-      toast({
-        title: "Backend no conectado",
-        description: "Conecta Supabase para activar el registro.",
-      });
+      navigate("/onboarding");
       return;
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/app/dashboard`,
-        data: { workspace_name: workspaceName },
+        emailRedirectTo: `${window.location.origin}/onboarding`,
+        data: { full_name: fullName, workspace_name: agencyName },
       },
+    });
+
+    if (signUpError) {
+      setLoading(false);
+      setError(translateAuthError(signUpError.message));
+      return;
+    }
+
+    // If the project requires email confirmation, there is no session yet.
+    if (!data.session) {
+      setLoading(false);
+      toast({
+        title: "Revisa tu correo",
+        description: "Te enviamos un enlace para confirmar tu cuenta.",
+      });
+      navigate("/login");
+      return;
+    }
+
+    // Create the workspace via RPC (owner membership is auto-created by trigger)
+    const { error: rpcError } = await supabase.rpc("create_workspace", {
+      _name: agencyName,
+      _slug: null,
     });
     setLoading(false);
 
-    if (error) {
-      toast({ title: "Error al crear cuenta", description: error.message, variant: "destructive" });
+    if (rpcError) {
+      setError(translateAuthError(rpcError.message));
       return;
     }
-    toast({
-      title: "Cuenta creada",
-      description: "Revisa tu correo para confirmar tu dirección.",
-    });
-    navigate("/login");
+
+    navigate("/onboarding", { replace: true });
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 flex justify-center">
           <Logo />
@@ -58,18 +80,33 @@ export default function Signup() {
           <div className="flex">
             <div className="w-1.5 bg-primary" aria-hidden />
             <div className="flex-1 p-8">
-              <h1 className="font-display text-2xl font-bold text-foreground">Crea tu workspace</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Empieza a operar tu agencia desde un solo lugar.</p>
+              <h1 className="font-display text-2xl font-bold leading-tight text-foreground">
+                Empieza a operar tu agencia como un studio
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Crea tu workspace y conecta clientes, proyectos y reportes en un solo lugar.
+              </p>
 
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="workspace">Nombre de la agencia</Label>
+                  <Label htmlFor="agency">Nombre de la agencia</Label>
                   <Input
-                    id="workspace"
+                    id="agency"
                     required
-                    value={workspaceName}
-                    onChange={(e) => setWorkspaceName(e.target.value)}
-                    placeholder="Mi Agencia DFW"
+                    value={agencyName}
+                    onChange={(e) => setAgencyName(e.target.value)}
+                    placeholder="Astratta Agency"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Tu nombre</Label>
+                  <Input
+                    id="fullName"
+                    required
+                    autoComplete="name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Ana Pérez"
                   />
                 </div>
                 <div className="space-y-2">
@@ -95,6 +132,11 @@ export default function Signup() {
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
+                {error && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {error}
+                  </p>
+                )}
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Creando…" : "Crear workspace"}
                 </Button>

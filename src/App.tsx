@@ -17,6 +17,7 @@ import Onboarding from "@/pages/Onboarding";
 
 import Dashboard from "@/pages/app/Dashboard";
 import Clientes from "@/pages/app/Clientes";
+import ClienteDetalle from "@/pages/app/ClienteDetalle";
 import Proyectos from "@/pages/app/Proyectos";
 import Calendario from "@/pages/app/Calendario";
 import Tareas from "@/pages/app/Tareas";
@@ -70,6 +71,7 @@ const App = () => (
             <Route index element={<Navigate to="/app/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="clientes" element={<Clientes />} />
+            <Route path="clientes/:slug" element={<ClienteDetalle />} />
             <Route path="proyectos" element={<Proyectos />} />
             <Route path="calendario" element={<Calendario />} />
             <Route path="tareas" element={<Tareas />} />

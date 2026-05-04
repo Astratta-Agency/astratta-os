@@ -1,93 +1,101 @@
-## Build the Clients page at `/app/clientes`
+## Client detail page — /app/clientes/:slug
 
-Note: route in this project is `/app/clientes` (not `/clients`); existing sidebar already points there. Detail route will be `/app/clientes/:slug`.
+Detail view for a single client with a 7-tab shell. Resumen, Proyectos, Notas internas, and Timeline ship fully functional. Documentos, Finanzas, and Credenciales render as "Próximamente" placeholders inside the tab shell so the navigation is complete from day one.
 
-### Files to create
+### Route & guards
 
-- `src/hooks/useClients.ts` — React Query hooks: `useClients(workspaceId, filters)` and `useCreateClient()`. Fetches `clients` filtered by workspace + joins related `projects (id, type, status)` for services chips. Health score: temporary deterministic mock derived from `id` until a server function exists.
-- `src/hooks/useActiveWorkspace.ts` — small helper that returns the first workspace from `useUserContext` (single source of truth; later replaceable by a workspace switcher).
-- `src/components/clients/clients-filters.tsx` — search input, industry dropdown, status dropdown (Todos / Activos / Pausados / Churned → maps to enum `active | paused | churned`), location filter (default "Dallas-Fort Worth, TX"), and table/cards view toggle.
-- `src/components/clients/clients-table.tsx` — shadcn `Table` with sortable columns: cliente (with logo thumb + name), industria, servicios chips, health score visual bar, status badge, próximo pago (placeholder "—" for now), 3-dot actions menu, and pagination (25/50/100).
-- `src/components/clients/clients-grid.tsx` — responsive card grid (3/2/1 cols), each card shows: logo thumb (or initials fallback in client brand color), name, industry, services chips, health score, status badge. Click navigates to `/app/clientes/:slug`.
-- `src/components/clients/client-logo.tsx` — small reusable component: renders `logo_url` if present, else generates initials avatar with the client's `brand_primary_color` as background. Sizes: sm (32px), md (48px), lg (80px).
-- `src/components/clients/health-score-bar.tsx` — 0–100 horizontal bar, color shifts red→amber→green by threshold.
-- `src/components/clients/status-badge.tsx` — badge variants for `prospect | active | paused | churned`. Spanish labels: Prospecto / Activo / Pausado / Churned.
-- `src/components/clients/services-chips.tsx` — derives unique `project.type` values into compact chips with localized labels (Web Dev, Social Media, Paid Ads, Diseño, Branding, Auditoría).
-- `src/components/clients/clients-empty-state.tsx` — centered Building2 lucide icon, headline "Aún no tienes clientes", subtitle "Crea tu primer cliente para empezar a operar", CTA button "Nuevo cliente".
-- `src/components/clients/new-client-dialog.tsx` — shadcn `Dialog` with zod-validated form (react-hook-form already in repo). See full field list below.
+- Add `<Route path="clientes/:slug" element={<ClienteDetalle />} />` inside the existing `/app` shell in `src/App.tsx` (already wrapped by `RequireAgencyAuth` + `AppShell`).
+- Page resolves the client by `(workspace_id, slug)`. If not found → "Cliente no encontrado" empty state with a back link to `/app/clientes`.
 
-### New client dialog — fields (extended)
+### Database migration (single migration file)
 
-**Sección 1: Datos generales**
+New tables, all RLS-enabled with the existing `is_workspace_member` / `can_write_workspace` helper pattern, scoped through `client_in_member_workspace(client_id)`:
 
-- Nombre comercial (required, ≤120)
-- Industria (dropdown required): Med Spa / Healthcare / Wellness / Retail / Industrial / Servicios Profesionales / Restaurante / Real Estate / Otro
-- Website (optional, URL validation, ≤255)
-- Ubicación (text, default "Dallas-Fort Worth, TX", ≤120)
-- Status (dropdown, default "prospect"): Prospecto / Activo / Pausado / Churned
+- `client_notes` — `id`, `client_id`, `body_md text`, `updated_by`, `updated_at`. One row per client (upsert on save). Workspace members read/write; never exposed to portal.
+- `client_timeline_events` — `id`, `client_id`, `workspace_id`, `event_type text` (enum-like check: `client_created`, `project_created`, `project_status_changed`, `contact_added`, `contact_updated`, `note_updated`, `client_updated`, `manual`), `title`, `description`, `metadata jsonb`, `actor_id`, `occurred_at`. Workspace-only read.
+- Triggers to auto-insert timeline rows: on `clients` insert (`client_created`) and on column update of name/status/industry (`client_updated`), on `projects` insert (`project_created`) and status update (`project_status_changed`), on `client_contacts` insert (`contact_added`) and update (`contact_updated`).
+- Backfill: insert `client_created` rows for existing clients using `created_at`.
 
-**Sección 2: Brand del cliente** (opcional, expandible — colapsada por default)
+Storage and credential tables are intentionally deferred.
 
-- Logo URL (optional, can paste URL or skip; upload to storage will come in detail page)
-- Color primario (color picker, default `#5140f2`)
-- Color secundario (color picker, default `#ff7503`)
+### Hooks (new in `src/hooks/`)
 
-**Sección 3: Contacto principal**
+- `useClient(workspaceId, slug)` — fetches one client + embeds `client_contacts(*)` and `projects(id, name, type, status, start_date, end_date, budget_amount, retainer_monthly)`. Gated with `enabled: !!workspaceId && !!slug` (per the project's race-condition rule in `docs/decisions.md`).
+- `useClientNotes(clientId)` + `useSaveClientNotes(clientId)` — fetch and upsert markdown body.
+- `useClientTimeline(clientId, { eventType })` — read-only feed.
+- `useCreateTimelineEvent(clientId)` — insert manual event (used by Timeline tab "Agregar evento").
+- `useCreateProject(workspaceId, clientId)` — minimal insert (name, type, status default `planning`, optional dates/budget, optional retainer toggle) + invalidates client query.
+- `useUpdateClient(clientId)` — partial update of `clients` row + invalidates queries (used by Editar dialog).
+- `useUpsertClientContact(clientId)` — create or update contact row + invalidates query (used by Stakeholders inline add).
 
-- Nombre del contacto (required, ≤120)
-- Email (required, email validation, ≤255)
-- Teléfono (optional, ≤40)
-- Rol/cargo (optional, ≤80) — ej: CEO, Marketing Lead, Owner
+### Page composition
 
-On submit:
+`src/pages/app/ClienteDetalle.tsx` orchestrates:
 
-1. Generate slug client-side from name using `generate_slug` SQL helper via RPC OR equivalent client-side regex (lowercase, alphanumeric, hyphens, collapse duplicates)
-2. Check slug uniqueness within workspace; on collision append `-2`, `-3`, …
-3. Insert into `clients` with brand fields populated (use defaults if user skipped section 2)
-4. Insert primary contact into `client_contacts` with `is_primary = true`
-5. If contact insert fails, surface error but keep the client (acceptable trade-off without an RPC)
-6. Toast "Cliente creado" + close dialog + invalidate clients query
-7. Navigate to `/app/clientes/[new-slug]` so user lands directly on the new client's detail page (placeholder for now)  
-  
-Files to edit
+1. **Breadcrumb** above header: Clientes / {name}.
+2. **Header** — `client-logo.tsx` (lg, 80px) + name (h1 Mulish bold), industry · location row, `status-badge`, and a circular health-score dial (new component, SVG, 64px, `#5140f2` track, mocked via existing `mockHealthScore`). Right side button cluster:
+  - `Editar` → opens `edit-client-dialog.tsx` (full edit of all client fields including brand colors, logo URL, status, industry, website, location, notes-internal toggle)
+  - `Crear proyecto` → opens new-project dialog
+  - `Invitar al portal` → opens `invite-client-user-dialog.tsx` (collects email + role; sends invitation magic-link; placeholder for now if email infra not ready, but UI is live)
+  - `Ver portal cliente` → opens `/portal/:slug` in new tab; tooltip "Disponible una vez invites al cliente"
+3. `<Tabs defaultValue="resumen">` with all 7 triggers visible in declared order.
 
-- `src/pages/app/Clientes.tsx` — replace placeholder with the real page: header (h1 "Clientes" + subtitle "Gestiona todos tus clientes en un solo lugar"), right-aligned primary "Nuevo cliente" button (`#5140f2` via `bg-primary` token), filters bar, view toggle, table or grid, empty state when zero results, loading skeletons.
+### Tab contents
 
-### Data & validation details
+#### Resumen
 
-- Query: `clients` where `workspace_id = activeWorkspace.id`, filtered by status/industry/location/search (ilike on name). Embed `projects(id, type, status)`.
-- Status filter mapping in UI: "Todos" (default, no filter) → "Activos" → `active`, "Pausados" → `paused`, "Churned" → `churned`, "Prospectos" → `prospect`. Show all four filter options (the original spec's "Todos / Activos / Pausados / Churned" plus Prospectos so the user can find leads-in-progress).
-- Health score: `((parseInt(id.slice(0,8),16)) % 101)` for stable mocks until backend function exists.
-- Próximo pago: rendered as `—` placeholder (no `invoices` table yet in core schema).
-- Client-side zod schemas with trim + length caps on all text inputs (name ≤120, website ≤255, email ≤255, phone ≤40).
-- Slug: try `generate_slug(name)` SQL helper via RPC if available; on collision append `-2`, `-3`, …; checked against existing slugs in the current workspace before insert.
-- All color inputs validated as HEX `#RRGGBB`.  
+**6 KPI cards** in a responsive grid (`grid-cols-2 md:grid-cols-3 lg:grid-cols-6`):
 
+- LTV (placeholder `—`)
+- MRR (placeholder `—`)
+- Proyectos activos (real count where status ∈ `planning|in_progress`)
+- Posts este mes (placeholder `—`)
+- **Tareas pendientes** (real count from `tasks` where `client_id` matches and status ∈ `todo|doing|review`)
+- **Días como cliente** (today minus `clients.created_at`)
 
-### 3-dot actions menu (table & grid card)
+Below: two-column layout (`md:grid-cols-2`):
 
-- "Abrir ficha" → navigates to `/app/clientes/:slug`
-- "Ver portal cliente" → opens `/portal/:slug` in new tab (will 403 until portal user is invited; OK for now, button shows tooltip "Disponible una vez invites al cliente")
-- "Editar" → toast "Próximamente" (until detail page implemented)
-- "Archivar" → toast "Próximamente"
-- "Eliminar" → toast "Próximamente" (destructive action requires confirmation flow, deferred)
+- Left card "Próximas entregas" — lists project rows with `end_date` in the next 60 days.
+- Right card "Stakeholders" — lists contacts (name, role, email, phone) with the primary contact pinned and badged. Inline button "Agregar contacto" opens a small dialog using `useUpsertClientContact`.
+
+**Proyectos** — Table of projects (name, type chip via existing `services-chips` label map, status badge, start, deadline, budget formatted USD, retainer indicator if `retainer_monthly = true`). Empty state "Aún no hay proyectos" + "Nuevo proyecto" CTA. Row click → toast "Detalle de proyecto próximamente". Header button "Nuevo proyecto" opens `new-project-dialog.tsx` (zod-validated: name ≤120, type required, optional dates with end ≥ start, optional budget ≥ 0, optional `retainer_monthly` switch with monthly amount when enabled). On submit: insert with `client_id` and `workspace_id` pre-filled.
+
+**Documentos** — Placeholder card per section (Contratos, Propuestas, Recibos, Briefs, Brand Assets) with disabled "Subir" button and "Próximamente — almacenamiento de archivos en la siguiente iteración".
+
+**Finanzas** — placeholder card "Próximamente — requiere tabla de facturas".
+
+**Credenciales** — placeholder card "Próximamente — bóveda cifrada con pgsodium en construcción. No subas credenciales reales aún."
+
+**Notas internas** — Markdown textarea (`Textarea`, monospace, min 320px tall) with live preview pane (`react-markdown` + `remark-gfm`) toggle. Debounced autosave (1.2s) calls `useSaveClientNotes`; saved-state indicator ("Guardado · hace Xs"). Helper line: "Solo visible para tu equipo, nunca para el cliente." Soporta básico: `# heading`, `**bold**`, `- bullet`, `[link](url)`, tablas vía `remark-gfm`.
+
+**Timeline** — Vertical feed of `client_timeline_events` ordered desc; each item shows icon by `event_type`, title, description, relative time, and actor name (joined from `profiles`). Filter `Select` at top: Todos / Proyectos / Contactos / Notas / Cliente / Manual. Header button "Agregar evento" opens a small dialog (title, description, date) that creates a `manual` event via `useCreateTimelineEvent` — útil para registrar calls, reuniones, decisiones que no entran por triggers.
+
+### New components (`src/components/clients/`)
+
+- `health-score-dial.tsx` — SVG circular progress, brand-colored.
+- `client-detail-header.tsx`
+- `kpi-card.tsx` (small reusable; used in Resumen and possibly Dashboard later)
+- `upcoming-deliveries.tsx`, `stakeholders-list.tsx`, `add-contact-dialog.tsx`
+- `client-projects-tab.tsx` + `new-project-dialog.tsx`
+- `client-notes-tab.tsx`
+- `client-timeline-tab.tsx` + `add-manual-event-dialog.tsx`
+- `edit-client-dialog.tsx`
+- `invite-client-user-dialog.tsx` (UI only; magic-link send hooked to `supabase.auth.admin.inviteUserByEmail` if available, otherwise inserts into `client_users` as `invited` and surfaces a manual-share link)
+- `tab-coming-soon.tsx` (shared placeholder card used by Documentos/Finanzas/Credenciales)
+
+### Dependencies
+
+Add `react-markdown` and `remark-gfm` for the notes preview. Add `date-fns` if not already present (for "hace Xs" relative time and 60-day deadline filtering). No other runtime deps.
 
 ### Design tokens
 
-All colors via existing semantic tokens (`bg-primary`, `text-foreground`, `text-muted-foreground`, `border-border`). Mulish via `font-display` / `font-sans` already configured. No raw hex in components.  
-  
-Mobile responsiveness
+All colors via existing semantic tokens; primary `#5140f2` only via `bg-primary` / `text-primary`. Mulish via `font-display`. Mobile: tabs become horizontal scroll; KPIs collapse to 2 cols; header buttons collapse to icon group with overflow menu (3-dot) for secondary actions (`Invitar al portal`, `Ver portal cliente`).
 
-- Filters bar collapses to a single "Filtros" trigger that opens a Sheet drawer below md breakpoint
-- Table view auto-switches to grid view on mobile (table is unusable < 768px)
-- "Nuevo cliente" button collapses to icon-only (`+`) on mobile
+### Out of scope (this iteration)
 
-### Out of scope
-
-- Detail page `/app/clientes/:slug` (will be the next iteration immediately after this).
-- Real health-score calculation (server function) and `próximo pago` (requires invoices table).
-- Logo upload to Storage (will be on detail page; for now URL paste only).
-- Inline status change in the table (clicking the badge does nothing for now).
-- Bulk actions (multi-select + bulk archive). Defer until 5+ clients in the system.
+- Real LTV/MRR/posts (no invoices/posts tables).
+- Documentos (Storage bucket + RLS), Finanzas (invoices), Credenciales (encrypted vault).
+- Project detail page.
+- Real magic-link invitation email — if Supabase Admin API not available client-side, the `invite-client-user-dialog` falls back to creating a row in `client_users` with status=`invited` and showing a "Send manually" message.
 
 Approve and I'll implement.

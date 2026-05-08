@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
-import { ArrowLeft, ExternalLink, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, ExternalLink, MoreVertical, Pencil, Plus, UserPlus } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +24,13 @@ import { ClientProjectsTab } from "@/components/clients/client-projects-tab";
 import { ClientNotesTab } from "@/components/clients/client-notes-tab";
 import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
+import { InviteClientUserDialog } from "@/components/clients/invite-client-user-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 
 export default function ClienteDetalle() {
@@ -33,6 +40,7 @@ export default function ClienteDetalle() {
   const { data: client, isLoading } = useClient(workspace?.id, slug);
   const { data: pendingTasks } = useClientPendingTasksCount(client?.id);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   if (wsLoading || isLoading) {
     return (
@@ -108,30 +116,60 @@ export default function ClienteDetalle() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={() => toast({ title: "Editar próximamente" })}>
-            <Pencil className="h-4 w-4" /> Editar
-          </Button>
-          <Button onClick={() => setNewProjectOpen(true)}>
-            <Plus className="h-4 w-4" /> Crear proyecto
-          </Button>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  onClick={() => window.open(`/portal/${client.slug}`, "_blank")}
-                >
-                  <ExternalLink className="h-4 w-4" /> Ver portal cliente
+        <div className="flex items-center gap-2">
+          {/* Desktop */}
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
+            <Button variant="outline" onClick={() => toast({ title: "Editar próximamente" })}>
+              <Pencil className="h-4 w-4" /> Editar
+            </Button>
+            <Button onClick={() => setNewProjectOpen(true)}>
+              <Plus className="h-4 w-4" /> Crear proyecto
+            </Button>
+            <Button variant="outline" onClick={() => setInviteOpen(true)}>
+              <UserPlus className="h-4 w-4" /> Invitar al portal
+            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(`/portal/${client.slug}`, "_blank")}
+                  >
+                    <ExternalLink className="h-4 w-4" /> Ver portal cliente
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Disponible una vez invites al cliente</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
+          {/* Mobile */}
+          <div className="flex items-center gap-2 md:hidden">
+            <Button variant="outline" size="sm" onClick={() => toast({ title: "Editar próximamente" })}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button size="sm" onClick={() => setNewProjectOpen(true)}>
+              <Plus className="h-4 w-4" /> Proyecto
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Disponible una vez invites al cliente
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setInviteOpen(true)}>
+                  <UserPlus className="h-4 w-4" /> Invitar al portal
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open(`/portal/${client.slug}`, "_blank")}>
+                  <ExternalLink className="h-4 w-4" /> Ver portal cliente
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
+
 
       {/* Tabs */}
       <Tabs defaultValue="resumen" className="space-y-6">
@@ -157,7 +195,7 @@ export default function ClienteDetalle() {
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <UpcomingDeliveries projects={client.projects} />
-            <StakeholdersList contacts={client.client_contacts} />
+            <StakeholdersList contacts={client.client_contacts} clientId={client.id} />
           </div>
         </TabsContent>
 
@@ -210,6 +248,13 @@ export default function ClienteDetalle() {
         onOpenChange={setNewProjectOpen}
         workspaceId={client.workspace_id}
         clientId={client.id}
+      />
+      <InviteClientUserDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        clientId={client.id}
+        clientSlug={client.slug}
+        clientName={client.name}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Phone, Star } from "lucide-react";
 import type { ClientContact, ClientProject } from "@/hooks/useClientDetail";
+import { PendingInvitesList } from "@/components/clients/pending-invites-list";
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
@@ -47,7 +48,7 @@ export function UpcomingDeliveries({ projects }: { projects: ClientProject[] }) 
   );
 }
 
-export function StakeholdersList({ contacts }: { contacts: ClientContact[] }) {
+export function StakeholdersList({ contacts, clientId }: { contacts: ClientContact[]; clientId?: string }) {
   const sorted = [...contacts].sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
   return (
     <Card>
@@ -88,6 +89,7 @@ export function StakeholdersList({ contacts }: { contacts: ClientContact[] }) {
             ))}
           </ul>
         )}
+        {clientId && <PendingInvitesList clientId={clientId} />}
       </CardContent>
     </Card>
   );

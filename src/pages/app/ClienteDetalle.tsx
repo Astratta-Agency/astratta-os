@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
-import { ArrowLeft, ExternalLink, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, ExternalLink, MoreVertical, Pencil, Plus, UserPlus } from "lucide-react";
 import { differenceInDays } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +24,13 @@ import { ClientProjectsTab } from "@/components/clients/client-projects-tab";
 import { ClientNotesTab } from "@/components/clients/client-notes-tab";
 import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
+import { InviteClientUserDialog } from "@/components/clients/invite-client-user-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 
 export default function ClienteDetalle() {

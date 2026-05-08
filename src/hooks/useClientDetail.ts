@@ -212,6 +212,91 @@ export function useCreateProject(workspaceId: string | undefined, clientId: stri
   });
 }
 
+// ---------------- Portal invites ----------------
+export type ClientUserRole = "client_admin" | "client_viewer";
+
+export type PendingInvite = {
+  id: string;
+  invited_email: string;
+  role: ClientUserRole;
+  invited_at: string | null;
+};
+
+export function useInviteClientUser(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      email: string;
+      role: ClientUserRole;
+      welcome_message?: string;
+    }): Promise<{ emailed: boolean }> => {
+      if (!clientId) throw new Error("clientId requerido");
+      const { data: userRes } = await supabase.auth.getUser();
+      const { error } = await (supabase as any).from("client_users").insert({
+        client_id: clientId,
+        invited_email: input.email.toLowerCase().trim(),
+        role: input.role,
+        welcome_message: input.welcome_message || null,
+        status: "invited",
+        invited_by: userRes.user?.id ?? null,
+        invited_at: new Date().toISOString(),
+      });
+      if (error) throw error;
+
+      // Try admin API (will fail with anon key — fallback path is the default).
+      let emailed = false;
+      try {
+        const adminApi = (supabase.auth as any)?.admin;
+        if (adminApi?.inviteUserByEmail) {
+          const { error: invErr } = await adminApi.inviteUserByEmail(input.email, {
+            redirectTo: `${window.location.origin}/portal/login`,
+          });
+          if (!invErr) emailed = true;
+        }
+      } catch {
+        // fallback handled by caller
+      }
+      return { emailed };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client-invites", clientId] });
+    },
+  });
+}
+
+export function usePendingInvites(clientId: string | undefined) {
+  return useQuery<PendingInvite[]>({
+    queryKey: ["client-invites", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("client_users")
+        .select("id, invited_email, role, invited_at")
+        .eq("client_id", clientId)
+        .eq("status", "invited")
+        .order("invited_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as PendingInvite[];
+    },
+  });
+}
+
+export function useRevokeInvite(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (inviteId: string) => {
+      const { error } = await (supabase as any)
+        .from("client_users")
+        .update({ status: "revoked", revoked_at: new Date().toISOString() })
+        .eq("id", inviteId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client-invites", clientId] });
+    },
+  });
+}
+
 // ---------------- Tasks (Resumen KPI) ----------------
 export function useClientPendingTasksCount(clientId: string | undefined) {
   return useQuery<number>({

@@ -62,7 +62,11 @@ export function InviteClientUserDialog({ open, onOpenChange, clientId, clientNam
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const res = await invite.mutateAsync(values);
+      const res = await invite.mutateAsync({
+        email: values.email,
+        role: values.role,
+        welcome_message: values.welcome_message,
+      });
       if (res.emailed) {
         toast({ title: `Invitación enviada a ${values.email}` });
         handleClose(false);

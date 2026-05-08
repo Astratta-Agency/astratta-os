@@ -89,6 +89,7 @@ export function StakeholdersList({ contacts, clientId }: { contacts: ClientConta
             ))}
           </ul>
         )}
+        {clientId && <PendingInvitesList clientId={clientId} />}
       </CardContent>
     </Card>
   );

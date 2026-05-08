@@ -1,101 +1,104 @@
-## Client detail page — /app/clientes/:slug
+## Add "Invitar al portal" button to client detail header
 
-Detail view for a single client with a 7-tab shell. Resumen, Proyectos, Notas internas, and Timeline ship fully functional. Documentos, Finanzas, and Credenciales render as "Próximamente" placeholders inside the tab shell so the navigation is complete from day one.
+Adds the missing portal invitation flow specified in the original plan but skipped in the previous build.
 
-### Route & guards
+### Schema change (new migration: `docs/migrations/004_client_user_invites.sql`)
 
-- Add `<Route path="clientes/:slug" element={<ClienteDetalle />} />` inside the existing `/app` shell in `src/App.tsx` (already wrapped by `RequireAgencyAuth` + `AppShell`).
-- Page resolves the client by `(workspace_id, slug)`. If not found → "Cliente no encontrado" empty state with a back link to `/app/clientes`.
+The current `client_users` table requires `user_id` (FK to `auth.users`) and has no invitation state. To support `status='invited'` inserts before the invitee has an account, the migration:
 
-### Database migration (single migration file)
+- Makes `client_users.user_id` nullable.
+- Adds columns: `status text not null default 'active'` with check `in ('invited','active','revoked')`, `invited_email text`, `invited_by uuid references auth.users(id)`, `welcome_message text`, `invited_at timestamptz`, `revoked_at timestamptz`, `accepted_at timestamptz`.
+- Adds a partial unique index on `(client_id, lower(invited_email))` where `status='invited'` to prevent duplicate pending invites.
+- Updates the existing RLS check so workspace members can insert invites where `user_id is null` and `invited_email is not null`. The existing `client_users_write_member` policy already scopes by client → workspace membership; adjust the check expression to allow null `user_id` only when `status = 'invited'` and `invited_email IS NOT NULL`.
+- Backfills `status='active'` for existing rows where `user_id IS NOT NULL`.
 
-New tables, all RLS-enabled with the existing `is_workspace_member` / `can_write_workspace` helper pattern, scoped through `client_in_member_workspace(client_id)`:
+### New component: `src/components/clients/invite-client-user-dialog.tsx`
 
-- `client_notes` — `id`, `client_id`, `body_md text`, `updated_by`, `updated_at`. One row per client (upsert on save). Workspace members read/write; never exposed to portal.
-- `client_timeline_events` — `id`, `client_id`, `workspace_id`, `event_type text` (enum-like check: `client_created`, `project_created`, `project_status_changed`, `contact_added`, `contact_updated`, `note_updated`, `client_updated`, `manual`), `title`, `description`, `metadata jsonb`, `actor_id`, `occurred_at`. Workspace-only read.
-- Triggers to auto-insert timeline rows: on `clients` insert (`client_created`) and on column update of name/status/industry (`client_updated`), on `projects` insert (`project_created`) and status update (`project_status_changed`), on `client_contacts` insert (`contact_added`) and update (`contact_updated`).
-- Backfill: insert `client_created` rows for existing clients using `created_at`.
+- Props: `open`, `onOpenChange`, `clientId`, `clientSlug`, `clientName`.
+- Form (react-hook-form + zod): 
+  - `email` — required, `.email()` validation, max 255 chars.
+  - `role` — `Select` with `client_admin` / `client_viewer` (default `client_viewer`). Helper text below: "Admin puede aprobar contenido y editar datos. Viewer solo lectura."
+  - `welcome_message` — optional `Textarea`, max 500 chars, placeholder: "Ej: Hola Juan, te invitamos al portal donde aprobarás contenido y verás reportes mensuales."
+- Submit handler:
+  1. Insert into `client_users` with `{ client_id, invited_email, role, welcome_message, status: 'invited', invited_by: auth.uid(), invited_at: now() }`. Handle 23505 (duplicate invite) with a friendly toast: "Ya existe una invitación pendiente para ese correo".
+  2. Try `supabase.auth.admin.inviteUserByEmail(email, { redirectTo: <portal URL> })`. The admin API is not available with the anon key in the browser, so this call will throw — wrap in try/catch and treat any failure as the manual fallback.
+  3. **Fallback path** (this is the default path until we have an Edge Function for invites): keep the dialog open, swap the form for a "Invitación creada" success state showing: 
+    - Green check icon + headline "Invitación creada"
+    - Subtle helper: "El envío automático de correo estará disponible pronto. Por ahora, comparte este enlace con el cliente:"
+    - Read-only input with the URL `${window.location.origin}/portal/login` (NOT the slug URL — clients log in to the portal root which then redirects them to their client based on `client_users` matching their email after they accept)
+    - "Copiar enlace" button (lucide `Copy` icon, copies to clipboard, toast "Enlace copiado")
+    - "Copiar mensaje completo" button — copies a pre-formatted message ready to paste into WhatsApp/email:
 
-Storage and credential tables are intentionally deferred.
+```text
+Hola {clientName},
+       
+       Te invitamos al portal de Astratta Agency donde podrás aprobar contenido, ver reportes y acceder a tus documentos.
+       
+       Accede en: {portalUrl}
+       Ingresa con este correo: {invitedEmail}
+       
+       {welcomeMessage if provided}
+```
 
-### Hooks (new in `src/hooks/`)
+```text
+ - "Cerrar" button to dismiss
+```
 
-- `useClient(workspaceId, slug)` — fetches one client + embeds `client_contacts(*)` and `projects(id, name, type, status, start_date, end_date, budget_amount, retainer_monthly)`. Gated with `enabled: !!workspaceId && !!slug` (per the project's race-condition rule in `docs/decisions.md`).
-- `useClientNotes(clientId)` + `useSaveClientNotes(clientId)` — fetch and upsert markdown body.
-- `useClientTimeline(clientId, { eventType })` — read-only feed.
-- `useCreateTimelineEvent(clientId)` — insert manual event (used by Timeline tab "Agregar evento").
-- `useCreateProject(workspaceId, clientId)` — minimal insert (name, type, status default `planning`, optional dates/budget, optional retainer toggle) + invalidates client query.
-- `useUpdateClient(clientId)` — partial update of `clients` row + invalidates queries (used by Editar dialog).
-- `useUpsertClientContact(clientId)` — create or update contact row + invalidates query (used by Stakeholders inline add).
+- States: `isSubmitting` disables the submit button and shows a spinner. Success toast `"Invitación enviada a {email}"` only fires if step 2 succeeded (rare with anon key); otherwise no toast — the dialog itself shows the success state.
+- Reset form on close.
 
-### Page composition
+### Header integration (`src/pages/app/ClienteDetalle.tsx`)
 
-`src/pages/app/ClienteDetalle.tsx` orchestrates:
+Insert the new button **between** "Crear proyecto" and "Ver portal cliente":
 
-1. **Breadcrumb** above header: Clientes / {name}.
-2. **Header** — `client-logo.tsx` (lg, 80px) + name (h1 Mulish bold), industry · location row, `status-badge`, and a circular health-score dial (new component, SVG, 64px, `#5140f2` track, mocked via existing `mockHealthScore`). Right side button cluster:
-  - `Editar` → opens `edit-client-dialog.tsx` (full edit of all client fields including brand colors, logo URL, status, industry, website, location, notes-internal toggle)
-  - `Crear proyecto` → opens new-project dialog
-  - `Invitar al portal` → opens `invite-client-user-dialog.tsx` (collects email + role; sends invitation magic-link; placeholder for now if email infra not ready, but UI is live)
-  - `Ver portal cliente` → opens `/portal/:slug` in new tab; tooltip "Disponible una vez invites al cliente"
-3. `<Tabs defaultValue="resumen">` with all 7 triggers visible in declared order.
+```text
+[Editar] [Crear proyecto] [Invitar al portal] [Ver portal cliente]
+```
 
-### Tab contents
+- Desktop (`hidden md:flex`): full button cluster as today, with the new `Button` using `UserPlus` lucide icon and label "Invitar al portal".
+- Mobile (`flex md:hidden`): primary actions remain inline (`Editar`, `Crear proyecto`); secondary actions (`Invitar al portal`, `Ver portal cliente`) collapse into a `DropdownMenu` triggered by a `MoreVertical` icon button. Each dropdown item carries its own icon.
+- New dialog state: `const [inviteOpen, setInviteOpen] = useState(false);`
+- Render `<InviteClientUserDialog open={inviteOpen} onOpenChange={setInviteOpen} clientId={client.id} clientSlug={client.slug} clientName={client.name} />` next to the existing `NewProjectDialog`.
 
-#### Resumen
+### Hook: `useInviteClientUser(clientId)`
 
-**6 KPI cards** in a responsive grid (`grid-cols-2 md:grid-cols-3 lg:grid-cols-6`):
+Co-located in `src/hooks/useClientDetail.ts` to match existing patterns. Wraps the insert + admin invite attempt + query invalidation for `["client", workspaceId, slug]` and a new `["client-invites", clientId]` query.
 
-- LTV (placeholder `—`)
-- MRR (placeholder `—`)
-- Proyectos activos (real count where status ∈ `planning|in_progress`)
-- Posts este mes (placeholder `—`)
-- **Tareas pendientes** (real count from `tasks` where `client_id` matches and status ∈ `todo|doing|review`)
-- **Días como cliente** (today minus `clients.created_at`)
+### New hook: `usePendingInvites(clientId)`
 
-Below: two-column layout (`md:grid-cols-2`):
+Returns rows from `client_users` where `client_id = clientId AND status = 'invited'`, with: `id`, `invited_email`, `role`, `invited_at`, `invited_by` (joined to profiles for `full_name`).
 
-- Left card "Próximas entregas" — lists project rows with `end_date` in the next 60 days.
-- Right card "Stakeholders" — lists contacts (name, role, email, phone) with the primary contact pinned and badged. Inline button "Agregar contacto" opens a small dialog using `useUpsertClientContact`.
+### Stakeholders tab update — show pending invites
 
-**Proyectos** — Table of projects (name, type chip via existing `services-chips` label map, status badge, start, deadline, budget formatted USD, retainer indicator if `retainer_monthly = true`). Empty state "Aún no hay proyectos" + "Nuevo proyecto" CTA. Row click → toast "Detalle de proyecto próximamente". Header button "Nuevo proyecto" opens `new-project-dialog.tsx` (zod-validated: name ≤120, type required, optional dates with end ≥ start, optional budget ≥ 0, optional `retainer_monthly` switch with monthly amount when enabled). On submit: insert with `client_id` and `workspace_id` pre-filled.
+In `src/components/clients/stakeholders-list.tsx` (or wherever the Resumen Stakeholders card lives), add a small section below the contacts list:
 
-**Documentos** — Placeholder card per section (Contratos, Propuestas, Recibos, Briefs, Brand Assets) with disabled "Subir" button and "Próximamente — almacenamiento de archivos en la siguiente iteración".
+```
+─── Invitaciones pendientes ───
+[email]                    Admin · hace 2 días    [Revocar] [Copiar enlace]
+[email]                    Viewer · hace 1 hora   [Revocar] [Copiar enlace]
+```
 
-**Finanzas** — placeholder card "Próximamente — requiere tabla de facturas".
+- Each row: invited_email, role badge, relative time, two actions:
+  - "Revocar" → updates status to `revoked` + sets `revoked_at = now()`. Toast "Invitación revocada".
+  - "Copiar enlace" → copies the same portal URL + message used in the dialog success state.
+- Section is hidden if no pending invites exist.
+- Header: "Invitaciones pendientes" with count badge.
 
-**Credenciales** — placeholder card "Próximamente — bóveda cifrada con pgsodium en construcción. No subas credenciales reales aún."
+### Files
 
-**Notas internas** — Markdown textarea (`Textarea`, monospace, min 320px tall) with live preview pane (`react-markdown` + `remark-gfm`) toggle. Debounced autosave (1.2s) calls `useSaveClientNotes`; saved-state indicator ("Guardado · hace Xs"). Helper line: "Solo visible para tu equipo, nunca para el cliente." Soporta básico: `# heading`, `**bold**`, `- bullet`, `[link](url)`, tablas vía `remark-gfm`.
+- Created: 
+  - `docs/migrations/004_client_user_invites.sql`
+  - `src/components/clients/invite-client-user-dialog.tsx`
+  - `src/components/clients/pending-invites-list.tsx`
+- Edited: 
+  - `src/pages/app/ClienteDetalle.tsx`
+  - `src/hooks/useClientDetail.ts`
+  - `src/components/clients/stakeholders-list.tsx` (or equivalent in Resumen tab) to render `<PendingInvitesList />` below contacts
 
-**Timeline** — Vertical feed of `client_timeline_events` ordered desc; each item shows icon by `event_type`, title, description, relative time, and actor name (joined from `profiles`). Filter `Select` at top: Todos / Proyectos / Contactos / Notas / Cliente / Manual. Header button "Agregar evento" opens a small dialog (title, description, date) that creates a `manual` event via `useCreateTimelineEvent` — útil para registrar calls, reuniones, decisiones que no entran por triggers.
+### Out of scope
 
-### New components (`src/components/clients/`)
+- Real magic-link email delivery (requires server-side admin key or a Supabase Edge Function — can be a follow-up; structure already supports it).
+- Resend invite action (UI placeholder OK for next iteration).
+- Listing invites globally (per-client surface only for now).
 
-- `health-score-dial.tsx` — SVG circular progress, brand-colored.
-- `client-detail-header.tsx`
-- `kpi-card.tsx` (small reusable; used in Resumen and possibly Dashboard later)
-- `upcoming-deliveries.tsx`, `stakeholders-list.tsx`, `add-contact-dialog.tsx`
-- `client-projects-tab.tsx` + `new-project-dialog.tsx`
-- `client-notes-tab.tsx`
-- `client-timeline-tab.tsx` + `add-manual-event-dialog.tsx`
-- `edit-client-dialog.tsx`
-- `invite-client-user-dialog.tsx` (UI only; magic-link send hooked to `supabase.auth.admin.inviteUserByEmail` if available, otherwise inserts into `client_users` as `invited` and surfaces a manual-share link)
-- `tab-coming-soon.tsx` (shared placeholder card used by Documentos/Finanzas/Credenciales)
-
-### Dependencies
-
-Add `react-markdown` and `remark-gfm` for the notes preview. Add `date-fns` if not already present (for "hace Xs" relative time and 60-day deadline filtering). No other runtime deps.
-
-### Design tokens
-
-All colors via existing semantic tokens; primary `#5140f2` only via `bg-primary` / `text-primary`. Mulish via `font-display`. Mobile: tabs become horizontal scroll; KPIs collapse to 2 cols; header buttons collapse to icon group with overflow menu (3-dot) for secondary actions (`Invitar al portal`, `Ver portal cliente`).
-
-### Out of scope (this iteration)
-
-- Real LTV/MRR/posts (no invoices/posts tables).
-- Documentos (Storage bucket + RLS), Finanzas (invoices), Credenciales (encrypted vault).
-- Project detail page.
-- Real magic-link invitation email — if Supabase Admin API not available client-side, the `invite-client-user-dialog` falls back to creating a row in `client_users` with status=`invited` and showing a "Send manually" message.
-
-Approve and I'll implement.
+You'll need to apply `004_client_user_invites.sql` in the Supabase SQL Editor after this lands.

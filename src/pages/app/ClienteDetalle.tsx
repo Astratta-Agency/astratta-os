@@ -249,6 +249,13 @@ export default function ClienteDetalle() {
         workspaceId={client.workspace_id}
         clientId={client.id}
       />
+      <InviteClientUserDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        clientId={client.id}
+        clientSlug={client.slug}
+        clientName={client.name}
+      />
     </div>
   );
 }

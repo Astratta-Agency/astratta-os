@@ -16,6 +16,7 @@ const BodySchema = z.object({
   post_id: z.string().uuid(),
   source: z.enum(["manual", "trigger"]).default("manual"),
   force: z.boolean().default(false),
+  message: z.string().max(300).nullable().optional(),
 });
 
 const json = (body: unknown, status = 200) =>
@@ -143,9 +144,9 @@ Deno.serve(async (req) => {
     if (!parsed.success) {
       return json({ error: "invalid_body", details: parsed.error.flatten() }, 400);
     }
-    const { post_id, source, force } = parsed.data;
+    const { post_id, source, force, message } = parsed.data;
 
-    // --- Auth: either internal-secret or JWT ---
+    // --- Auth: either internal-secret or JWT (verify in code per signing-keys system) ---
     let callerUserId: string | null = null;
     if (source === "trigger") {
       const provided = req.headers.get("x-internal-secret") ?? "";
@@ -158,8 +159,12 @@ Deno.serve(async (req) => {
       const authClient = createClient(supabaseUrl, anonKey, {
         global: { headers: { Authorization: authHeader } },
       });
-      const { data: claimsData, error: claimsErr } = await authClient.auth.getClaims();
-      if (claimsErr || !claimsData?.claims?.sub) return json({ error: "invalid_token" }, 401);
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: claimsErr } = await authClient.auth.getClaims(token);
+      if (claimsErr || !claimsData?.claims?.sub) {
+        console.error("[send-content-approval-request] invalid_token", claimsErr);
+        return json({ error: "invalid_token" }, 401);
+      }
       callerUserId = claimsData.claims.sub as string;
     }
 
@@ -173,9 +178,6 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (postErr) return json({ error: "post_lookup_failed", detail: postErr.message }, 500);
     if (!post) return json({ error: "post_not_found" }, 404);
-    if (post.status !== "pending_approval") {
-      return json({ emailed: false, error: "post_not_pending_approval", status: post.status }, 200);
-    }
 
     // --- Manual source: enforce workspace membership ---
     if (source === "manual" && callerUserId) {
@@ -186,6 +188,30 @@ Deno.serve(async (req) => {
         .eq("user_id", callerUserId)
         .maybeSingle();
       if (!membership) return json({ error: "forbidden" }, 403);
+    }
+
+    // --- Status transition: move into pending_approval atomically with send ---
+    const TRANSITIONABLE = new Set([
+      "draft",
+      "pending_internal_review",
+      "rejected",
+      "changes_requested",
+    ]);
+    if (post.status !== "pending_approval") {
+      if (!TRANSITIONABLE.has(post.status)) {
+        return json(
+          { emailed: false, error: "invalid_status_transition", status: post.status },
+          200,
+        );
+      }
+      const { error: transErr } = await admin
+        .from("social_posts")
+        .update({ status: "pending_approval" })
+        .eq("id", post.id);
+      if (transErr) {
+        return json({ error: "status_transition_failed", detail: transErr.message }, 500);
+      }
+      post.status = "pending_approval";
     }
 
     // --- Load client ---
@@ -328,6 +354,7 @@ Deno.serve(async (req) => {
       metadata: {
         source,
         force,
+        message: message ?? null,
         scheduled_for: post.scheduled_for,
         brand_color_used: primaryColor,
         sent,

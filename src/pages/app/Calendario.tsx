@@ -23,7 +23,6 @@ import {
   useSocialPosts,
   useUpdatePostSchedule,
   useUpdatePostStatus,
-  type SocialPostRow,
 } from "@/hooks/useSocialPosts";
 import type { Channel, PostStatus } from "@/lib/post-states";
 

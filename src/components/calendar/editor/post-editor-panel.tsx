@@ -470,6 +470,27 @@ export function PostEditorPanel({
         />
       )}
 
+      {post && meta && (
+        <SubmitForApprovalDialog
+          open={submitOpen}
+          onOpenChange={setSubmitOpen}
+          postId={post.id}
+          clientId={post.client_id}
+          clientSlug={clientSlug}
+          clientName={clientName}
+          isHealthcare={isHealthcare}
+          post={{
+            channels: meta.channels,
+            scheduled_for: meta.scheduled_for,
+            media_urls: meta.media_urls,
+            status: post.status,
+          }}
+          variants={post.variants}
+        />
+      )}
+
+
+
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
         <AlertDialogContent>

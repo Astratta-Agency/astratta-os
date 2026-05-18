@@ -327,7 +327,14 @@ export function PostEditorPanel({
               <div className="ml-auto flex items-center gap-1">
                 <PostSubmitForApprovalButton
                   status={post.status}
-                  onClick={() => setSubmitOpen(true)}
+                  onClick={async () => {
+                    try {
+                      await flush();
+                    } catch {
+                      /* surfaced by save status */
+                    }
+                    setSubmitOpen(true);
+                  }}
                 />
                 <StateChangeDropdown status={post.status} onChange={handleStatusChange} />
                 <Button size="sm" variant="ghost" onClick={() => toast("Duplicar próximamente")}>

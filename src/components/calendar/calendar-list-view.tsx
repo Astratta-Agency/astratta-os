@@ -10,24 +10,42 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Download } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { ChannelIcon } from "./channel-icon";
 import { PillarBadge } from "./pillar-badge";
 import { StateBadgePost } from "./state-badge-post";
 import type { SocialPostRow, ContentPillar } from "@/hooks/useSocialPosts";
+import { POST_STATE_META } from "@/lib/post-states";
+import { exportToCsv } from "@/lib/csv-export";
 
 interface Props {
   posts: SocialPostRow[];
   pillarMap: Map<string, ContentPillar>;
   onPostClick: (p: SocialPostRow) => void;
+  clientName?: string;
+  rangeFrom?: Date;
+  rangeTo?: Date;
 }
 
 const PAGE_SIZES = [25, 50, 100];
 
-export function CalendarListView({ posts, pillarMap, onPostClick }: Props) {
+export function CalendarListView({ posts, pillarMap, onPostClick, clientName, rangeFrom, rangeTo }: Props) {
   const [asc, setAsc] = useState(true);
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const sorted = useMemo(() => {
     const arr = [...posts];
@@ -41,6 +59,57 @@ export function CalendarListView({ posts, pillarMap, onPostClick }: Props) {
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const slice = sorted.slice(page * pageSize, (page + 1) * pageSize);
+
+  const doExport = () => {
+    const fmtDT = (v: string | null) =>
+      v ? format(new Date(v), "yyyy-MM-dd HH:mm", { locale: es }) : "";
+    const filename = `astratta-calendar-${clientName ?? "cliente"}-${
+      rangeFrom ? format(rangeFrom, "yyyy-MM-dd") : ""
+    }-to-${rangeTo ? format(rangeTo, "yyyy-MM-dd") : ""}.csv`;
+
+    exportToCsv(filename, sorted, [
+      { key: "scheduled_for", header: "Fecha programada", format: (v) => fmtDT(v) },
+      { key: "client", header: "Cliente", format: () => clientName ?? "" },
+      { key: "channels", header: "Canales", format: (v) => (Array.isArray(v) && v.length ? v.join(" | ") : "") },
+      { key: "type", header: "Formato", format: (v) => v ?? "" },
+      {
+        key: "content_pillar",
+        header: "Pilar",
+        format: (v) => (v ? (pillarMap.get(v)?.name ?? v) : "Sin pilar"),
+      },
+      {
+        key: "status",
+        header: "Estado",
+        format: (v) => POST_STATE_META[v as keyof typeof POST_STATE_META]?.label ?? v ?? "",
+      },
+      { key: "caption", header: "Caption", format: (v) => v ?? "" },
+      { key: "hashtags", header: "Hashtags", format: (v) => v ?? "" },
+      { key: "media_urls", header: "Media URLs", format: (v) => (Array.isArray(v) && v.length ? v.join(" | ") : "") },
+      { key: "url", header: "URL del post", format: () => "" },
+      { key: "created_by", header: "Creado por", format: () => "" },
+      { key: "created_at", header: "Creado en", format: (v) => fmtDT(v) },
+    ]);
+    toast.success(`Exportado — ${sorted.length} publicaciones`);
+  };
+
+  const handleExportClick = () => {
+    if (sorted.length > 200) setConfirmOpen(true);
+    else doExport();
+  };
+
+  const exportDisabled = sorted.length === 0;
+  const exportButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleExportClick}
+      disabled={exportDisabled}
+      aria-label="Exportar publicaciones a CSV"
+    >
+      <Download className="h-4 w-4" />
+      Exportar
+    </Button>
+  );
 
   return (
     <div className="space-y-3">
@@ -138,8 +207,42 @@ export function CalendarListView({ posts, pillarMap, onPostClick }: Props) {
           >
             Siguiente
           </Button>
+          {exportDisabled ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>{exportButton}</span>
+                </TooltipTrigger>
+                <TooltipContent>No hay publicaciones para exportar con los filtros actuales</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            exportButton
+          )}
         </div>
       </div>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Exportar {sorted.length} publicaciones</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esto generará un archivo CSV con todas las publicaciones que coinciden con tus filtros actuales. ¿Continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmOpen(false);
+                doExport();
+              }}
+            >
+              Exportar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -101,15 +101,18 @@ export function useUploadAsset() {
         clientId: input.clientId,
         subfolder: input.subfolder,
       });
-      if (!result.ok) {
+      if (result.ok === false) {
+        const err = result.error;
+        const msg = result.message;
         throw new Error(
-          result.error === "file_too_large"
+          err === "file_too_large"
             ? "El archivo supera 50MB"
-            : result.error === "invalid_type"
+            : err === "invalid_type"
               ? "Tipo de archivo no permitido"
-              : result.message || "Error al subir el archivo",
+              : msg || "Error al subir el archivo",
         );
       }
+
 
       const { data: userData } = await supabase.auth.getUser();
       const row = {

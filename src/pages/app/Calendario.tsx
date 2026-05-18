@@ -33,7 +33,7 @@ import { CalendarFiltersBar } from "@/components/calendar/calendar-filters-bar";
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
-import { PostDetailPanel } from "@/components/calendar/post-detail-panel";
+import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
 
 const parseList = (v: string | null): string[] => (v ? v.split(",").filter(Boolean) : []);
@@ -141,8 +141,16 @@ export default function Calendario() {
   const updateStatus = useUpdatePostStatus();
   const createPost = useCreatePost();
 
-  const [detailPost, setDetailPost] = useState<SocialPostRow | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const postIdParam = params.get("post");
+  const [editorOpen, setEditorOpen] = useState<boolean>(!!postIdParam);
+  useEffect(() => {
+    setEditorOpen(!!postIdParam);
+  }, [postIdParam]);
+  const openPost = (id: string) => update({ post: id });
+  const closeEditor = () => {
+    setEditorOpen(false);
+    update({ post: null });
+  };
   const [createOpen, setCreateOpen] = useState(false);
   const [createDate, setCreateDate] = useState<Date | null>(null);
 

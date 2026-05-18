@@ -1,0 +1,7 @@
+project_id = "601312f6-accf-461c-ab0d-cfc12d476bfe"
+
+[functions.send-portal-invite]
+verify_jwt = true
+
+[functions.send-content-approval-request]
+verify_jwt = false

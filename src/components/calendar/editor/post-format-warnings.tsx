@@ -1,5 +1,3 @@
-import type { PostStatus } from "@/lib/post-states";
-
 interface Props {
   type: string;
 }
@@ -20,5 +18,3 @@ export function PostFormatWarnings({ type }: Props) {
     </div>
   );
 }
-
-export type _UnusedPostStatus = PostStatus;

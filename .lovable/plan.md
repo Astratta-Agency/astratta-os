@@ -1,138 +1,217 @@
-# Plan: Edge Function `send-portal-invite` con Amazon SES
+# Plan: `send-content-approval-request`
 
-Reemplaza el approach Resend. Envío directo a SES v2 con SigV4 firmado en Deno (sin SDK).
+Replica la arquitectura de `send-portal-invite` (Amazon SES v2 + SigV4 inline, sin SDKs) para notificar a los `client_admin` cuando un `content_item` queda listo para aprobación.
 
-## 1. Edge Function `supabase/functions/send-portal-invite/index.ts`
+## 1. Tabla `social_posts` (migración nueva)
 
-- `verify_jwt: true` (default Lovable). Validar JWT en código con `getClaims` igual.
-- CORS preflight estándar (`corsHeaders` desde `npm:@supabase/supabase-js@2/cors`).
-- Body con Zod:
-  ```ts
+Importante: la tabla se llama `social_posts` (alineada con la estructura del módulo Social Media Management ya definida en `astratta-os-estructura.md`), NO `content_items`. Esto evita refactor cuando se construya el módulo completo de calendario.
+
+`docs/migrations/005_social_posts_minimal.sql`:
+
+```text
+create type post_type as enum ('feed_post', 'carousel', 'reel', 'story', 'video', 'other');
+create type post_status as enum ('draft', 'pending_internal_review', 'pending_approval', 'approved', 'rejected', 'scheduled', 'published', 'archived');
+
+create table public.social_posts (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  client_id uuid not null references public.clients(id) on delete cascade,
+  project_id uuid references public.projects(id) on delete set null,
+  title text not null,
+  type post_type not null default 'feed_post',
+  preview_url text,
+  caption text,
+  scheduled_for timestamptz,
+  status post_status not null default 'draft',
+  -- Approval tracking (lightweight; full approvals table comes later)
+  last_approval_sent_at timestamptz,
+  approved_at timestamptz,
+  approved_by_user_id uuid references auth.users(id),
+  rejected_at timestamptz,
+  rejection_reason text,
+  -- Audit
+  created_by uuid references auth.users(id),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index idx_social_posts_client_status on public.social_posts (client_id, status);
+create index idx_social_posts_workspace_scheduled on public.social_posts (workspace_id, scheduled_for);
+```
+
+`approval_history` table (for audit trail — important for med spa compliance):
+
+```sql
+create table public.content_approval_history (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.social_posts(id) on delete cascade,
+  client_id uuid not null references public.clients(id) on delete cascade,
+  action text not null check (action in ('sent_for_approval', 'approved', 'rejected', 'resent', 'auto_expired')),
+  actor_user_id uuid references auth.users(id),  -- null when triggered by system
+  recipient_emails text[],  -- for sent_for_approval rows
+  comment text,
+  ses_message_ids jsonb,  -- map of email -> messageId or error
+  metadata jsonb,
+  created_at timestamptz default now()
+);
+
+create index idx_approval_history_post on public.content_approval_history (post_id, created_at desc);
+```
+
+RLS:
+
+- **workspace_members** del cliente: CRUD completo en ambas tablas.
+- **client_users** del cliente con role `client_admin` o `client_viewer`:
+  - `social_posts`: SELECT cuando `status in ('pending_approval','approved','rejected','published')`. NUNCA ven drafts ni internal reviews.
+  - `content_approval_history`: SELECT (read-only).
+- **client_admin** (no viewer): UPDATE en `social_posts.status` solo entre `pending_approval ↔ approved` y `pending_approval ↔ rejected`, validado vía DB trigger que recibe los inputs de `approved_by_user_id`, `rejection_reason`, etc.
+- **content_approval_history**: INSERT permitido a workspace_members y a client_admins (estos solo con `action in ('approved','rejected')`). UPDATE/DELETE prohibido para todos (audit log inmutable).
+
+Trigger SQL `trg_notify_content_approval`:
+
+- AFTER UPDATE de `status` cuando `NEW.status='pending_approval'` y `OLD.status<>'pending_approval'`
+- AFTER INSERT cuando `status='pending_approval'`
+- Hace `pg_net.http_post` a la Edge Function con `{ post_id, source:'trigger' }` y el header `x-internal-secret` desde `vault` (secret `INTERNAL_TRIGGER_SECRET`).
+- También inserta row en `content_approval_history` con `action='sent_for_approval'` y `actor_user_id = auth.uid()`.
+
+## 2. Edge Function `supabase/functions/send-content-approval-request/index.ts`
+
+Copia la arquitectura de `send-portal-invite`:
+
+- Reusa la arquitectura de `send-portal-invite`. **Refactor recomendado**: extrae helpers SigV4 a `supabase/functions/_shared/ses.ts` (`sha256Hex`, `hmac`, `toHex`, `signSesRequest`, `sendSesEmail`) y úsalos desde ambas funciones. Reduce duplicación de ~80 LOC.
+  - CORS: `npm:@supabase/supabase-js@2/cors`.
+  - `verify_jwt`: por defecto Lovable. Permite bypass cuando header `x-internal-secret` matches `INTERNAL_TRIGGER_SECRET` env var (para llamadas desde el trigger SQL).
+  - Zod body:
+  ```text
   z.object({
-    client_id: z.string().uuid(),
-    email: z.string().email(),
-    welcome_message: z.string().max(500).optional(),
+    post_id: z.string().uuid(),
+    source: z.enum(['manual', 'trigger']).default('manual'),
+    force: z.boolean().default(false)  // bypass idempotency for manual resend
   })
   ```
 
-### Flujo
+### Handler flow
 
-1. OPTIONS → 200.
-2. Validar `Authorization: Bearer ...` → `getClaims` con anon client. 401 si falla. `userId = claims.sub`.
-3. Service-role client (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) →
-  - `clients.select('id, name, slug, workspace_id, brand_primary_color, brand_secondary_color, logo_url').eq('id', client_id).maybeSingle()` → 404 si no existe.
-  - `workspace_members.select('user_id').eq('workspace_id', client.workspace_id).eq('user_id', userId).maybeSingle()` → 403 si no es miembro.
-4. Service-role client → `workspaces.select('name').eq('id', client.workspace_id).maybeSingle()` → para el `From` display name personalizable y el footer.
-5. `portalUrl` = `${SITE_URL ?? new URL(req.headers.get('origin') ?? '').origin}/portal/login`.
-6. Generar `invite_id = crypto.randomUUID()` para tracking (irá en custom header del email + en logs).
-7. Render HTML + texto plano (helpers inline, sin libs externas).
-8. POST a SES v2 `https://email.${REGION}.amazonaws.com/v2/email/outbound-emails` con SigV4. Body JSON:
-  ```json
-   {
-       "FromEmailAddress": "Astratta <invites@astrattaagency.com>",
-       "Destination": { "ToAddresses": [email] },
-       "ReplyToAddresses": ["hello@astrattaagency.com"],
-       "ConfigurationSetName": "astratta-transactional",
-       "EmailTags": [
-         { "Name": "category", "Value": "portal_invite" },
-         { "Name": "client_id", "Value": "<short-client-id>" },
-         { "Name": "invite_id", "Value": "<invite_id>" }
-       ],
-       "Content": {
-         "Simple": {
-           "Subject": { "Data": "Te invitamos al portal de <Client> x Astratta", "Charset": "UTF-8" },
-           "Body": {
-             "Html": { "Data": "<html...>", "Charset": "UTF-8" },
-             "Text": { "Data": "...", "Charset": "UTF-8" }
-           }
-         }
-       }
-     }
+1. Validate `x-internal-secret` if `source='trigger'`, else validate JWT and check caller is in workspace_members.
+2. Service-role client → fetch:
+  - `social_posts` (full row) — 404 si no existe o `status<>'pending_approval'`.
+  - `clients` (name, slug, workspace_id, brand_primary_color, brand_secondary_color, logo_url).
+3. **Idempotency check** (skip if `force=false`):
+  - Query: `SELECT created_at FROM content_approval_history WHERE post_id=$1 AND action='sent_for_approval' ORDER BY created_at DESC LIMIT 1`
+  - If exists AND `created_at > now() - interval '4 hours'` → return `{ emailed: true, sent: 0, skipped: true, reason: 'duplicate_within_4h_window' }`.
+  - Si `force=true`, ignora el check (manual resend bypass).
+4. Resolver destinatarios:
+  ```text
+   Validate x-internal-secret if source='trigger', else validate JWT and check caller is in workspace_members.
+  Service-role client → fetch:
+
+  social_posts (full row) — 404 si no existe o status<>'pending_approval'.
+  clients (name, slug, workspace_id, brand_primary_color, brand_secondary_color, logo_url).
+
+
+  Idempotency check (skip if force=false):
+
+  Query: SELECT created_at FROM content_approval_history WHERE post_id=$1 AND action='sent_for_approval' ORDER BY created_at DESC LIMIT 1
+  If exists AND created_at > now() - interval '4 hours' → return { emailed: true, sent: 0, skipped: true, reason: 'duplicate_within_4h_window' }.
+  Si force=true, ignora el check (manual resend bypass).
+
+
+  Resolver destinatarios:
   ```
-9. `ConfigurationSetName` es opcional: si la env `SES_CONFIGURATION_SET` no está definida, se omite del payload (no rompe el envío).
-10. `EmailTags` permiten filtrar bounces/deliveries por categoría en CloudWatch sin esfuerzo extra.
-11. **Retry policy**: si la respuesta de SES es 5xx o network error, reintentar hasta 2 veces con backoff exponencial (250ms, 750ms). 4xx (validation errors) NO se reintenta — devolver error inmediato.
-12. Si 200 → `{ emailed: true, messageId, invite_id }`. Si error después de retries → `{ emailed: false, error, invite_id }` con status 200 (para que el dialog muestre fallback).
-13. **Logging estructurado** (JSON.stringify a console.log con prefijo `[send-portal-invite]`): siempre log con shape `{ invite_id, client_id, recipient_email_hash, status, duration_ms, ses_message_id?, error? }`. Hash del email (SHA-256 truncado 8 chars) para evitar PII en logs.
+  - Dedupe + filter nulls.
+  - If empty → return `{ emailed: false, error: 'no_recipients', recipient_count: 0 }` (200). Manual fallback en UI.
+5. portalUrl = ${SITE_URL || Origin}/portal/${slug}/aprobaciones/${post_id}
+6. Render HTML (mismo sistema visual que invite): 
+  - Header bar 60px con `brand_primary_color`
+  - Logo del cliente (si existe)
+  - H1: "Nuevo contenido para aprobar"
+  - **Tarjeta de preview** con:
+    - `preview_url` (img max-width: 480px, border-radius 8px)
+    - `title` (h2)
+    - `type` badge en `brand_primary_color`
+    - "Programado para: " + `scheduled_for` formateado en español (`dd MMM yyyy 'a las' HH:mm`)
+    - "Cliente: " + `client.name`
+    - Primeros 200 chars de `caption` + "..." si excede
+  - CTA "Revisar y aprobar" en `brand_primary_color` → `portalUrl`
+  - Helper: "También puedes solicitar cambios o rechazar el contenido desde el portal"
+  - Footer Astratta + línea legal mínima
+  - Versión texto plano equivalente
+7. **Envío con estrategia BCC controlada** (mejora vs envío 1-por-1):
+  - Si hay 1 destinatario → envío directo con `ToAddresses: [email]`.
+  - Si hay 2+ destinatarios → 1 envío por destinatario en paralelo (Promise.all) con `ToAddresses: [email]` cada uno. NUNCA usar BCC con múltiples emails en el mismo envío (algunos clientes lo flagean como spam y exponen el resto del array si hay bug).
+  - Esto mantiene privacidad (cada cliente solo ve su email) y permite trackear messageId por destinatario.
+  - Reusa la misma SigV4 session por throughput.
+8. **Inserta row en** `content_approval_history` con:
+  - `action: 'sent_for_approval'` (o `'resent'` si `force=true`)
+  - `actor_user_id`: caller si `source='manual'`, null si `source='trigger'`
+  - `recipient_emails`: array de emails enviados
+  - `ses_message_ids`: objeto `{ "email@x.com": "msg-id-..." }` o `{ "email@x.com": "error: ..." }`
+  - `metadata`: `{ source, force, scheduled_for, brand_color_used }`
+9. **Update** `social_posts.last_approval_sent_at = now()`.
+10. Respuesta:
 
-### SigV4 helper (inline, ~80 LOC)
-
-- Función `signRequest({ method, url, region, service: 'ses', body, accessKeyId, secretAccessKey })` que devuelve headers `Authorization`, `X-Amz-Date`, `X-Amz-Content-Sha256`, `Host`.
-- Usa `crypto.subtle` (HMAC-SHA256, SHA-256) — disponible en Deno sin imports.
-- Canonical request → string to sign → signing key (`AWS4` + secret → date → region → service → `aws4_request`) → signature.
-
-### Template HTML
-
-Estructura tabular (compatible Gmail/Outlook), inline styles:
-
-- Outer `<table>` background `#f6f7fb`, content table 600px centered, `#ffffff`, border-radius 12.
-- Header bar 60px, `background: ${brand_primary_color ?? '#5140f2'}`.
-- Hero: si `logo_url` presente, `<img src="..." height="48" alt="${client.name} logo" />` centrado, sino skip. Headline `<h1>` "Te invitamos al portal de {Client Name}".
-- Párrafo de bienvenida explicando capacidades (aprobar contenido, ver reportes, acceder documentos).
-- Si `welcome_message` presente: blockquote con border-left `4px solid ${brand_primary_color}`, padding-left 16, color `#475569`, italic.
-- CTA `<a>` botón: bg `${brand_primary_color ?? '#5140f2'}`, color blanco, padding `14px 28px`, border-radius 8, text "Acceder al portal", href `portalUrl`.
-- Helper: "Inicia sesión con tu correo: **{email}**".
-- Footer: hr, "Powered by Astratta Agency · astrattaagency.com" + logo Astratta (URL pública estable, hardcoded — TODO confirmar URL).
-- Mini-línea legal final (gris claro 11px): "Recibes este correo porque {workspace.name} te invitó al portal cliente. Si no esperabas esta invitación, ignora este mensaje."
-- Escape de `client.name` y `welcome_message` con helper `escapeHtml`.
-- `meta` tag `<meta name="x-invite-id" content="{invite_id}" />` dentro del `<head>` para trazabilidad si alguien forwardea el email.
-
-Texto plano: versión mínima con headline, mensaje, URL, login email.
-
-## 2. Hook `src/hooks/useClientDetail.ts`
-
-En `useInviteClientUser.mutationFn`, reemplazar el bloque `try { const adminApi = ... }` por:
-
-```ts
-let emailed = false;
-let inviteId: string | null = null;
-try {
-  const { data, error: fnErr } = await supabase.functions.invoke("send-portal-invite", {
-    body: { 
-      client_id: clientId, 
-      email: input.email.toLowerCase().trim(), 
-      welcome_message: input.welcome_message ?? null 
-    },
-  });
-  if (!fnErr && data?.emailed) emailed = true;
-  inviteId = data?.invite_id ?? null;
-} catch (e) { 
-  console.warn('[useInviteClientUser] Edge function failed, falling back to manual share', e);
-}
-return { emailed, inviteId };
+```json
+    {
+      "emailed": true,  // true si ≥1 envío OK
+      "sent": 2,
+      "failed": 0,
+      "skipped": false,
+      "results": [
+        { "email": "owner@180grados.com", "messageId": "01000196..." },
+        { "email": "marketing@180grados.com", "messageId": "01000196..." }
+      ]
+    }
 ```
 
-El insert previo en `client_users` queda igual. Opcional: guardar `inviteId` en el row de `client_users` (`metadata jsonb` o columna nueva `invite_id text`) para correlacionar con logs después.
+```
+Siempre 200 para que el caller maneje fallback.
+```
 
-## 3. Dialog
+## 3. Hook UI `useRequestContentApproval`
 
-`invite-client-user-dialog.tsx` ya maneja `emailed: true` (toast + cierre) vs `false` (pantalla copia). Sin cambios estructurales.
+Nuevo en `src/hooks/useContentApproval.ts`:
 
-Ajuste menor: cuando `emailed: true`, el toast pasa a `"Invitación enviada a {email}"` con un subtítulo discreto `"El correo puede tardar 1-2 minutos en llegar"`. Setea expectativa correcta y reduce los "no me llegó nada" del cliente.
+```ts
+mutationFn(postId, opts?: { force?: boolean }):
+  1. Si status actual != 'pending_approval': update social_posts set status='pending_approval' where id=postId
+     (esto dispara el trigger automático)
+  2. Invoke send-content-approval-request con { post_id, source: 'manual', force: opts?.force ?? false }
+  3. Return { emailed, sent, failed, skipped, results }
+```
 
-## 4. Secretos requeridos
+- Toasts:
+  - `emailed && sent > 0 && !skipped` → "Aprobación solicitada — enviado a {sent} admin(s)"
+  - `skipped` → "Ya se envió una solicitud hace menos de 4 horas" + botón "Reenviar de todos modos" (que llama con `force: true`)
+  - `!emailed && error === 'no_recipients'` → "No hay client_admin para este cliente. Invita uno desde la ficha." + botón "Ir a Stakeholders"
+  - `!emailed` (otros errores) → "Estado actualizado. Avisa al cliente manualmente — copia el link." con botón copiar `portalUrl`
 
-El usuario los configura manualmente en Supabase Dashboard → Edge Functions → Secrets:
+## 4. Secrets requeridos (ya existentes + 1 nuevo)
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_REGION` (default `us-east-1` si falta)
-- `FROM_EMAIL` (default `invites@astrattaagency.com`)
-- `REPLY_TO_EMAIL` (default `hello@astrattaagency.com`)
-- `SITE_URL` (default desde `Origin` header)
-- `SES_CONFIGURATION_SET` (opcional, default omitido del payload — habilita event tracking si se setea)
+Reusa los del invite: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `FROM_EMAIL`, `REPLY_TO_EMAIL`, `SITE_URL`.
 
-`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` ya están disponibles automáticamente.
+Nuevo:
+
+- `INTERNAL_TRIGGER_SECRET` — para validar llamadas desde el trigger SQL. Generar con `openssl rand -hex 32` y guardar en Supabase Edge Functions secrets + en Postgres vault para que el trigger lo lea.
+
+## 5. Out of scope
+
+- Magic links aprobar/rechazar sin login (descartado — el CTA va al portal autenticado)
+- Page `/portal/{slug}/aprobaciones/{id}` (UI del portal — se construye en otro prompt)
+- SNS bounce/complaint webhooks
+- Reintentos automáticos (cae al copy-link manual)
+- Notificación de aprobado/rechazado de vuelta al equipo Astratta (se hará en `send-content-approval-result` futuro — usará `content_approval_history` que ya queda lista)
+- Variantes multi-canal del post (IG/FB/LinkedIn copy diferente) — campo `caption` único por ahora, se expande en módulo Calendario completo
+- Asset library / media uploads — el `preview_url` por ahora es una URL externa
 
 ## Archivos
 
-- **Nuevo:** `supabase/functions/send-portal-invite/index.ts` (~280 LOC incluyendo SigV4 + template + retry + logging)
-- **Editado:** `src/hooks/useClientDetail.ts` (~12 LOC en `useInviteClientUser`)
+Crear:
 
-## Fuera de alcance
+- `docs/migrations/005_social_posts_minimal.sql`
+- `supabase/functions/_shared/ses.ts` (extract SigV4 helpers)
+- `supabase/functions/send-content-approval-request/index.ts` (~280 LOC, refactored to use _shared/ses)
+- `src/hooks/useContentApproval.ts`
 
-- MIME multipart con attachments.
-- Tracking de bounces/complaints (SNS) — los tags + Configuration Set dejan la base lista para activarlo después sin refactor.
-- Reenvío automático en caso de fallo (queda manual).
-- Verificación adicional de `astrattaagency.com` en SES (ya hecho por el usuario).
-- Almacenar `invite_id` en `client_users` (no estructural — se puede agregar en migration futura si quieres correlación bidireccional).
+Editar:
+
+- `supabase/functions/send-portal-invite/index.ts` — refactor para importar de `_shared/ses.ts` (DRY)

@@ -341,6 +341,9 @@ export default function Calendario() {
             setDetailPost(p);
             setDetailOpen(true);
           }}
+          clientName={activeClients.find((c) => c.id === clientId)?.name}
+          rangeFrom={range.from}
+          rangeTo={range.to}
         />
       )}
 

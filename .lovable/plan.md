@@ -1,116 +1,142 @@
-## Phase 4.3 — Storage uploads + media management
+# Phase 4.4 — Real-time agency notifications + Submit-for-approval flow
 
-Replace the URL-paste flow in the post editor with real Supabase Storage uploads, persist uploaded files in a per-client `media_assets` table, and add a reusable asset library picker. Adds a med-spa consent gate that blocks scheduling/publishing posts whose media lacks signed consent.
+End-to-end loop that lets agency send posts to client for approval, fires a Postgres trigger when client responds, and surfaces results to the agency in real time via a notifications bell. Also unblocks two parked Edge Function bugs by fixing the auth pattern.
 
-### Database — `docs/migrations/009_media_assets_and_buckets.sql`
+## 1. Migration — `docs/migrations/011_notifications.sql`
 
-`media_assets` table:
+New `public.notifications` table:
 
-- `id, workspace_id (FK workspaces), client_id (FK clients), uploaded_by (FK auth.users)`
-- `file_name, storage_path (unique), public_url, mime_type, size_bytes, width, height, duration_seconds`
-- `tags text[] default '{}'`
-- `orientation text generated always as (case when width is null or height is null then null when width > height then 'landscape' when width < height then 'portrait' else 'square' end) stored` — auto-derived. Esencial para warnings en reel (necesita portrait) y story (también portrait) sin tener que calcular cada vez en el cliente.
-- Med-spa: `consent_required bool`, `consent_signed bool`, `consent_form_url`, `patient_ref`, `treatment`, `before_after_pair_id (self-FK)`
-- `created_at`
-- Indexes: `(client_id, created_at desc)`, GIN on `tags`, partial index `(client_id) where consent_required = true and consent_signed = false` — fast lookup of "qué assets están pendientes de consentimiento" para badge counts.
-- RLS: SELECT for workspace members + client users; ALL for workspace members only — using existing `is_workspace_member` / `is_client_user` helpers
+- Columns: `id`, `workspace_id`, `recipient_user_id`, `type` (check constraint: `post_approved`, `post_rejected`, `post_changes_requested`, `invite_accepted`, `payment_received`, `contract_expiring`), `title`, `body`, `link`, `read`, `read_at`, `metadata jsonb`, `created_at`.
+- Partial index on `(recipient_user_id, created_at desc) where read = false`.
+- RLS enabled. Policies: select + update only when `recipient_user_id = auth.uid()`.
 
-Storage bucket `client-media` is created manually in the Dashboard — instructions in `docs/setup-storage.md` (public read, 50MB limit, allowed mime types, RLS policies on `storage.objects` keyed off the first folder segment = workspace_id).
+Trigger `notify_post_status_change()` on `social_posts` AFTER UPDATE OF status:
 
-### Code
+- Skips if status unchanged or not in `(approved, rejected, changes_requested)`.
+- Looks up client → workspace, fans out one notification per active `workspace_members` row with role `owner` or `team_member`.
+- Title is client-driven (e.g. `"<Client> aprobó un post"`), body is the truncated caption, link is `/app/calendario?post=<id>`, metadata includes `post_id`, `client_id`, `new_status`, `rejection_reason`.
 
-`**src/lib/storage.ts**`
+**Server-side approval lock guard** — also add a separate trigger `BEFORE UPDATE OF status` on `social_posts` that:
 
-- `uploadAsset({ file, workspaceId, clientId, onProgress? })` → uploads to `client-media` at `${workspaceId}/${clientId}/${uuid}-${sanitizedName}`.
-- **Cache control**: pass `{ cacheControl: '31536000', upsert: false }` so uploaded media gets 1-year browser cache. Reduces bandwidth costs cuando 180 Grados Med Spa abre el calendario varias veces al día.
-- Pre-upload validation: max 50MB, mime in `{image/jpeg,png,webp,gif, video/mp4, video/quicktime}`.
-- For images: read width/height via `URL.createObjectURL` + `Image()`. For videos: read `duration` and a first-frame thumbnail (canvas at `currentTime=0.1`).
-- Returns `{ storagePath, publicUrl, sizeBytes, mimeType, width?, height?, durationSeconds? }` or `{ error: 'file_too_large'|'invalid_type'|'upload_failed' }`.
-- `sanitizeFilename(name)` helper: replace `[^a-zA-Z0-9._-]` with `-`, collapse hyphens, trim, max 80 chars. Cuando el cliente sube `Foto fiñal de tratamiento (2).jpg` no rompe.
+- If `OLD.status = 'pending_approval'` AND `NEW.status IN ('approved','rejected','changes_requested')`:
+  - Checks if any other update has already landed in the last 2 seconds for this post (lookup `content_approval_history` rows with `post_id = OLD.id AND action IN ('approved','rejected','changes_requested') AND created_at > now() - interval '2 seconds'`).
+  - If yes: `RAISE EXCEPTION 'Already responded to this post in the last 2 seconds'`.
+  - Prevents double-submit when 2 client_admins click simultaneously from different devices.
 
-`**src/lib/client-validation.ts**`
+(Per project convention: schema-only migration file. User applies it manually in the Supabase SQL editor.)
 
-- `isHealthcareClient(client)` → `industry ∈ {Med Spa, Healthcare, Wellness}`.
-- `assertConsentForMediaUrls(urls, assets)` → returns list of asset filenames missing signed consent. Used by state-change guard.
+## 2. Client-side submit-for-approval flow
 
-`**src/hooks/useMediaAssets.ts**`
+For the agency editor to trigger the loop, we need a clean submit action with real pre-flight validation (not just "is there a channel"):
 
-- `useMediaAssets(clientId, { search, tags })` — list query.
-- `useUploadAsset()` — wraps storage upload + insert into `media_assets`; auto-sets `consent_required=true` for healthcare clients.
-- `useDeleteAsset()` — remove from storage then from table; rolls back the table delete if storage delete fails.
-- `useAssetsByUrls(publicUrls)` — lookup helper used by the consent guard.
+- `src/lib/preflight-approval.ts` — `runApprovalPreflight(post, variants, mediaAssets, clientUsers)` → returns `{ ok: true } | { ok: false, errors: string[], actions?: Array<{label, path}> }`. Checks in order:
+  1. At least 1 channel in `post.channels[]` — error "Debes activar al menos un canal antes de enviar a aprobación"
+  2. Each enabled channel has a `post_variants` row with `caption.trim().length > 0` — error per channel: "Falta el caption para {channelName}"
+  3. `post.scheduled_for` is set AND > `now()` — error "Define una fecha de publicación futura antes de enviar"
+  4. If `isHealthcareClient(client)` AND `post.media_urls.length > 0`: every referenced asset has `consent_signed = true` (lookup via `useAssetsByUrls`). Error lists asset filenames missing consent + action "Ver biblioteca" → `/portal-or-vault link`
+  5. Client has at least 1 `client_users` row with role `client_admin` AND status in `('active','invited')`. Error: "Este cliente no tiene admin invitado al portal. Invita uno desde Stakeholders." + action → `/app/clientes/{slug}#stakeholders`
+- `src/hooks/usePostSubmitForApproval.ts` — mutation that:
+  1. Runs `runApprovalPreflight`; throws preflight errors if any
+  2. Calls Edge Function `send-content-approval-request` with body `{ post_id, source: 'manual', message: optionalNote }`
+  3. The Edge Function does the status transition `draft|changes_requested → pending_approval` server-side (NOT client-side, to ensure atomic with the email send)
+  4. Parses response `{ emailed, sent, failed, portalUrl, recipientEmails }`
+  5. Invalidates `social-posts`, `social-post-detail`, `content-approval-history` queries
+  6. Returns the full response object so UI can show success state or fallback
+- `src/components/calendar/editor/submit-for-approval-dialog.tsx` — Two-step:
+  - **Step 1 (Pre-flight check)**: runs `runApprovalPreflight` on dialog open. If preflight has errors, shows them with action buttons to resolve (e.g. "Ir a Stakeholders" navigates closing the dialog). Submit button disabled until all green.
+  - **Step 2 (Confirmation)**: shows summary "Se enviará a {N} admin(s) del cliente: {emails}" + optional `message` textarea (max 300 chars) included in the email body + "Enviar a cliente" CTA.
+- `src/components/calendar/editor/submit-success-state.tsx` — Post-submit:
+  - If `response.emailed === true`: green check + "Enviado a {N} admin(s)" + "El correo puede tardar 1-2 minutos en llegar" + Cerrar
+  - If `response.emailed === false` (Edge Function failed but post status was updated): orange info + read-only `portalUrl` input + "Copiar enlace" + "Copiar mensaje completo" (pre-formatted message ready to paste in WhatsApp/email):
 
-`**src/components/calendar/editor/media-uploader.tsx**` (replaces `media-urls-editor.tsx`)
+```
+    Hola {clientName},
+    
+    Tienes un nuevo post pendiente de aprobación en el portal:
+    
+    {portalUrl}
+    
+    {optionalMessage}
+    
+    — {workspaceName}
+```
 
-- Dropzone via `react-dropzone` (added to package.json): "Arrastra una imagen/video aquí, o haz clic para seleccionar".
-- Collapsible "Pegar URL" accordion preserves the legacy paste flow (HEAD validate, fallback embed on CORS fail).
-- Per-file progress bar (Astratta primary token).
-- Failed uploads: red border + retry icon.
-- Thumbnail grid (80x80). Click X to remove from post (does not delete asset).
-- When `post.type === 'carousel'`: drag-to-reorder via `dnd-kit` (cap 10 items).
-- "Desde biblioteca" button opens `MediaLibraryPicker`.
-- On success: append `publicUrl` to `post.media_urls[]` and insert `media_assets` row.
-- **Orientation warning**: if `post.type === 'reel'` OR `post.type === 'story'` AND uploaded asset is `landscape` → inline warning "Reels y Stories funcionan mejor en formato vertical (9:16). Esta imagen es horizontal." con opción de subirla igual.
-- For healthcare clients: inline consent form appears after upload (`consent_signed` checkbox, `consent_form_url` upload to `/consents/` subpath, `patient_ref`, `treatment`).
+- `src/components/calendar/editor/post-submit-for-approval-button.tsx` — primary CTA mounted prominently in `PostEditorPanel` header (left of `StateChangeDropdown`), only visible when status is `draft` / `pending_internal_review` / `changes_requested`. Label adapts:
+  - `draft` or `pending_internal_review` → "Enviar a cliente"
+  - `changes_requested` → "Reenviar a cliente"
+  - Style: secondary brand color background (`#ff7503`), white text, Send icon, prominent right side.
 
-`**src/components/calendar/editor/media-library-picker.tsx**`
+Edit `src/components/calendar/editor/post-editor-panel.tsx` to mount the button.
 
-- Dialog listing `media_assets` for current client; search by name + tag chip filters.
-- Click thumb → preview modal with metadata.
-- Multi-select checkboxes → "Agregar N a este post" appends `public_url` values to `post.media_urls`.
-- For med-spa assets: badge "Consentimiento firmado" (green) / "Falta consentimiento" (red).
-- **Tab "Pendientes de consentimiento"** in the picker header (visible only for healthcare clients): pre-filtered view of assets with `consent_required = true AND consent_signed = false`. Te permite resolver el backlog de consentimientos sin scroll de toda la biblioteca.
+## 3. Real-time notifications hooks + UI
 
-### Wiring
+- `src/hooks/useNotifications.ts`
+  - `useNotifications()` — fetches unread + last 20 for current user, subscribes to `notifications` INSERT via `supabase.channel` filtered by `recipient_user_id`, invalidates query on event.
+  - `useMarkNotificationRead(id)` and `useMarkAllRead()` mutations.
+- `src/hooks/usePostStatusChanges.ts` — ambient subscription mounted in `AppShell` that listens to `social_posts` UPDATE filtered by active workspace and invalidates `useSocialPosts` cache. (Trigger handles notification insert server-side; this just ensures calendar refreshes everywhere, not only on the page that already subscribes.)
+- `src/components/notifications-bell.tsx` — replaces the placeholder bell in `top-bar.tsx`:
+  - Unread badge count (hidden when 0).
+  - Dropdown with last 20 (icon by type, title, body, relative time via `date-fns` locale `es`).
+  - Click row → navigates to `link` + marks read.
+  - Footer: "Marcar todas como leídas" + disabled "Ver todas" (full page deferred).
+  - Mobile: dropdown becomes a Sheet drawer for better touch targets.
+- Edit `src/components/top-bar.tsx` — swap the placeholder `<Button><Bell/></Button>` for `<NotificationsBell />`.
 
-- `variant-editor.tsx` → swap `MediaUrlsEditor` for `MediaUploader` (lift media editing up if it makes more sense at the post level — media is shared across variants, not per-channel). Recommend moving the uploader into `post-editor-panel.tsx` so all variants share it, and keep per-variant only caption/hashtags/etc.
-- `post-editor-panel.tsx` → mount `MediaUploader` once in the post meta area; mount `MediaLibraryPicker` dialog.
-- `state-change-dropdown.tsx` → before transitioning to `scheduled` or `published`, run `assertConsentForMediaUrls`; block with toast `El asset {filename} no tiene consentimiento firmado` if any fail. Show a "Ver biblioteca" link in the toast that opens MediaLibraryPicker directly on the "Pendientes de consentimiento" tab.
-- `Calendario.tsx` → no changes.
+## 4. Edge Function fixes (un-blocks parked bugs)
 
-### Storage path convention
+- `supabase/functions/send-content-approval-request/index.ts` — three changes:
+  1. Auth pattern: extract `Authorization` header, instantiate request-scoped Supabase client with `{ global: { headers: { Authorization: authHeader } } }`, call `client.auth.getUser()`. Return 401 with clear error message if missing/invalid.
+  2. Move the **post status transition** (`draft → pending_approval`) INSIDE the function, after auth + workspace check, so that "send email failed" doesn't leave the post in a half-updated state. Use a service-role client for the write.
+  3. Use Zod for body validation: `{ post_id: uuid, source: 'manual' | 'trigger', message?: string (max 300) }`. Validate before any side effects.
+- `supabase/functions/send-portal-invite/index.ts` — same auth pattern fix. Un-blocks the parked bug.
+- `supabase/functions/ping/index.ts` — new 10-line health-check returning `{ ok: true, ts, user_id: <if auth header present else null> }`. Useful for debugging the Test panel.
 
-- Media: `{workspace_id}/{client_id}/{uuid}-{sanitized_filename}.{ext}`
-- Consent forms: `{workspace_id}/{client_id}/consents/{uuid}-{patient_ref_or_anon}.pdf`
+(Deploy steps for these are manual after merge since this is BYO Supabase.)
 
-Allows per-workspace cleanup via folder enumeration and keeps RLS keyed on first path segment.
+## 5. Verification
 
-### UX details
+- After merge + manual deploy + migration apply:
+  1. **Auth pattern fix sanity** — invoke `ping` from Supabase Test panel with fresh JWT → must return `{ ok: true, user_id: <your uuid> }`. If yes, both other functions are fixed too.
+  2. **Submit flow** — open a draft post in calendar editor → click "Enviar a cliente" → confirm preflight passes → confirm dialog → invoke → email arrives + status moves to `pending_approval`.
+  3. **Trigger test (server-side)** — manually UPDATE a `social_posts.status` to `approved` via SQL editor → confirm a notification row appears for every active workspace member.
+  4. **Bell UI** — open dropdown after step 3 → unread count, click-to-navigate, mark-all-read all work.
+  5. **End-to-end** — agency submits → client logs into portal → approves → agency sees realtime notification + calendar updates color → no page reload.
 
-- Max 10 files per upload action.
-- 50MB per file; toast on rejection.
-- Video thumbs: canvas snapshot at `currentTime=0.1`.
-- Upload progress at bottom edge of thumb.
-- **Optimistic UI**: thumb appears in the grid immediately with progress overlay, swapped for real public_url when upload completes.
+## Out of scope (deferred)
 
-### Manual steps for the user (after merge)
+- Edge Function that emails the agency on approval result (in-app only for now).
+- Daily email digest.
+- Slack / WhatsApp / mobile push.
+- `/app/notificaciones` full-page list.
+- Email rate limiting / quotas.
+- Notification preferences per user (mute certain types).
 
-1. Apply `docs/migrations/009_media_assets_and_buckets.sql` in the Supabase SQL editor.
-2. Create the `client-media` bucket per `docs/setup-storage.md` (public, 50MB, allowed mime list, RLS policies).
-
-### Out of scope (4.4+)
-
-AI alt-text, image optimization/transcoding, bulk consent upload, approval email Edge Function, before/after pair UI beyond the FK column.
-
-### Files
+## Files
 
 **Created**
 
-- `docs/migrations/009_media_assets_and_buckets.sql`
-- `docs/setup-storage.md`
-- `src/lib/storage.ts`
-- `src/lib/client-validation.ts`
-- `src/hooks/useMediaAssets.ts`
-- `src/components/calendar/editor/media-uploader.tsx`
-- `src/components/calendar/editor/media-library-picker.tsx`
+- `docs/migrations/011_notifications.sql`
+- `supabase/functions/ping/index.ts`
+- `src/lib/preflight-approval.ts`
+- `src/hooks/usePostSubmitForApproval.ts`
+- `src/hooks/usePostStatusChanges.ts`
+- `src/hooks/useNotifications.ts`
+- `src/components/calendar/editor/post-submit-for-approval-button.tsx`
+- `src/components/calendar/editor/submit-for-approval-dialog.tsx`
+- `src/components/calendar/editor/submit-success-state.tsx`
+- `src/components/notifications-bell.tsx`
 
 **Edited**
 
-- `src/components/calendar/editor/variant-editor.tsx` (remove media block)
-- `src/components/calendar/editor/post-editor-panel.tsx` (mount uploader + picker)
-- `src/components/calendar/editor/state-change-dropdown.tsx` (consent guard)
-- `package.json` (add `react-dropzone`, `@dnd-kit/core`, `@dnd-kit/sortable`)
+- `supabase/functions/send-content-approval-request/index.ts` (auth pattern + status transition moved server-side + Zod)
+- `supabase/functions/send-portal-invite/index.ts` (auth pattern fix)
+- `src/components/calendar/editor/post-editor-panel.tsx` (mount Submit button + dialog)
+- `src/components/top-bar.tsx` (wire NotificationsBell)
+- `src/layouts/AppShell.tsx` (mount ambient usePostStatusChanges subscription)
 
-**Deleted (or left as deprecated stub)**
+## Manual steps after merge
 
-- `src/components/calendar/editor/media-urls-editor.tsx`
+1. Apply `docs/migrations/011_notifications.sql` in Supabase SQL editor.
+2. Deploy `send-content-approval-request`, `send-portal-invite`, and new `ping` Edge Functions (Supabase CLI or web editor).
+3. From the Test panel, invoke `ping` with a fresh JWT — should return `{ ok: true, user_id }` not 401. This confirms the auth pattern fix worked.
+4. Then invoke `send-content-approval-request` with a real post_id — should return `{ emailed: true|false }`.

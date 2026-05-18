@@ -18,6 +18,8 @@ import { MediaUploader } from "./media-uploader";
 import { MediaLibraryPicker } from "./media-library-picker";
 import { PostFormatWarnings } from "./post-format-warnings";
 import { StateChangeDropdown } from "./state-change-dropdown";
+import { PostSubmitForApprovalButton } from "./post-submit-for-approval-button";
+import { SubmitForApprovalDialog } from "./submit-for-approval-dialog";
 
 import {
   usePost,
@@ -78,6 +80,7 @@ export function PostEditorPanel({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryPendingOnly, setLibraryPendingOnly] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false);
 
   // Hydrate local state when post loads / changes
   useEffect(() => {
@@ -322,6 +325,17 @@ export function PostEditorPanel({
                 {saveLabel}
               </span>
               <div className="ml-auto flex items-center gap-1">
+                <PostSubmitForApprovalButton
+                  status={post.status}
+                  onClick={async () => {
+                    try {
+                      await flush();
+                    } catch {
+                      /* surfaced by save status */
+                    }
+                    setSubmitOpen(true);
+                  }}
+                />
                 <StateChangeDropdown status={post.status} onChange={handleStatusChange} />
                 <Button size="sm" variant="ghost" onClick={() => toast("Duplicar próximamente")}>
                   <Copy className="h-4 w-4" />
@@ -462,6 +476,27 @@ export function PostEditorPanel({
           }}
         />
       )}
+
+      {post && meta && (
+        <SubmitForApprovalDialog
+          open={submitOpen}
+          onOpenChange={setSubmitOpen}
+          postId={post.id}
+          clientId={post.client_id}
+          clientSlug={clientSlug}
+          clientName={clientName}
+          isHealthcare={isHealthcare}
+          post={{
+            channels: meta.channels,
+            scheduled_for: meta.scheduled_for,
+            media_urls: meta.media_urls,
+            status: post.status,
+          }}
+          variants={post.variants}
+        />
+      )}
+
+
 
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>

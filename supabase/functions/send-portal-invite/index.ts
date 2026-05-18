@@ -97,11 +97,13 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const authClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: claimsData, error: claimsErr } = await authClient.auth.getClaims();
-    if (claimsErr || !claimsData?.claims?.sub) return json({ error: "invalid_token" }, 401);
+    const token = authHeader.replace("Bearer ", "");
+    const authClient = createClient(supabaseUrl, anonKey);
+    const { data: claimsData, error: claimsErr } = await authClient.auth.getClaims(token);
+    if (claimsErr || !claimsData?.claims?.sub) {
+      console.error("[send-portal-invite] invalid_token", claimsErr);
+      return json({ error: "invalid_token" }, 401);
+    }
     const userId = claimsData.claims.sub as string;
 
     // --- Validate body ---

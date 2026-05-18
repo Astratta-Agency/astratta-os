@@ -228,13 +228,48 @@ export function PostEditorPanel({
   };
 
   const handleStatusChange = async (to: PostStatus) => {
-    if (!post) return;
+    if (!post || !meta) return;
+    // Consent guard: block scheduling/publishing if any attached asset
+    // requires consent but isn't signed.
+    if ((to === "scheduled" || to === "published") && meta.media_urls.length > 0) {
+      try {
+        const { data: assets } = await (await import("@/integrations/supabase/client")).supabase
+          .from("media_assets" as any)
+          .select("file_name, public_url, consent_required, consent_signed")
+          .in("public_url", meta.media_urls);
+        const missing = (assets ?? []).filter(
+          (a: any) => a.consent_required && !a.consent_signed,
+        );
+        if (missing.length > 0) {
+          toast.error(
+            `El asset ${missing[0].file_name} no tiene consentimiento firmado`,
+            {
+              description:
+                missing.length > 1
+                  ? `+${missing.length - 1} más sin consentimiento`
+                  : undefined,
+              action: {
+                label: "Ver biblioteca",
+                onClick: () => {
+                  setLibraryPendingOnly(true);
+                  setLibraryOpen(true);
+                },
+              },
+            },
+          );
+          return;
+        }
+      } catch {
+        /* if the lookup fails, fall through and let the server-side check it */
+      }
+    }
     try {
       await onChangeStatus(post.id, post.status, to, post.client_id);
     } catch (e: any) {
       toast.error("No se pudo cambiar el estado", { description: e?.message });
     }
   };
+
 
   const captionLengths = useMemo(() => {
     const out: Partial<Record<Channel, number>> = {};

@@ -447,6 +447,23 @@ export function PostEditorPanel({
         )}
       </SheetContent>
 
+      {post && (
+        <MediaLibraryPicker
+          open={libraryOpen}
+          onOpenChange={setLibraryOpen}
+          clientId={post.client_id}
+          isHealthcare={isHealthcare}
+          attachedUrls={meta?.media_urls ?? []}
+          initialPendingOnly={libraryPendingOnly}
+          onAdd={(toAdd) => {
+            if (!meta) return;
+            const merged = Array.from(new Set([...meta.media_urls, ...toAdd]));
+            setMeta({ ...meta, media_urls: merged });
+          }}
+        />
+      )}
+
+
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
         <AlertDialogContent>
           <AlertDialogHeader>

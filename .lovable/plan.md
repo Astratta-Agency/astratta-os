@@ -1,74 +1,221 @@
-## Phase 3 — Global Projects view at `/app/proyectos`
+## Phase 4.1 — Content Calendar base view en `/app/calendario`
 
-Reemplazar el placeholder por el cockpit operativo de proyectos a nivel agencia.
+Reemplazar el placeholder por el calendario de contenido funcional para un cliente a la vez. Editor multi-canal completo, uploads de assets y flujo de aprobación del cliente quedan deferidos a 4.2/4.3/4.4.
 
-### 1. Migración — `docs/migrations/006_projects_global_view.sql`
+### 1. Migración — `docs/migrations/007_social_posts_calendar_fields.sql`
 
-- `alter table public.projects add column if not exists assigned_team_ids jsonb not null default '[]'::jsonb;`
-- `description` ya existe (omitir).
-- `create index if not exists idx_projects_ws_status_end on public.projects (workspace_id, status, end_date);`
-- `create index if not exists idx_projects_assigned_team_gin on public.projects using gin (assigned_team_ids);` — necesario para que el filtro "Asignados a mí" use `assigned_team_ids @> '["<userId>"]'::jsonb` con buen performance.
-- Sin tablas nuevas, sin cambios en RLS.
+```sql
+alter table public.social_posts add column if not exists channels text[] not null default '{}';
+alter table public.social_posts add column if not exists content_pillar text;
+alter table public.social_posts add column if not exists media_urls text[] not null default '{}';
+alter table public.social_posts add column if not exists hashtags text;
 
-### 2. Dependencias
+create index if not exists idx_social_posts_client_scheduled
+  on public.social_posts (client_id, scheduled_for);
+create index if not exists idx_social_posts_workspace_status_scheduled
+  on public.social_posts (workspace_id, status, scheduled_for);
+create index if not exists idx_social_posts_channels_gin
+  on public.social_posts using gin (channels);
 
-`@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`, `use-debounce` (~1KB).
+create table if not exists public.content_pillars (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  name text not null,
+  color text default '#5140f2',
+  description text,
+  sort_order int default 0,
+  created_at timestamptz default now(),
+  unique (client_id, name)
+);
 
-### 3. Hooks nuevos — `src/hooks/`
+create index if not exists idx_content_pillars_client_order
+  on public.content_pillars (client_id, sort_order);
 
-- `useProjects.ts`
-  - `useProjects(workspaceId, filters)`: 
-    - Join `projects` + `clients(name, slug, logo_url, brand_primary_color)`.
-    - **Server-side filters** (para que escale a 100+ proyectos): `workspace_id`, `status` (in), `type` (in), `client_id` (in), `assigned_to_me` (usando `assigned_team_ids @> [auth.uid()]`), `search` (ilike por nombre).
-    - **Client-side**: nada — todos los filtros se mandan a Supabase para que no carguemos 500 rows que después filtramos en el browser.
-    - Búsqueda con debounce 300ms (`use-debounce`) para no spamear queries mientras el usuario tipea.
-    - `enabled: !!workspaceId`.
-    - StaleTime 30s, refetchOnWindowFocus true (cockpit operativo, queremos data fresca al volver a la tab).
-  - `useProjectsStats(workspaceId)`: query separada que solo hace `select status, count(*) from projects group by status` + un `where end_date < today and status in ('planning','in_progress')` para overdue. NO derivar de `useProjects` (las stats deben reflejar TODO el workspace, no solo el resultado filtrado de la tabla).
-  - `useUpdateProjectStatus()`: mutación optimista. On success inserta `client_timeline_events { event_type: 'project_status_changed', metadata: { from_status, to_status } }` con `client_id` y `workspace_id` del proyecto. On error: revert + toast `"No se pudo actualizar el estado"`.
-  - `useWorkspaceMembers(workspaceId)`: list members con `profiles(full_name, avatar_url, email)` para el avatar group y el multi-select de "Equipo asignado" del wizard.
+alter table public.content_pillars enable row level security;
 
-### 4. Componentes — `src/components/projects/`
+-- RLS policies for content_pillars (workspace_members CRUD, client_users SELECT)
+drop policy if exists pillars_select on public.content_pillars;
+create policy pillars_select on public.content_pillars
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.clients c
+      where c.id = content_pillars.client_id
+        and (
+          public.is_workspace_member(c.workspace_id)
+          or public.is_client_user(c.id)
+        )
+    )
+  );
 
-- `projects-kpi-bar.tsx` (5 cards clickables; "Vencidos" highlight rojo si > 0). Cada card al click llama un setter del padre que aplica el filtro correspondiente. **Adicional**: agregar un botón sutil "Limpiar filtros" que aparece solo cuando hay filtros activos, al lado derecho del bar.
-- `projects-filters-bar.tsx` (cliente multi, tipo chips, status chips, "Asignados a mí", search con debounce, toggle Lista/Kanban). En `<md` se colapsa en `Sheet` con botón "Filtros" + badge de count de filtros activos. **Persiste el state de filtros en URL search params** (`?clients=a,b&status=in_progress&view=kanban`) — así el usuario puede compartir links o usar el back button del browser.
-- `projects-table.tsx` (tabla shadcn, sortable, columnas: Nombre, Cliente, Tipo, Status, Inicio, Deadline, Equipo, Progreso, menú 3 puntos). Paginación 25/50/100. Empty state con "Limpiar filtros". **Deadline overdue** (rojo) solo si `end_date < today AND status IN ('planning', 'in_progress')` — entregados/cerrados/pausados NO se marcan rojo aunque tengan fecha vieja.
-- `projects-kanban.tsx` + `project-kanban-card.tsx` (columnas Planning / En ejecución / Pausado / Entregado / Cerrado; dnd-kit; scroll horizontal con snap en mobile; highlight de columna target con `border-secondary` en hover de drag). **Confirmation toast** después del drop exitoso: `"Movido a {nuevo estado}"` con botón "Deshacer" que revierte por 5 segundos. Evita errores de drop accidental.
-- `project-type-selector.tsx` (grid visual 6 cards de tipo). Cada card con icono lucide específico: `Globe` (web_dev), `Instagram` (social_media), `Target` (paid_ads), `Palette` (graphic_design), `Sparkles` (branding), `Search` (audit). Hover state con `border-primary`.
-- `new-project-global-dialog.tsx` (wizard 3 pasos: Cliente+Tipo → Detalles → Plantilla onboarding solo si `social_media`).
-  - **Step 1 — Cliente Combobox**: incluye un link "+ Crear cliente nuevo" al final de la lista que abre el `new-client-dialog` existente. Evita que el user tenga que cerrar y reabrir flow.
-  - **Step 2 — Validación de fechas**: si el usuario pone `end_date < start_date`, el botón Next se deshabilita y muestra error inline.
-  - **Step 3 — Solo visible para** `social_media`: si type ≠ social_media, el wizard salta directo de Step 2 a submit (3 pasos máx visualmente, pero el flow se adapta).
-  - Submit inserta en `projects` con `assigned_team_ids` como JSON array. Si template on para social_media: toast `"Plantilla aplicada (próximamente)"`. Navega a `/app/clientes/:slug` e invalida `projects`, `clients` y `useProjectsStats`.
+drop policy if exists pillars_insert on public.content_pillars;
+create policy pillars_insert on public.content_pillars
+  for insert to authenticated
+  with check (
+    exists (
+      select 1 from public.clients c
+      where c.id = content_pillars.client_id
+        and public.is_workspace_member(c.workspace_id)
+    )
+  );
 
-Progreso (mock): Si `start_date` y `end_date` presentes y status `in_progress` → `Math.max(0, Math.min(100, (today - start) / (end - start) * 100))`. `delivered`/`closed` → 100. `planning` → 0. `paused` → muestra "—" (no progresa). Sin fechas → "—".
+drop policy if exists pillars_update on public.content_pillars;
+create policy pillars_update on public.content_pillars
+  for update to authenticated
+  using (
+    exists (
+      select 1 from public.clients c
+      where c.id = content_pillars.client_id
+        and public.is_workspace_member(c.workspace_id)
+    )
+  );
 
-Equipo asignado: Avatares derivados de `assigned_team_ids` (join con `workspace_members` + `profiles` para nombre/avatar). UI de selección en wizard a partir de `useWorkspaceMembers`. Avatar group max 3 visibles + `+N` badge con tooltip listando los nombres.
+drop policy if exists pillars_delete on public.content_pillars;
+create policy pillars_delete on public.content_pillars
+  for delete to authenticated
+  using (
+    exists (
+      select 1 from public.clients c
+      where c.id = content_pillars.client_id
+        and public.is_workspace_member(c.workspace_id)
+    )
+  );
 
-### 5. Página — `src/pages/app/Proyectos.tsx`
+-- Seed default pillars for "180 Grados Med Spa" if the client exists
+do $$
+declare
+  v_client_id uuid;
+begin
+  select id into v_client_id 
+  from public.clients 
+  where slug = '180-grados-med-spa' 
+  limit 1;
 
-Reemplazar `PlaceholderPage` con:
+  if v_client_id is not null then
+    insert into public.content_pillars (client_id, name, color, description, sort_order)
+    values 
+      (v_client_id, 'Educativo',           '#5140f2', 'Información sobre tratamientos, cuidados, beneficios',                1),
+      (v_client_id, 'Antes/Después',       '#ff7503', 'Resultados con disclaimer FTC y consentimiento firmado',              2),
+      (v_client_id, 'Testimonios',         '#10b981', 'Reseñas y experiencias de pacientes con consentimiento',              3),
+      (v_client_id, 'Behind-the-scenes',   '#3b82f6', 'Equipo, instalaciones, día a día del spa',                            4),
+      (v_client_id, 'Promociones',         '#f59e0b', 'Ofertas, paquetes, eventos especiales',                               5)
+    on conflict (client_id, name) do nothing;
+  end if;
+end $$;
+```
 
-- H1 "Proyectos" + subtítulo + botón "Nuevo proyecto" (primary).
-- `<ProjectsKpiBar onStatusClick={setStatusFilter} />` (los clics setean filtros).
-- `<ProjectsFiltersBar />` con state local sincronizado a URL search params (`useSearchParams` de react-router).
-- `view === 'lista'` → `<ProjectsTable />`, `view === 'kanban'` → `<ProjectsKanban />`.
-- Click en fila de proyecto / botón "Abrir" → `toast("Detalle de proyecto próximamente")`.
-- **Loading skeleton** mientras `useProjects.isLoading`: skeleton de tabla con 5 rows fantasma. Mejor UX que un spinner genérico.
+`content_pillar` en `social_posts` queda como text (nombre del pilar, no FK) para tolerar pilares ad-hoc; la tabla `content_pillars` alimenta el select y el color. En el join lo resolvemos client-side mapeando por nombre dentro del cliente actual — esto evita una FK que rompería si renombran un pilar.
 
-### 6. Tokens de diseño
+Nota: la migración debe aplicarse manualmente en Supabase SQL Editor antes de usar el calendario.
 
-- Mini-logo cliente: si no hay `logo_url`, iniciales sobre fondo derivado de `client.brand_primary_color`.
-- Status badge y service chips reutilizan los componentes existentes (`status-badge`, `services-chips`).
-- Sin hex crudos en JSX salvo el inline-style del fallback de logo de cliente (color dinámico por dato).
-- **Type icons**: usar `text-primary` en hover, `text-muted-foreground` en idle. Color animado.
+### 2. Hooks — `src/hooks/useSocialPosts.ts`
 
-### Fuera de scope
+- `useSocialPosts({ workspaceId, clientId, dateRange:{from,to}, filters })`
+  - select `social_posts.*` con `.gte('scheduled_for', from).lte('scheduled_for', to)`.
+  - Server-side: `workspace_id`, `client_id`, `channels && {...}` (overlap array con `.overlaps`), `status in`, `content_pillar in`, `caption ilike` (debounce 300ms en la página).
+  - StaleTime 30s. `enabled: !!workspaceId && !!clientId`.
+  - Refetch on window focus = true (cuando el equipo edita en paralelo, los cambios aparecen al volver a la tab).
+- `useContentPillars(clientId)` — `select * from content_pillars where client_id order by sort_order`. Agrega `{ name: "Sin pilar", color: "hsl(var(--muted-foreground))" }` al final en memoria.
+- `useUpdatePostSchedule()` — optimista. Recibe `{ id, scheduled_for }`. Revert + toast en error con botón "Reintentar".
+- `useCreatePost()` — insert mínimo (caption, scheduled_for, channels[], content_pillar, status, workspace_id, client_id, type='feed_post'). Invalida `social-posts`. Devuelve el row creado.
+- `useUpdatePostStatus()` — cambio de estado; inserta `content_approval_history` cuando transiciona entre estados de revisión/aprobación.
 
-- Detalle `/app/proyectos/:id`.
-- Cálculo real de progreso server-side.
-- Auto-creación de tareas desde plantilla onboarding (deferred to Tareas module).
-- Cambios de permisos.
-- Bulk actions (multi-select de proyectos para cambiar status en masa) — defer hasta que tengas 20+ proyectos activos.
+### 3. Página — `src/pages/app/Calendario.tsx`
+
+Composición:
+
+```
+<div class="space-y-4">
+  <CalendarTopBar /> // sticky top, client selector + navigator + view toggle + "Nueva publicación"
+  <CalendarFiltersBar />
+  {view === 'mes' && <CalendarMonthView />}
+  {view === 'semana' && <CalendarWeekView />}
+  {view === 'lista' && <CalendarListView />}
+  <PostDetailPanel /> // controlado por state
+  <PostQuickCreateDialog /> // controlado por state
+</div>
+```
+
+- Cliente activo: defaults al primer cliente activo del workspace; persiste última selección en `localStorage["calendario:last_client_id"]`. Si el cliente persistido fue borrado, fallback al primero activo.
+- Empty state cuando 0 posts en el rango: ilustración `CalendarPlus`, headline "Aún no hay publicaciones para este período", CTA "Nueva publicación".
+- Loading: skeleton de grilla mes (35 celdas) / week / table según view.
+
+**Atajo de teclado**: presionar `N` (sin otro modificador y sin foco en input) abre el `PostQuickCreateDialog`. Aceleración crítica cuando estás planificando 30 posts el lunes en la mañana.
+
+### 4. Componentes — `src/components/calendar/`
+
+- `client-selector.tsx` — combobox con logo + nombre, search. Reusa `ClientLogo` existente. Persiste a localStorage. Si el workspace tiene 0 clientes activos, muestra inline empty state con CTA "Crear primer cliente" → `/app/clientes`.
+- `calendar-navigator.tsx` — Prev/Hoy/Next + label ("Mayo 2026" o "12 – 18 May 2026"). Sabe del view actual para incrementar mes vs semana. Atajos `←` y `→` para navegar prev/next cuando no hay input enfocado.
+- `calendar-filters-bar.tsx` — canales (multi chips con iconos), pilares (multi), estados (multi chips con color), search debounced. Badge de count + "Limpiar". Sheet en mobile.
+- `calendar-month-view.tsx` + `day-cell.tsx` — grilla 7 col, min-h 140px, hoy con círculo `bg-primary`, días fuera de mes con `text-muted-foreground/50`. dnd-kit `DndContext` envolvente; celdas son `useDroppable`, cards son `useDraggable`. Drop preserva hora, cambia solo fecha. Click en celda vacía → quick create con date prefill. Max 3 posts visibles, "+N más" expande con Popover.
+- `calendar-week-view.tsx` + `time-slot.tsx` — 7 cols × slots 6am–11pm cada 1h. Drop cambia timestamp completo (fecha + hora del slot). Scroll vertical con auto-scroll a 9am al montar.
+- `calendar-list-view.tsx` — tabla shadcn sortable: fecha/hora, canal (iconos), formato, caption (60 chars), pilar (chip), estado (badge), acciones. Paginación 25/50/100. Default sort: scheduled_for asc.
+- `post-card.tsx` — compact 80px en mes: iconos de canales (max 3 + "+N" si más), caption 1 línea truncate, thumbnail si `media_urls[0]`, dot de pilar, badge de estado. Hover: ring con secondary color. Cursor grab. Click → detail panel. Si scheduled_for < now() AND status NOT IN ('published','archived') → ring rojo sutil (señal de "post atrasado").
+- `post-detail-panel.tsx` — `Sheet` lado derecho. Read-only: full caption, channels, scheduled_for (formato `dd MMM yyyy 'a las' HH:mm`), pilar, estado, thumbnails de media_urls (grid 3 cols), hashtags (como chips), history de cambios de estado desde `content_approval_history`. Botón "Editar" → toast "Editor completo próximamente". Botón "Cambiar estado" funcional usando `useUpdatePostStatus` con confirmación si el target es destructivo (archived/rejected). Botón "Duplicar" — crea copia con caption + media + pilar pero fecha = mañana 9am, status = 'draft'. Acelera la creación de variantes.
+- `post-quick-create-dialog.tsx` — form: caption (Textarea ≤500 con counter), `scheduled_for` (date picker shadcn + time input HH:mm, default = mañana 9am), canales (multi chips), pilar (select), estado (default 'draft', selector que incluye 'pending_approval'). **Validación**: caption no vacío, scheduled_for entre `now() - 30 días` y `now() + 365 días` (med spas planifican lanzamientos con meses de anticipación; el límite original de 7 días era demasiado restrictivo). Al menos 1 canal seleccionado.
+- `pillar-badge.tsx` — dot color + nombre (size sm/md).
+- `state-badge-post.tsx` — badge con dot y label, color desde mapa.
+- `channel-icon.tsx` — mapper canal → icono (lucide `Instagram`, `Facebook`, `Linkedin` + svg inline custom para `tiktok`, `x`, `threads`). Acepta size prop (sm 16px, md 20px).
+
+### 5. Tokens de estado y canales
+
+En lugar de hex crudos en componentes, agregar en `src/lib/post-states.ts`:
+
+```ts
+export const POST_STATE_META = {
+  idea:                    { label: "Idea",            color: "hsl(0 0% 60%)" },
+  draft:                   { label: "Borrador",        color: "hsl(217 91% 60%)" },
+  pending_internal_review: { label: "Revisión interna",color: "hsl(38 92% 50%)" },
+  pending_approval:        { label: "Esperando cliente",color:"hsl(23 100% 51%)" },
+  approved:                { label: "Aprobado",        color: "hsl(142 71% 45%)" },
+  scheduled:               { label: "Programado",      color: "hsl(245 87% 60%)" },
+  published:               { label: "Publicado",       color: "hsl(158 100% 30%)" },
+  rejected:                { label: "Rechazado",       color: "hsl(0 84% 60%)" },
+  archived:                { label: "Archivado",       color: "hsl(0 0% 70%)" },
+} as const;
+
+export const POST_STATE_TRANSITIONS = {
+  idea:                    ["draft", "archived"],
+  draft:                   ["pending_internal_review", "pending_approval", "archived"],
+  pending_internal_review: ["draft", "pending_approval", "rejected"],
+  pending_approval:        ["approved", "rejected", "draft"],
+  approved:                ["scheduled", "draft"],
+  scheduled:               ["approved", "published", "archived"],
+  published:               ["archived"],
+  rejected:                ["draft", "archived"],
+  archived:                ["draft"],
+} as const;
+```
+
+Las transiciones definen el subconjunto de estados a los que se puede mover desde uno actual. El menú "Cambiar estado" en el detail panel solo muestra opciones válidas según `POST_STATE_TRANSITIONS[currentState]`. Evita transiciones inválidas tipo "published → draft".
+
+Excepción aceptada al "no hex crudos": estos son datos de dominio (mapa de estados), igual que `brand_primary_color` de cliente. Se aplican vía `style={{ backgroundColor }}` en el dot, no en clases Tailwind.
+
+### 6. URL search params
+
+`useSearchParams`: `view`, `client_id`, `from`, `to`, `status`, `channels`, `pillars`, `q`. Compartibles vía link. Defaults: `view=mes`, rango = mes actual, client_id = localStorage o primer activo.
+
+### 7. Responsive
+
+- `<md`: month cells `min-h-[80px]`, max 1 post + "+N", header con día abreviado (3 letras).
+- Week view en mobile: degrada a un solo día (selector de día) en columna vertical scroll.
+- List view en mobile: solo columnas fecha + caption + estado.
+- Filters bar → Sheet con trigger "Filtros" + badge de count.
+
+### Detalles técnicos
+
+- `dnd-kit/core` ya está instalado (Phase 3). Reutilizamos `DndContext` + `PointerSensor` con activation distance 5px para no romper clicks.
+- date-fns ya disponible; usamos `startOfMonth`, `endOfMonth`, `eachDayOfInterval`, `startOfWeek`, `format` con locale `es`.
+- Channels almacenados como `text[]`; query con `.overlaps('channels', selected)`.
+- `pending_approval` desde quick-create NO dispara email aún (deferred 4.4); solo cambia status.
+
+### Fuera de scope (4.2+)
+
+- Editor completo multi-canal con variantes por canal.
+- Hashtag suggestions, mentions autocomplete, UTM builder.
+- Asset library y media uploads (solo URL string por ahora).
+- Wire-up de `send-content-approval-request`.
+- First comment IG, carousel/reel/story editing.
+- Bulk ops, repeats, AI captions.
 
 Aprobado → implemento todo en este loop.

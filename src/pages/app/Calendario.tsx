@@ -184,13 +184,18 @@ export default function Calendario() {
     }
   };
 
-  const handleStatusChange = async (post: SocialPostRow, to: PostStatus) => {
+  const handleStatusChange = async (
+    postId: string,
+    from: PostStatus,
+    to: PostStatus,
+    clientIdArg: string,
+  ) => {
     try {
-      await updateStatus.mutateAsync({ id: post.id, clientId: post.client_id, from: post.status, to });
+      await updateStatus.mutateAsync({ id: postId, clientId: clientIdArg, from, to });
       toast.success(`Movido a ${to}`);
-      setDetailPost({ ...post, status: to });
     } catch (e: any) {
       toast.error("No se pudo actualizar el estado", { description: e?.message });
+      throw e;
     }
   };
 
@@ -322,10 +327,7 @@ export default function Calendario() {
           monthAnchor={anchor}
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => {
-            setDetailPost(p);
-            setDetailOpen(true);
-          }}
+          onPostClick={(p) => openPost(p.id)}
           onCreate={openCreate}
           onReschedule={handleReschedule}
         />
@@ -334,10 +336,7 @@ export default function Calendario() {
           anchor={anchor}
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => {
-            setDetailPost(p);
-            setDetailOpen(true);
-          }}
+          onPostClick={(p) => openPost(p.id)}
           onCreate={openCreate}
           onReschedule={handleReschedule}
         />
@@ -345,23 +344,29 @@ export default function Calendario() {
         <CalendarListView
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => {
-            setDetailPost(p);
-            setDetailOpen(true);
-          }}
+          onPostClick={(p) => openPost(p.id)}
           clientName={activeClients.find((c) => c.id === clientId)?.name}
           rangeFrom={range.from}
           rangeTo={range.to}
         />
       )}
 
-      <PostDetailPanel
-        post={detailPost}
-        pillarMap={pillarMap}
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        onChangeStatus={handleStatusChange}
-      />
+      {(() => {
+        const activeClient = activeClients.find((c) => c.id === clientId);
+        return (
+          <PostEditorPanel
+            postId={postIdParam}
+            open={editorOpen}
+            onOpenChange={(o) => (o ? setEditorOpen(true) : closeEditor())}
+            clientName={activeClient?.name ?? "Cliente"}
+            clientSlug={(activeClient as any)?.slug ?? "cliente"}
+            clientLogo={activeClient?.logo_url}
+            brandColor={activeClient?.brand_primary_color}
+            onChangeStatus={handleStatusChange}
+          />
+        );
+      })()}
+
 
       <PostQuickCreateDialog
         open={createOpen}

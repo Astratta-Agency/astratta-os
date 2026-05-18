@@ -21,7 +21,7 @@ import {
   getHours,
   getMinutes,
 } from "date-fns";
-import { es } from "date-fns/locale";
+
 import { DayCell } from "./day-cell";
 import type { SocialPostRow, ContentPillar } from "@/hooks/useSocialPosts";
 

@@ -18,6 +18,8 @@ import { MediaUploader } from "./media-uploader";
 import { MediaLibraryPicker } from "./media-library-picker";
 import { PostFormatWarnings } from "./post-format-warnings";
 import { StateChangeDropdown } from "./state-change-dropdown";
+import { PostSubmitForApprovalButton } from "./post-submit-for-approval-button";
+import { SubmitForApprovalDialog } from "./submit-for-approval-dialog";
 
 import {
   usePost,
@@ -78,6 +80,7 @@ export function PostEditorPanel({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryPendingOnly, setLibraryPendingOnly] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false);
 
   // Hydrate local state when post loads / changes
   useEffect(() => {

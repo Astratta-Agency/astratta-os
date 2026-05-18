@@ -2,8 +2,13 @@ import { Outlet } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/top-bar";
+import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
+import { usePostStatusChanges } from "@/hooks/usePostStatusChanges";
 
 export default function AppShell() {
+  const { workspace } = useActiveWorkspace();
+  usePostStatusChanges(workspace?.id);
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">

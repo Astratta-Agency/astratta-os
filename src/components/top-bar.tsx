@@ -1,8 +1,7 @@
-import { Bell } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { UserMenu } from "@/components/user-menu";
+import { NotificationsBell } from "@/components/notifications-bell";
 
 export function TopBar() {
   return (
@@ -14,10 +13,7 @@ export function TopBar() {
       <div className="flex-1" />
 
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notificaciones">
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-secondary" aria-hidden />
-        </Button>
+        <NotificationsBell />
         <UserMenu />
       </div>
     </header>

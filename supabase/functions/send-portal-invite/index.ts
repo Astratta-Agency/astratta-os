@@ -144,7 +144,6 @@ Deno.serve(async (req) => {
     });
 
     // --- Send via SES v2 ---
-    const region = Deno.env.get("AWS_REGION") ?? "us-east-1";
     const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID");
     const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
     const fromEmail = Deno.env.get("FROM_EMAIL") ?? "invites@astrattaagency.com";
@@ -155,46 +154,23 @@ Deno.serve(async (req) => {
       return json({ emailed: false, error: "aws_credentials_missing" }, 200);
     }
 
-    const host = `email.${region}.amazonaws.com`;
-    const path = "/v2/email/outbound-emails";
-    const payload = JSON.stringify({
-      FromEmailAddress: `Astratta <${fromEmail}>`,
-      Destination: { ToAddresses: [email] },
-      ReplyToAddresses: [replyTo],
-      Content: {
-        Simple: {
-          Subject: { Data: subject, Charset: "UTF-8" },
-          Body: {
-            Html: { Data: html, Charset: "UTF-8" },
-            Text: { Data: text, Charset: "UTF-8" },
-          },
-        },
-      },
-    });
-
-    const headers = await signSesRequest({
-      region,
+    const sesResult = await sendSesEmail({
+      region: Deno.env.get("AWS_REGION") ?? "us-east-1",
       accessKeyId,
       secretAccessKey,
-      body: payload,
-      host,
-      path,
+      fromEmail: `Astratta <${fromEmail}>`,
+      replyTo,
+      toAddresses: [email],
+      subject,
+      html,
+      text,
     });
 
-    const sesRes = await fetch(`https://${host}${path}`, {
-      method: "POST",
-      headers,
-      body: payload,
-    });
-
-    if (!sesRes.ok) {
-      const errBody = await sesRes.text();
-      console.error("[send-portal-invite] SES error", sesRes.status, errBody);
-      return json({ emailed: false, error: `ses_${sesRes.status}`, detail: errBody.slice(0, 500) }, 200);
+    if (!sesResult.ok) {
+      console.error("[send-portal-invite] SES error", sesResult.status, sesResult.error);
+      return json({ emailed: false, error: `ses_${sesResult.status}`, detail: sesResult.error }, 200);
     }
-
-    const sesData = await sesRes.json().catch(() => ({}));
-    return json({ emailed: true, messageId: sesData?.MessageId ?? null });
+    return json({ emailed: true, messageId: sesResult.messageId });
   } catch (e) {
     console.error("[send-portal-invite] unexpected", e);
     return json({ emailed: false, error: "unexpected", detail: String(e) }, 200);

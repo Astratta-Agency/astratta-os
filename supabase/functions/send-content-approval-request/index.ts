@@ -373,6 +373,8 @@ Deno.serve(async (req) => {
       sent,
       failed,
       skipped: false,
+      portalUrl,
+      recipientEmails: recipients,
       results: sendResults.map((r) => ({
         email: r.email,
         messageId: r.ok ? r.messageId : null,

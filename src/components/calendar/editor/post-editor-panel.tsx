@@ -14,7 +14,8 @@ import { PostEditorMeta, type PostFormat } from "./post-editor-meta";
 import { ChannelTabs } from "./channel-tabs";
 import { VariantEditor, variantToDraft, emptyDraft, type VariantDraft } from "./variant-editor";
 import { PostPreview } from "./post-preview";
-import { MediaUrlsEditor } from "./media-urls-editor";
+import { MediaUploader } from "./media-uploader";
+import { MediaLibraryPicker } from "./media-library-picker";
 import { PostFormatWarnings } from "./post-format-warnings";
 import { StateChangeDropdown } from "./state-change-dropdown";
 
@@ -38,6 +39,8 @@ interface Props {
   clientSlug: string;
   clientLogo?: string | null;
   brandColor?: string | null;
+  workspaceId: string;
+  isHealthcare: boolean;
   onChangeStatus: (postId: string, from: PostStatus, to: PostStatus, clientId: string) => Promise<void>;
 }
 
@@ -58,6 +61,8 @@ export function PostEditorPanel({
   clientSlug,
   clientLogo,
   brandColor,
+  workspaceId,
+  isHealthcare,
   onChangeStatus,
 }: Props) {
   const { data: post, isLoading } = usePost(postId);
@@ -71,6 +76,8 @@ export function PostEditorPanel({
   const [active, setActive] = useState<Channel | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryPendingOnly, setLibraryPendingOnly] = useState(false);
 
   // Hydrate local state when post loads / changes
   useEffect(() => {

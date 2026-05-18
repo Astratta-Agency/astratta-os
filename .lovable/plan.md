@@ -1,104 +1,138 @@
-## Add "Invitar al portal" button to client detail header
+# Plan: Edge Function `send-portal-invite` con Amazon SES
 
-Adds the missing portal invitation flow specified in the original plan but skipped in the previous build.
+Reemplaza el approach Resend. Envío directo a SES v2 con SigV4 firmado en Deno (sin SDK).
 
-### Schema change (new migration: `docs/migrations/004_client_user_invites.sql`)
+## 1. Edge Function `supabase/functions/send-portal-invite/index.ts`
 
-The current `client_users` table requires `user_id` (FK to `auth.users`) and has no invitation state. To support `status='invited'` inserts before the invitee has an account, the migration:
+- `verify_jwt: true` (default Lovable). Validar JWT en código con `getClaims` igual.
+- CORS preflight estándar (`corsHeaders` desde `npm:@supabase/supabase-js@2/cors`).
+- Body con Zod:
+  ```ts
+  z.object({
+    client_id: z.string().uuid(),
+    email: z.string().email(),
+    welcome_message: z.string().max(500).optional(),
+  })
+  ```
 
-- Makes `client_users.user_id` nullable.
-- Adds columns: `status text not null default 'active'` with check `in ('invited','active','revoked')`, `invited_email text`, `invited_by uuid references auth.users(id)`, `welcome_message text`, `invited_at timestamptz`, `revoked_at timestamptz`, `accepted_at timestamptz`.
-- Adds a partial unique index on `(client_id, lower(invited_email))` where `status='invited'` to prevent duplicate pending invites.
-- Updates the existing RLS check so workspace members can insert invites where `user_id is null` and `invited_email is not null`. The existing `client_users_write_member` policy already scopes by client → workspace membership; adjust the check expression to allow null `user_id` only when `status = 'invited'` and `invited_email IS NOT NULL`.
-- Backfills `status='active'` for existing rows where `user_id IS NOT NULL`.
+### Flujo
 
-### New component: `src/components/clients/invite-client-user-dialog.tsx`
+1. OPTIONS → 200.
+2. Validar `Authorization: Bearer ...` → `getClaims` con anon client. 401 si falla. `userId = claims.sub`.
+3. Service-role client (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) →
+  - `clients.select('id, name, slug, workspace_id, brand_primary_color, brand_secondary_color, logo_url').eq('id', client_id).maybeSingle()` → 404 si no existe.
+  - `workspace_members.select('user_id').eq('workspace_id', client.workspace_id).eq('user_id', userId).maybeSingle()` → 403 si no es miembro.
+4. Service-role client → `workspaces.select('name').eq('id', client.workspace_id).maybeSingle()` → para el `From` display name personalizable y el footer.
+5. `portalUrl` = `${SITE_URL ?? new URL(req.headers.get('origin') ?? '').origin}/portal/login`.
+6. Generar `invite_id = crypto.randomUUID()` para tracking (irá en custom header del email + en logs).
+7. Render HTML + texto plano (helpers inline, sin libs externas).
+8. POST a SES v2 `https://email.${REGION}.amazonaws.com/v2/email/outbound-emails` con SigV4. Body JSON:
+  ```json
+   {
+       "FromEmailAddress": "Astratta <invites@astrattaagency.com>",
+       "Destination": { "ToAddresses": [email] },
+       "ReplyToAddresses": ["hello@astrattaagency.com"],
+       "ConfigurationSetName": "astratta-transactional",
+       "EmailTags": [
+         { "Name": "category", "Value": "portal_invite" },
+         { "Name": "client_id", "Value": "<short-client-id>" },
+         { "Name": "invite_id", "Value": "<invite_id>" }
+       ],
+       "Content": {
+         "Simple": {
+           "Subject": { "Data": "Te invitamos al portal de <Client> x Astratta", "Charset": "UTF-8" },
+           "Body": {
+             "Html": { "Data": "<html...>", "Charset": "UTF-8" },
+             "Text": { "Data": "...", "Charset": "UTF-8" }
+           }
+         }
+       }
+     }
+  ```
+9. `ConfigurationSetName` es opcional: si la env `SES_CONFIGURATION_SET` no está definida, se omite del payload (no rompe el envío).
+10. `EmailTags` permiten filtrar bounces/deliveries por categoría en CloudWatch sin esfuerzo extra.
+11. **Retry policy**: si la respuesta de SES es 5xx o network error, reintentar hasta 2 veces con backoff exponencial (250ms, 750ms). 4xx (validation errors) NO se reintenta — devolver error inmediato.
+12. Si 200 → `{ emailed: true, messageId, invite_id }`. Si error después de retries → `{ emailed: false, error, invite_id }` con status 200 (para que el dialog muestre fallback).
+13. **Logging estructurado** (JSON.stringify a console.log con prefijo `[send-portal-invite]`): siempre log con shape `{ invite_id, client_id, recipient_email_hash, status, duration_ms, ses_message_id?, error? }`. Hash del email (SHA-256 truncado 8 chars) para evitar PII en logs.
 
-- Props: `open`, `onOpenChange`, `clientId`, `clientSlug`, `clientName`.
-- Form (react-hook-form + zod): 
-  - `email` — required, `.email()` validation, max 255 chars.
-  - `role` — `Select` with `client_admin` / `client_viewer` (default `client_viewer`). Helper text below: "Admin puede aprobar contenido y editar datos. Viewer solo lectura."
-  - `welcome_message` — optional `Textarea`, max 500 chars, placeholder: "Ej: Hola Juan, te invitamos al portal donde aprobarás contenido y verás reportes mensuales."
-- Submit handler:
-  1. Insert into `client_users` with `{ client_id, invited_email, role, welcome_message, status: 'invited', invited_by: auth.uid(), invited_at: now() }`. Handle 23505 (duplicate invite) with a friendly toast: "Ya existe una invitación pendiente para ese correo".
-  2. Try `supabase.auth.admin.inviteUserByEmail(email, { redirectTo: <portal URL> })`. The admin API is not available with the anon key in the browser, so this call will throw — wrap in try/catch and treat any failure as the manual fallback.
-  3. **Fallback path** (this is the default path until we have an Edge Function for invites): keep the dialog open, swap the form for a "Invitación creada" success state showing: 
-    - Green check icon + headline "Invitación creada"
-    - Subtle helper: "El envío automático de correo estará disponible pronto. Por ahora, comparte este enlace con el cliente:"
-    - Read-only input with the URL `${window.location.origin}/portal/login` (NOT the slug URL — clients log in to the portal root which then redirects them to their client based on `client_users` matching their email after they accept)
-    - "Copiar enlace" button (lucide `Copy` icon, copies to clipboard, toast "Enlace copiado")
-    - "Copiar mensaje completo" button — copies a pre-formatted message ready to paste into WhatsApp/email:
+### SigV4 helper (inline, ~80 LOC)
 
-```text
-Hola {clientName},
-       
-       Te invitamos al portal de Astratta Agency donde podrás aprobar contenido, ver reportes y acceder a tus documentos.
-       
-       Accede en: {portalUrl}
-       Ingresa con este correo: {invitedEmail}
-       
-       {welcomeMessage if provided}
+- Función `signRequest({ method, url, region, service: 'ses', body, accessKeyId, secretAccessKey })` que devuelve headers `Authorization`, `X-Amz-Date`, `X-Amz-Content-Sha256`, `Host`.
+- Usa `crypto.subtle` (HMAC-SHA256, SHA-256) — disponible en Deno sin imports.
+- Canonical request → string to sign → signing key (`AWS4` + secret → date → region → service → `aws4_request`) → signature.
+
+### Template HTML
+
+Estructura tabular (compatible Gmail/Outlook), inline styles:
+
+- Outer `<table>` background `#f6f7fb`, content table 600px centered, `#ffffff`, border-radius 12.
+- Header bar 60px, `background: ${brand_primary_color ?? '#5140f2'}`.
+- Hero: si `logo_url` presente, `<img src="..." height="48" alt="${client.name} logo" />` centrado, sino skip. Headline `<h1>` "Te invitamos al portal de {Client Name}".
+- Párrafo de bienvenida explicando capacidades (aprobar contenido, ver reportes, acceder documentos).
+- Si `welcome_message` presente: blockquote con border-left `4px solid ${brand_primary_color}`, padding-left 16, color `#475569`, italic.
+- CTA `<a>` botón: bg `${brand_primary_color ?? '#5140f2'}`, color blanco, padding `14px 28px`, border-radius 8, text "Acceder al portal", href `portalUrl`.
+- Helper: "Inicia sesión con tu correo: **{email}**".
+- Footer: hr, "Powered by Astratta Agency · astrattaagency.com" + logo Astratta (URL pública estable, hardcoded — TODO confirmar URL).
+- Mini-línea legal final (gris claro 11px): "Recibes este correo porque {workspace.name} te invitó al portal cliente. Si no esperabas esta invitación, ignora este mensaje."
+- Escape de `client.name` y `welcome_message` con helper `escapeHtml`.
+- `meta` tag `<meta name="x-invite-id" content="{invite_id}" />` dentro del `<head>` para trazabilidad si alguien forwardea el email.
+
+Texto plano: versión mínima con headline, mensaje, URL, login email.
+
+## 2. Hook `src/hooks/useClientDetail.ts`
+
+En `useInviteClientUser.mutationFn`, reemplazar el bloque `try { const adminApi = ... }` por:
+
+```ts
+let emailed = false;
+let inviteId: string | null = null;
+try {
+  const { data, error: fnErr } = await supabase.functions.invoke("send-portal-invite", {
+    body: { 
+      client_id: clientId, 
+      email: input.email.toLowerCase().trim(), 
+      welcome_message: input.welcome_message ?? null 
+    },
+  });
+  if (!fnErr && data?.emailed) emailed = true;
+  inviteId = data?.invite_id ?? null;
+} catch (e) { 
+  console.warn('[useInviteClientUser] Edge function failed, falling back to manual share', e);
+}
+return { emailed, inviteId };
 ```
 
-```text
- - "Cerrar" button to dismiss
-```
+El insert previo en `client_users` queda igual. Opcional: guardar `inviteId` en el row de `client_users` (`metadata jsonb` o columna nueva `invite_id text`) para correlacionar con logs después.
 
-- States: `isSubmitting` disables the submit button and shows a spinner. Success toast `"Invitación enviada a {email}"` only fires if step 2 succeeded (rare with anon key); otherwise no toast — the dialog itself shows the success state.
-- Reset form on close.
+## 3. Dialog
 
-### Header integration (`src/pages/app/ClienteDetalle.tsx`)
+`invite-client-user-dialog.tsx` ya maneja `emailed: true` (toast + cierre) vs `false` (pantalla copia). Sin cambios estructurales.
 
-Insert the new button **between** "Crear proyecto" and "Ver portal cliente":
+Ajuste menor: cuando `emailed: true`, el toast pasa a `"Invitación enviada a {email}"` con un subtítulo discreto `"El correo puede tardar 1-2 minutos en llegar"`. Setea expectativa correcta y reduce los "no me llegó nada" del cliente.
 
-```text
-[Editar] [Crear proyecto] [Invitar al portal] [Ver portal cliente]
-```
+## 4. Secretos requeridos
 
-- Desktop (`hidden md:flex`): full button cluster as today, with the new `Button` using `UserPlus` lucide icon and label "Invitar al portal".
-- Mobile (`flex md:hidden`): primary actions remain inline (`Editar`, `Crear proyecto`); secondary actions (`Invitar al portal`, `Ver portal cliente`) collapse into a `DropdownMenu` triggered by a `MoreVertical` icon button. Each dropdown item carries its own icon.
-- New dialog state: `const [inviteOpen, setInviteOpen] = useState(false);`
-- Render `<InviteClientUserDialog open={inviteOpen} onOpenChange={setInviteOpen} clientId={client.id} clientSlug={client.slug} clientName={client.name} />` next to the existing `NewProjectDialog`.
+El usuario los configura manualmente en Supabase Dashboard → Edge Functions → Secrets:
 
-### Hook: `useInviteClientUser(clientId)`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION` (default `us-east-1` si falta)
+- `FROM_EMAIL` (default `invites@astrattaagency.com`)
+- `REPLY_TO_EMAIL` (default `hello@astrattaagency.com`)
+- `SITE_URL` (default desde `Origin` header)
+- `SES_CONFIGURATION_SET` (opcional, default omitido del payload — habilita event tracking si se setea)
 
-Co-located in `src/hooks/useClientDetail.ts` to match existing patterns. Wraps the insert + admin invite attempt + query invalidation for `["client", workspaceId, slug]` and a new `["client-invites", clientId]` query.
+`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` ya están disponibles automáticamente.
 
-### New hook: `usePendingInvites(clientId)`
+## Archivos
 
-Returns rows from `client_users` where `client_id = clientId AND status = 'invited'`, with: `id`, `invited_email`, `role`, `invited_at`, `invited_by` (joined to profiles for `full_name`).
+- **Nuevo:** `supabase/functions/send-portal-invite/index.ts` (~280 LOC incluyendo SigV4 + template + retry + logging)
+- **Editado:** `src/hooks/useClientDetail.ts` (~12 LOC en `useInviteClientUser`)
 
-### Stakeholders tab update — show pending invites
+## Fuera de alcance
 
-In `src/components/clients/stakeholders-list.tsx` (or wherever the Resumen Stakeholders card lives), add a small section below the contacts list:
-
-```
-─── Invitaciones pendientes ───
-[email]                    Admin · hace 2 días    [Revocar] [Copiar enlace]
-[email]                    Viewer · hace 1 hora   [Revocar] [Copiar enlace]
-```
-
-- Each row: invited_email, role badge, relative time, two actions:
-  - "Revocar" → updates status to `revoked` + sets `revoked_at = now()`. Toast "Invitación revocada".
-  - "Copiar enlace" → copies the same portal URL + message used in the dialog success state.
-- Section is hidden if no pending invites exist.
-- Header: "Invitaciones pendientes" with count badge.
-
-### Files
-
-- Created: 
-  - `docs/migrations/004_client_user_invites.sql`
-  - `src/components/clients/invite-client-user-dialog.tsx`
-  - `src/components/clients/pending-invites-list.tsx`
-- Edited: 
-  - `src/pages/app/ClienteDetalle.tsx`
-  - `src/hooks/useClientDetail.ts`
-  - `src/components/clients/stakeholders-list.tsx` (or equivalent in Resumen tab) to render `<PendingInvitesList />` below contacts
-
-### Out of scope
-
-- Real magic-link email delivery (requires server-side admin key or a Supabase Edge Function — can be a follow-up; structure already supports it).
-- Resend invite action (UI placeholder OK for next iteration).
-- Listing invites globally (per-client surface only for now).
-
-You'll need to apply `004_client_user_invites.sql` in the Supabase SQL Editor after this lands.
+- MIME multipart con attachments.
+- Tracking de bounces/complaints (SNS) — los tags + Configuration Set dejan la base lista para activarlo después sin refactor.
+- Reenvío automático en caso de fallo (queda manual).
+- Verificación adicional de `astrattaagency.com` en SES (ya hecho por el usuario).
+- Almacenar `invite_id` en `client_users` (no estructural — se puede agregar en migration futura si quieres correlación bidireccional).

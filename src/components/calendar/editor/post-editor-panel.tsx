@@ -325,6 +325,10 @@ export function PostEditorPanel({
                 {saveLabel}
               </span>
               <div className="ml-auto flex items-center gap-1">
+                <PostSubmitForApprovalButton
+                  status={post.status}
+                  onClick={() => setSubmitOpen(true)}
+                />
                 <StateChangeDropdown status={post.status} onChange={handleStatusChange} />
                 <Button size="sm" variant="ghost" onClick={() => toast("Duplicar próximamente")}>
                   <Copy className="h-4 w-4" />

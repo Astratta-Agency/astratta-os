@@ -6,6 +6,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
+import { escapeHtml, sendSesEmail } from "../_shared/ses.ts";
 
 const BodySchema = z.object({
   client_id: z.string().uuid(),
@@ -18,95 +19,6 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-
-// ----------------- AWS SigV4 -----------------
-const enc = new TextEncoder();
-
-async function sha256Hex(data: string | Uint8Array): Promise<string> {
-  const buf = typeof data === "string" ? enc.encode(data) : data;
-  const hash = await crypto.subtle.digest("SHA-256", buf);
-  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function hmac(key: ArrayBuffer | Uint8Array, data: string): Promise<ArrayBuffer> {
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    key as BufferSource,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  return crypto.subtle.sign("HMAC", cryptoKey, enc.encode(data));
-}
-
-function toHex(buf: ArrayBuffer): string {
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function signSesRequest(opts: {
-  region: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  body: string;
-  host: string;
-  path: string;
-}): Promise<Record<string, string>> {
-  const { region, accessKeyId, secretAccessKey, body, host, path } = opts;
-  const service = "ses";
-  const method = "POST";
-  const now = new Date();
-  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, ""); // YYYYMMDDTHHMMSSZ
-  const dateStamp = amzDate.slice(0, 8);
-
-  const payloadHash = await sha256Hex(body);
-  const canonicalHeaders =
-    `content-type:application/json\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
-  const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
-  const canonicalRequest = [
-    method,
-    path,
-    "",
-    canonicalHeaders,
-    signedHeaders,
-    payloadHash,
-  ].join("\n");
-
-  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-  const stringToSign = [
-    "AWS4-HMAC-SHA256",
-    amzDate,
-    credentialScope,
-    await sha256Hex(canonicalRequest),
-  ].join("\n");
-
-  const kDate = await hmac(enc.encode("AWS4" + secretAccessKey), dateStamp);
-  const kRegion = await hmac(kDate, region);
-  const kService = await hmac(kRegion, service);
-  const kSigning = await hmac(kService, "aws4_request");
-  const signature = toHex(await hmac(kSigning, stringToSign));
-
-  const authorization =
-    `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, ` +
-    `SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
-  return {
-    "Content-Type": "application/json",
-    "Host": host,
-    "X-Amz-Date": amzDate,
-    "X-Amz-Content-Sha256": payloadHash,
-    "Authorization": authorization,
-  };
-}
-
-// ----------------- HTML template -----------------
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 function renderEmail(args: {
   clientName: string;

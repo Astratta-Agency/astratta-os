@@ -237,13 +237,14 @@ export function PostEditorPanel({
           .from("media_assets" as any)
           .select("file_name, public_url, consent_required, consent_signed")
           .in("public_url", meta.media_urls);
-        const missing = (assets ?? []).filter(
-          (a: any) => a.consent_required && !a.consent_signed,
+        const missing = ((assets ?? []) as any[]).filter(
+          (a) => a.consent_required && !a.consent_signed,
         );
         if (missing.length > 0) {
           toast.error(
             `El asset ${missing[0].file_name} no tiene consentimiento firmado`,
             {
+
               description:
                 missing.length > 1
                   ? `+${missing.length - 1} más sin consentimiento`
@@ -386,12 +387,20 @@ export function PostEditorPanel({
                 </div>
 
                 <div className="rounded-lg border bg-card p-3">
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">Media</p>
-                  <MediaUrlsEditor
+                  <MediaUploader
+                    workspaceId={workspaceId}
+                    clientId={post.client_id}
                     urls={meta.media_urls}
                     onChange={(u) => setMeta({ ...meta, media_urls: u })}
+                    postType={meta.type}
+                    isHealthcare={isHealthcare}
+                    onOpenLibrary={() => {
+                      setLibraryPendingOnly(false);
+                      setLibraryOpen(true);
+                    }}
                   />
                 </div>
+
               </div>
 
               {/* Right: preview — desktop sticky, mobile accordion */}

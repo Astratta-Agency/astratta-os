@@ -34,6 +34,7 @@ import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
 import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
+import { isHealthcareClient } from "@/lib/client-validation";
 
 const parseList = (v: string | null): string[] => (v ? v.split(",").filter(Boolean) : []);
 
@@ -361,10 +362,13 @@ export default function Calendario() {
             clientSlug={(activeClient as any)?.slug ?? "cliente"}
             clientLogo={activeClient?.logo_url}
             brandColor={activeClient?.brand_primary_color}
+            workspaceId={workspaceId ?? ""}
+            isHealthcare={isHealthcareClient(activeClient)}
             onChangeStatus={handleStatusChange}
           />
         );
       })()}
+
 
 
       <PostQuickCreateDialog

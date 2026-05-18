@@ -14,7 +14,8 @@ import { PostEditorMeta, type PostFormat } from "./post-editor-meta";
 import { ChannelTabs } from "./channel-tabs";
 import { VariantEditor, variantToDraft, emptyDraft, type VariantDraft } from "./variant-editor";
 import { PostPreview } from "./post-preview";
-import { MediaUrlsEditor } from "./media-urls-editor";
+import { MediaUploader } from "./media-uploader";
+import { MediaLibraryPicker } from "./media-library-picker";
 import { PostFormatWarnings } from "./post-format-warnings";
 import { StateChangeDropdown } from "./state-change-dropdown";
 
@@ -38,6 +39,8 @@ interface Props {
   clientSlug: string;
   clientLogo?: string | null;
   brandColor?: string | null;
+  workspaceId: string;
+  isHealthcare: boolean;
   onChangeStatus: (postId: string, from: PostStatus, to: PostStatus, clientId: string) => Promise<void>;
 }
 
@@ -58,6 +61,8 @@ export function PostEditorPanel({
   clientSlug,
   clientLogo,
   brandColor,
+  workspaceId,
+  isHealthcare,
   onChangeStatus,
 }: Props) {
   const { data: post, isLoading } = usePost(postId);
@@ -71,6 +76,8 @@ export function PostEditorPanel({
   const [active, setActive] = useState<Channel | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryPendingOnly, setLibraryPendingOnly] = useState(false);
 
   // Hydrate local state when post loads / changes
   useEffect(() => {
@@ -221,13 +228,49 @@ export function PostEditorPanel({
   };
 
   const handleStatusChange = async (to: PostStatus) => {
-    if (!post) return;
+    if (!post || !meta) return;
+    // Consent guard: block scheduling/publishing if any attached asset
+    // requires consent but isn't signed.
+    if ((to === "scheduled" || to === "published") && meta.media_urls.length > 0) {
+      try {
+        const { data: assets } = await (await import("@/integrations/supabase/client")).supabase
+          .from("media_assets" as any)
+          .select("file_name, public_url, consent_required, consent_signed")
+          .in("public_url", meta.media_urls);
+        const missing = ((assets ?? []) as any[]).filter(
+          (a) => a.consent_required && !a.consent_signed,
+        );
+        if (missing.length > 0) {
+          toast.error(
+            `El asset ${missing[0].file_name} no tiene consentimiento firmado`,
+            {
+
+              description:
+                missing.length > 1
+                  ? `+${missing.length - 1} más sin consentimiento`
+                  : undefined,
+              action: {
+                label: "Ver biblioteca",
+                onClick: () => {
+                  setLibraryPendingOnly(true);
+                  setLibraryOpen(true);
+                },
+              },
+            },
+          );
+          return;
+        }
+      } catch {
+        /* if the lookup fails, fall through and let the server-side check it */
+      }
+    }
     try {
       await onChangeStatus(post.id, post.status, to, post.client_id);
     } catch (e: any) {
       toast.error("No se pudo cambiar el estado", { description: e?.message });
     }
   };
+
 
   const captionLengths = useMemo(() => {
     const out: Partial<Record<Channel, number>> = {};
@@ -344,12 +387,20 @@ export function PostEditorPanel({
                 </div>
 
                 <div className="rounded-lg border bg-card p-3">
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">Media</p>
-                  <MediaUrlsEditor
+                  <MediaUploader
+                    workspaceId={workspaceId}
+                    clientId={post.client_id}
                     urls={meta.media_urls}
                     onChange={(u) => setMeta({ ...meta, media_urls: u })}
+                    postType={meta.type}
+                    isHealthcare={isHealthcare}
+                    onOpenLibrary={() => {
+                      setLibraryPendingOnly(false);
+                      setLibraryOpen(true);
+                    }}
                   />
                 </div>
+
               </div>
 
               {/* Right: preview — desktop sticky, mobile accordion */}
@@ -395,6 +446,23 @@ export function PostEditorPanel({
           </>
         )}
       </SheetContent>
+
+      {post && (
+        <MediaLibraryPicker
+          open={libraryOpen}
+          onOpenChange={setLibraryOpen}
+          clientId={post.client_id}
+          isHealthcare={isHealthcare}
+          attachedUrls={meta?.media_urls ?? []}
+          initialPendingOnly={libraryPendingOnly}
+          onAdd={(toAdd) => {
+            if (!meta) return;
+            const merged = Array.from(new Set([...meta.media_urls, ...toAdd]));
+            setMeta({ ...meta, media_urls: merged });
+          }}
+        />
+      )}
+
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
         <AlertDialogContent>

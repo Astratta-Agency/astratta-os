@@ -1,85 +1,116 @@
-## Phase 4.2 — Full Multi-Channel Post Editor
+## Phase 4.3 — Storage uploads + media management
 
-Replace the read-only `post-detail-panel.tsx` with a full editing experience: per-channel variants, char counters per platform, hashtags, mentions, first comment (IG), UTM builder, live preview, format selector. Asset uploads remain deferred to 4.3.
+Replace the URL-paste flow in the post editor with real Supabase Storage uploads, persist uploaded files in a per-client `media_assets` table, and add a reusable asset library picker. Adds a med-spa consent gate that blocks scheduling/publishing posts whose media lacks signed consent.
 
-### Database
+### Database — `docs/migrations/009_media_assets_and_buckets.sql`
 
-`docs/migrations/008_post_variants.sql` (user applies in SQL editor):
+`media_assets` table:
 
-- `post_variants` table: `(id, post_id FK→social_posts, channel, caption, hashtags, first_comment, mentions text[], location, utm_url, is_enabled, updated_at, updated_by)`, unique on `(post_id, channel)`, index on `post_id`.
-- **Additional indexes**: `idx_post_variants_mentions_gin on post_variants using gin (mentions)` (for future mention-based queries — costs 0 to add now).
-- RLS: workspace members get full access via `social_posts → clients → workspace`. Client users get SELECT only for posts in `pending_approval|approved|rejected|scheduled|published`.
-- Trigger `set_post_variants_updated_at` updates `updated_at` + `updated_by = auth.uid()`.
-- Expand `social_posts.type` check to `('feed_post','carousel','reel','story','video','other')`.
-- **Add column** `social_posts.format_meta jsonb default '{}'::jsonb` for format-specific metadata (story duration, reel cover frame index, carousel order map, etc.). UI to manipulate this lives in 4.3, but adding the column now avoids a future migration.
+- `id, workspace_id (FK workspaces), client_id (FK clients), uploaded_by (FK auth.users)`
+- `file_name, storage_path (unique), public_url, mime_type, size_bytes, width, height, duration_seconds`
+- `tags text[] default '{}'`
+- `orientation text generated always as (case when width is null or height is null then null when width > height then 'landscape' when width < height then 'portrait' else 'square' end) stored` — auto-derived. Esencial para warnings en reel (necesita portrait) y story (también portrait) sin tener que calcular cada vez en el cliente.
+- Med-spa: `consent_required bool`, `consent_signed bool`, `consent_form_url`, `patient_ref`, `treatment`, `before_after_pair_id (self-FK)`
+- `created_at`
+- Indexes: `(client_id, created_at desc)`, GIN on `tags`, partial index `(client_id) where consent_required = true and consent_signed = false` — fast lookup of "qué assets están pendientes de consentimiento" para badge counts.
+- RLS: SELECT for workspace members + client users; ALL for workspace members only — using existing `is_workspace_member` / `is_client_user` helpers
+
+Storage bucket `client-media` is created manually in the Dashboard — instructions in `docs/setup-storage.md` (public read, 50MB limit, allowed mime types, RLS policies on `storage.objects` keyed off the first folder segment = workspace_id).
 
 ### Code
 
-**Channel meta —** `src/lib/channels.ts`
+`**src/lib/storage.ts**`
 
-`CHANNEL_META` with `{ label, limit, hashtagLimit, firstComment, icon, color }` per channel (IG 2200, FB 63206, LI 3000, TT 2200, X 280, Threads 500). IG is the only one with `firstComment: true`.
+- `uploadAsset({ file, workspaceId, clientId, onProgress? })` → uploads to `client-media` at `${workspaceId}/${clientId}/${uuid}-${sanitizedName}`.
+- **Cache control**: pass `{ cacheControl: '31536000', upsert: false }` so uploaded media gets 1-year browser cache. Reduces bandwidth costs cuando 180 Grados Med Spa abre el calendario varias veces al día.
+- Pre-upload validation: max 50MB, mime in `{image/jpeg,png,webp,gif, video/mp4, video/quicktime}`.
+- For images: read width/height via `URL.createObjectURL` + `Image()`. For videos: read `duration` and a first-frame thumbnail (canvas at `currentTime=0.1`).
+- Returns `{ storagePath, publicUrl, sizeBytes, mimeType, width?, height?, durationSeconds? }` or `{ error: 'file_too_large'|'invalid_type'|'upload_failed' }`.
+- `sanitizeFilename(name)` helper: replace `[^a-zA-Z0-9._-]` with `-`, collapse hyphens, trim, max 80 chars. Cuando el cliente sube `Foto fiñal de tratamiento (2).jpg` no rompe.
 
-**Hooks — `src/hooks/usePostEditor.ts**`
+`**src/lib/client-validation.ts**`
 
-- `usePost(postId)` — joins `social_posts` + `post_variants[]`. enabled: `!!postId`.
-- `useUpdatePost(postId)` — patches the post row.
-- `useUpsertVariant(postId)` — upserts by `(post_id, channel)`.
-- `useDeleteVariant(postId, channel)` — sets `is_enabled=false`.
-- `useAutosave(saveFn)` — 1.5s debounce, exposes `{ status: 'idle'|'saving'|'saved'|'error', lastSavedAt }`.
-- `useDirtyState(postId)` — tracks whether the in-memory editor state has unsaved diffs vs the last saved snapshot. Used by `Esc` close confirm and by the browser `beforeunload` guard (only mounted when editor is open).
+- `isHealthcareClient(client)` → `industry ∈ {Med Spa, Healthcare, Wellness}`.
+- `assertConsentForMediaUrls(urls, assets)` → returns list of asset filenames missing signed consent. Used by state-change guard.
 
-**Components — `src/components/calendar/editor/**`
+`**src/hooks/useMediaAssets.ts**`
 
-- `post-editor-panel.tsx` — Sheet 920px (full-screen on mobile). Header with editable title, state badge, autosave indicator, action bar (state dropdown, duplicar, eliminar). 2-col body (editor left, preview right; stacked on mobile with collapsible preview).
-  - **Anti-data-loss guardrails**:
-    - `Esc` close shows confirm dialog ONLY if `useDirtyState` returns dirty AND autosave status is `error` or `saving` (not saved yet). If saved, close silently.
-    - Mount a `useBeforeUnload` handler that triggers the native browser "Are you sure you want to leave?" if dirty AND not saved.
+- `useMediaAssets(clientId, { search, tags })` — list query.
+- `useUploadAsset()` — wraps storage upload + insert into `media_assets`; auto-sets `consent_required=true` for healthcare clients.
+- `useDeleteAsset()` — remove from storage then from table; rolls back the table delete if storage delete fails.
+- `useAssetsByUrls(publicUrls)` — lookup helper used by the consent guard.
 
-- `post-editor-meta.tsx` — cliente (read-only), pilar, formato (segmented), fecha programada (date+time), estado.
+`**src/components/calendar/editor/media-uploader.tsx**` (replaces `media-urls-editor.tsx`)
 
-- `post-format-warnings.tsx` — contextual hints for story / reel / carousel.
+- Dropzone via `react-dropzone` (added to package.json): "Arrastra una imagen/video aquí, o haz clic para seleccionar".
+- Collapsible "Pegar URL" accordion preserves the legacy paste flow (HEAD validate, fallback embed on CORS fail).
+- Per-file progress bar (Astratta primary token).
+- Failed uploads: red border + retry icon.
+- Thumbnail grid (80x80). Click X to remove from post (does not delete asset).
+- When `post.type === 'carousel'`: drag-to-reorder via `dnd-kit` (cap 10 items).
+- "Desde biblioteca" button opens `MediaLibraryPicker`.
+- On success: append `publicUrl` to `post.media_urls[]` and insert `media_assets` row.
+- **Orientation warning**: if `post.type === 'reel'` OR `post.type === 'story'` AND uploaded asset is `landscape` → inline warning "Reels y Stories funcionan mejor en formato vertical (9:16). Esta imagen es horizontal." con opción de subirla igual.
+- For healthcare clients: inline consent form appears after upload (`consent_signed` checkbox, `consent_form_url` upload to `/consents/` subpath, `patient_ref`, `treatment`).
 
-- `channel-tabs.tsx` — one tab per enabled channel with icon + char counter pill (amber at 80%, red at 100%). "+ Agregar canal" dropdown for missing channels. Remove with confirm. **Keyboard shortcut**: `Cmd/Ctrl + 1..6` jumps to channel tab N (no input focused). Acelera el switching entre canales cuando estás editando 4 variantes seguidas.
+`**src/components/calendar/editor/media-library-picker.tsx**`
 
-- `variant-editor.tsx` — caption Textarea (auto-resize + live count), hashtags field (count vs `hashtagLimit`), first comment (IG only), mentions (text array for now), location, UTM URL display + builder button, "Copiar variante a otros canales" modal (copies caption/hashtags/mentions/location, not first_comment or utm_url).
-
-- `utm-builder-dialog.tsx` — prefilled `source=channel`, `medium=social`, `campaign=${client.slug}-${yyyy-MM}`, `content=post.id[-8:]`. Base URL field with validation, live preview, "Copiar" + "Aplicar".
-
-- `post-preview.tsx` — channel-specific mock (IG square 380px, FB 380px, LI 500px, X 500px compact, TT 380px vertical, Threads 500px). Mini header + media or placeholder + caption (truncate at "..." per channel) + hashtags + first comment + action row icons. Auto-switches with active tab.
-
-- `media-urls-editor.tsx` — URL paste input + "Agregar URL" → horizontal thumbs with remove X. Basic ordering for carousel (full drag in 4.3).
-
-- `state-change-dropdown.tsx` — uses `POST_STATE_TRANSITIONS`. Destructive states confirm. `pending_approval` shows toast about deferred email wire-up.
+- Dialog listing `media_assets` for current client; search by name + tag chip filters.
+- Click thumb → preview modal with metadata.
+- Multi-select checkboxes → "Agregar N a este post" appends `public_url` values to `post.media_urls`.
+- For med-spa assets: badge "Consentimiento firmado" (green) / "Falta consentimiento" (red).
+- **Tab "Pendientes de consentimiento"** in the picker header (visible only for healthcare clients): pre-filtered view of assets with `consent_required = true AND consent_signed = false`. Te permite resolver el backlog de consentimientos sin scroll de toda la biblioteca.
 
 ### Wiring
 
-- `src/components/calendar/post-card.tsx` — click handler opens `PostEditorPanel` instead of detail panel.
-- `src/pages/app/Calendario.tsx` — mount `PostEditorPanel`; sync `?post={id}` URL param (open on load if id is in workspace, remove on close). When closing with dirty state, prompt confirm; on cancel, keep editor open with param intact.
-- `src/components/calendar/post-detail-panel.tsx` — removed from render tree; file kept (deprecated stub) until 4.3 cleanup.
+- `variant-editor.tsx` → swap `MediaUrlsEditor` for `MediaUploader` (lift media editing up if it makes more sense at the post level — media is shared across variants, not per-channel). Recommend moving the uploader into `post-editor-panel.tsx` so all variants share it, and keep per-variant only caption/hashtags/etc.
+- `post-editor-panel.tsx` → mount `MediaUploader` once in the post meta area; mount `MediaLibraryPicker` dialog.
+- `state-change-dropdown.tsx` → before transitioning to `scheduled` or `published`, run `assertConsentForMediaUrls`; block with toast `El asset {filename} no tiene consentimiento firmado` if any fail. Show a "Ver biblioteca" link in the toast that opens MediaLibraryPicker directly on the "Pendientes de consentimiento" tab.
+- `Calendario.tsx` → no changes.
 
-### UX
+### Storage path convention
 
-- Autosave 1.5s after last keystroke. Indicator: "Guardando..." → "Guardado · hace Xs". On error: toast with "Reintentar".
-- Cmd/Ctrl+S = immediate save. Esc closes (confirm if pending dirty).
-- Char counter visible while scrolling variant editor (sticky on active tab).
+- Media: `{workspace_id}/{client_id}/{uuid}-{sanitized_filename}.{ext}`
+- Consent forms: `{workspace_id}/{client_id}/consents/{uuid}-{patient_ref_or_anon}.pdf`
 
-### URL behavior
+Allows per-workspace cleanup via folder enumeration and keeps RLS keyed on first path segment.
 
-- `/app/calendario?post={id}` auto-opens editor.
-- Closing removes param (back-button friendly).
-- Shareable inside the team.
+### UX details
 
-### Out of scope (deferred)
+- Max 10 files per upload action.
+- 50MB per file; toast on rejection.
+- Video thumbs: canvas snapshot at `currentTime=0.1`.
+- Upload progress at bottom edge of thumb.
+- **Optimistic UI**: thumb appears in the grid immediately with progress overlay, swapped for real public_url when upload completes.
 
-- Asset uploads to Storage (4.3) — only URL paste now.
-- Full carousel drag-reorder (4.3).
-- AI captions, hashtag/mention autocomplete (later).
-- Approval email Edge Function wire-up (4.4).
-- Real publishing to Meta/TikTok APIs (Phase 5).
-- UI to edit `format_meta` (column exists, UI in 4.3).
+### Manual steps for the user (after merge)
+
+1. Apply `docs/migrations/009_media_assets_and_buckets.sql` in the Supabase SQL editor.
+2. Create the `client-media` bucket per `docs/setup-storage.md` (public, 50MB, allowed mime list, RLS policies).
+
+### Out of scope (4.4+)
+
+AI alt-text, image optimization/transcoding, bulk consent upload, approval email Edge Function, before/after pair UI beyond the FK column.
 
 ### Files
 
-**Created**: `docs/migrations/008_post_variants.sql`, `src/lib/channels.ts`, `src/hooks/usePostEditor.ts`, and 8 components under `src/components/calendar/editor/`.
+**Created**
 
-**Edited**: `src/components/calendar/post-card.tsx`, `src/pages/app/Calendario.tsx`, `src/components/calendar/post-detail-panel.tsx`.
+- `docs/migrations/009_media_assets_and_buckets.sql`
+- `docs/setup-storage.md`
+- `src/lib/storage.ts`
+- `src/lib/client-validation.ts`
+- `src/hooks/useMediaAssets.ts`
+- `src/components/calendar/editor/media-uploader.tsx`
+- `src/components/calendar/editor/media-library-picker.tsx`
+
+**Edited**
+
+- `src/components/calendar/editor/variant-editor.tsx` (remove media block)
+- `src/components/calendar/editor/post-editor-panel.tsx` (mount uploader + picker)
+- `src/components/calendar/editor/state-change-dropdown.tsx` (consent guard)
+- `package.json` (add `react-dropzone`, `@dnd-kit/core`, `@dnd-kit/sortable`)
+
+**Deleted (or left as deprecated stub)**
+
+- `src/components/calendar/editor/media-urls-editor.tsx`

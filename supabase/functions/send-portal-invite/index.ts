@@ -91,20 +91,22 @@ Deno.serve(async (req) => {
   try {
     // --- Auth ---
     const authHeader = req.headers.get("Authorization") ?? "";
+    console.log("[send-portal-invite] Authorization header:", authHeader.substring(0, 50));
     if (!authHeader.startsWith("Bearer ")) return json({ error: "missing_token" }, 401);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const token = authHeader.replace("Bearer ", "");
-    const authClient = createClient(supabaseUrl, anonKey);
-    const { data: claimsData, error: claimsErr } = await authClient.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims?.sub) {
-      console.error("[send-portal-invite] invalid_token", claimsErr);
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await authClient.auth.getUser();
+    if (userErr || !userData?.user?.id) {
+      console.error("[send-portal-invite] invalid_token", userErr);
       return json({ error: "invalid_token" }, 401);
     }
-    const userId = claimsData.claims.sub as string;
+    const userId = userData.user.id;
 
     // --- Validate body ---
     const raw = await req.json().catch(() => null);

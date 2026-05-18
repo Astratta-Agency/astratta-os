@@ -243,18 +243,20 @@ export function useInviteClientUser(clientId: string | undefined) {
       });
       if (error) throw error;
 
-      // Try admin API (will fail with anon key — fallback path is the default).
+      // Send invitation email via Amazon SES (Edge Function). On failure the
+      // dialog falls back to "copy link" flow.
       let emailed = false;
       try {
-        const adminApi = (supabase.auth as any)?.admin;
-        if (adminApi?.inviteUserByEmail) {
-          const { error: invErr } = await adminApi.inviteUserByEmail(input.email, {
-            redirectTo: `${window.location.origin}/portal/login`,
-          });
-          if (!invErr) emailed = true;
-        }
-      } catch {
-        // fallback handled by caller
+        const { data, error: fnErr } = await supabase.functions.invoke("send-portal-invite", {
+          body: {
+            client_id: clientId,
+            email: input.email.toLowerCase().trim(),
+            welcome_message: input.welcome_message ?? null,
+          },
+        });
+        if (!fnErr && (data as any)?.emailed) emailed = true;
+      } catch (e) {
+        console.warn("[useInviteClientUser] send-portal-invite failed", e);
       }
       return { emailed };
     },

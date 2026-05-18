@@ -23,7 +23,6 @@ import {
   useSocialPosts,
   useUpdatePostSchedule,
   useUpdatePostStatus,
-  type SocialPostRow,
 } from "@/hooks/useSocialPosts";
 import type { Channel, PostStatus } from "@/lib/post-states";
 
@@ -33,7 +32,7 @@ import { CalendarFiltersBar } from "@/components/calendar/calendar-filters-bar";
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
-import { PostDetailPanel } from "@/components/calendar/post-detail-panel";
+import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
 
 const parseList = (v: string | null): string[] => (v ? v.split(",").filter(Boolean) : []);
@@ -141,8 +140,16 @@ export default function Calendario() {
   const updateStatus = useUpdatePostStatus();
   const createPost = useCreatePost();
 
-  const [detailPost, setDetailPost] = useState<SocialPostRow | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const postIdParam = params.get("post");
+  const [editorOpen, setEditorOpen] = useState<boolean>(!!postIdParam);
+  useEffect(() => {
+    setEditorOpen(!!postIdParam);
+  }, [postIdParam]);
+  const openPost = (id: string) => update({ post: id });
+  const closeEditor = () => {
+    setEditorOpen(false);
+    update({ post: null });
+  };
   const [createOpen, setCreateOpen] = useState(false);
   const [createDate, setCreateDate] = useState<Date | null>(null);
 
@@ -176,13 +183,18 @@ export default function Calendario() {
     }
   };
 
-  const handleStatusChange = async (post: SocialPostRow, to: PostStatus) => {
+  const handleStatusChange = async (
+    postId: string,
+    from: PostStatus,
+    to: PostStatus,
+    clientIdArg: string,
+  ) => {
     try {
-      await updateStatus.mutateAsync({ id: post.id, clientId: post.client_id, from: post.status, to });
+      await updateStatus.mutateAsync({ id: postId, clientId: clientIdArg, from, to });
       toast.success(`Movido a ${to}`);
-      setDetailPost({ ...post, status: to });
     } catch (e: any) {
       toast.error("No se pudo actualizar el estado", { description: e?.message });
+      throw e;
     }
   };
 
@@ -314,10 +326,7 @@ export default function Calendario() {
           monthAnchor={anchor}
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => {
-            setDetailPost(p);
-            setDetailOpen(true);
-          }}
+          onPostClick={(p) => openPost(p.id)}
           onCreate={openCreate}
           onReschedule={handleReschedule}
         />
@@ -326,10 +335,7 @@ export default function Calendario() {
           anchor={anchor}
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => {
-            setDetailPost(p);
-            setDetailOpen(true);
-          }}
+          onPostClick={(p) => openPost(p.id)}
           onCreate={openCreate}
           onReschedule={handleReschedule}
         />
@@ -337,23 +343,29 @@ export default function Calendario() {
         <CalendarListView
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => {
-            setDetailPost(p);
-            setDetailOpen(true);
-          }}
+          onPostClick={(p) => openPost(p.id)}
           clientName={activeClients.find((c) => c.id === clientId)?.name}
           rangeFrom={range.from}
           rangeTo={range.to}
         />
       )}
 
-      <PostDetailPanel
-        post={detailPost}
-        pillarMap={pillarMap}
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-        onChangeStatus={handleStatusChange}
-      />
+      {(() => {
+        const activeClient = activeClients.find((c) => c.id === clientId);
+        return (
+          <PostEditorPanel
+            postId={postIdParam}
+            open={editorOpen}
+            onOpenChange={(o) => (o ? setEditorOpen(true) : closeEditor())}
+            clientName={activeClient?.name ?? "Cliente"}
+            clientSlug={(activeClient as any)?.slug ?? "cliente"}
+            clientLogo={activeClient?.logo_url}
+            brandColor={activeClient?.brand_primary_color}
+            onChangeStatus={handleStatusChange}
+          />
+        );
+      })()}
+
 
       <PostQuickCreateDialog
         open={createOpen}

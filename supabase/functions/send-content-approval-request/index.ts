@@ -10,6 +10,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
+import { validateRequest } from "../_shared/auth.ts";
 import { escapeHtml, sendSesEmail } from "../_shared/ses.ts";
 
 const BodySchema = z.object({
@@ -134,7 +135,6 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const internalSecret = Deno.env.get("INTERNAL_TRIGGER_SECRET") ?? "";
 
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
     }
     const { post_id, source, force, message } = parsed.data;
 
-    // --- Auth: either internal-secret or JWT (verify in code per signing-keys system) ---
+    // --- Auth: either internal-secret or JWT ---
     let callerUserId: string | null = null;
     if (source === "trigger") {
       const provided = req.headers.get("x-internal-secret") ?? "";
@@ -154,18 +154,9 @@ Deno.serve(async (req) => {
         return json({ error: "invalid_internal_secret" }, 401);
       }
     } else {
-      const authHeader = req.headers.get("Authorization") ?? "";
-      if (!authHeader.startsWith("Bearer ")) return json({ error: "missing_token" }, 401);
-      const authClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader } },
-      });
-      const token = authHeader.replace("Bearer ", "");
-      const { data: claimsData, error: claimsErr } = await authClient.auth.getClaims(token);
-      if (claimsErr || !claimsData?.claims?.sub) {
-        console.error("[send-content-approval-request] invalid_token", claimsErr);
-        return json({ error: "invalid_token" }, 401);
-      }
-      callerUserId = claimsData.claims.sub as string;
+      const authResult = await validateRequest(req, corsHeaders);
+      if ("errorResponse" in authResult) return authResult.errorResponse;
+      callerUserId = authResult.user.id;
     }
 
     const admin = createClient(supabaseUrl, serviceKey);

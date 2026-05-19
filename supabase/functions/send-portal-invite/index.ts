@@ -6,6 +6,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
+import { validateRequest } from "../_shared/auth.ts";
 import { escapeHtml, sendSesEmail } from "../_shared/ses.ts";
 
 const BodySchema = z.object({
@@ -84,29 +85,14 @@ function renderEmail(args: {
 
 // ----------------- Handler -----------------
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
   try {
-    // --- Auth (signing-keys: verify in code with getClaims) ---
-    const authHeader = req.headers.get("Authorization") ?? "";
-    if (!authHeader.startsWith("Bearer ")) return json({ error: "missing_token" }, 401);
+    // --- Auth ---
+    const authResult = await validateRequest(req, corsHeaders);
+    if ("errorResponse" in authResult) return authResult.errorResponse;
+    const userId = authResult.user.id;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const authClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsErr } = await authClient.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims?.sub) {
-      console.error("[send-portal-invite] invalid_token", claimsErr);
-      return json({ error: "invalid_token" }, 401);
-    }
-    const userId = claimsData.claims.sub as string;
 
     // --- Validate body ---
     const raw = await req.json().catch(() => null);

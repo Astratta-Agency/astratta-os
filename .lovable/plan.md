@@ -1,142 +1,211 @@
-# Phase 4.4 — Real-time agency notifications + Submit-for-approval flow
+# Phase 5.1 — Client Portal: Shell + Home + Approvals
 
-End-to-end loop that lets agency send posts to client for approval, fires a Postgres trigger when client responds, and surfaces results to the agency in real time via a notifications bell. Also unblocks two parked Edge Function bugs by fixing the auth pattern.
+Goal: replace the placeholder `/portal/:slug` with a real, branded client portal so clients (180 Grados Med Spa first) can review and act on pending content. Builds on Phase 4.4 (notifications + approval submit flow). Email wire-up stays parked (Edge Function auth bug tracked separately); manual link share remains the fallback.
 
-## 1. Migration — `docs/migrations/011_notifications.sql`
+## 1. Database
 
-New `public.notifications` table:
+`docs/migrations/010_post_status_changes_requested.sql` (only if not already applied):
 
-- Columns: `id`, `workspace_id`, `recipient_user_id`, `type` (check constraint: `post_approved`, `post_rejected`, `post_changes_requested`, `invite_accepted`, `payment_received`, `contract_expiring`), `title`, `body`, `link`, `read`, `read_at`, `metadata jsonb`, `created_at`.
-- Partial index on `(recipient_user_id, created_at desc) where read = false`.
-- RLS enabled. Policies: select + update only when `recipient_user_id = auth.uid()`.
+- Add `changes_requested` to `post_status` (enum `ADD VALUE` guarded by `pg_enum` check, or extend CHECK constraint if it's a constraint).
+- No new tables; reuse existing `social_posts`, `post_variants`, `content_approval_history`, `notifications`, `client_users`, `clients`.
 
-Trigger `notify_post_status_change()` on `social_posts` AFTER UPDATE OF status:
+**RLS audit — confirm these policies exist; create them in this same migration if missing**:
 
-- Skips if status unchanged or not in `(approved, rejected, changes_requested)`.
-- Looks up client → workspace, fans out one notification per active `workspace_members` row with role `owner` or `team_member`.
-- Title is client-driven (e.g. `"<Client> aprobó un post"`), body is the truncated caption, link is `/app/calendario?post=<id>`, metadata includes `post_id`, `client_id`, `new_status`, `rejection_reason`.
+```sql
+-- social_posts SELECT for client_users
+drop policy if exists social_posts_select_client_users on public.social_posts;
+create policy social_posts_select_client_users on public.social_posts
+  for select to authenticated
+  using (
+    public.is_client_user(client_id)
+    and status in ('pending_approval','approved','rejected','changes_requested','scheduled','published')
+  );
 
-**Server-side approval lock guard** — also add a separate trigger `BEFORE UPDATE OF status` on `social_posts` that:
+-- social_posts UPDATE for client_admin only, only the columns they need
+drop policy if exists social_posts_update_client_admin on public.social_posts;
+create policy social_posts_update_client_admin on public.social_posts
+  for update to authenticated
+  using (
+    public.is_client_admin(client_id)
+    and status in ('pending_approval','changes_requested')
+  )
+  with check (
+    public.is_client_admin(client_id)
+    and status in ('approved','rejected','changes_requested')
+  );
 
-- If `OLD.status = 'pending_approval'` AND `NEW.status IN ('approved','rejected','changes_requested')`:
-  - Checks if any other update has already landed in the last 2 seconds for this post (lookup `content_approval_history` rows with `post_id = OLD.id AND action IN ('approved','rejected','changes_requested') AND created_at > now() - interval '2 seconds'`).
-  - If yes: `RAISE EXCEPTION 'Already responded to this post in the last 2 seconds'`.
-  - Prevents double-submit when 2 client_admins click simultaneously from different devices.
+-- post_variants SELECT for client_users
+drop policy if exists post_variants_select_client_users on public.post_variants;
+create policy post_variants_select_client_users on public.post_variants
+  for select to authenticated
+  using (
+    exists (
+      select 1 from public.social_posts sp
+      where sp.id = post_variants.post_id
+        and public.is_client_user(sp.client_id)
+        and sp.status in ('pending_approval','approved','rejected','changes_requested','scheduled','published')
+    )
+  );
 
-(Per project convention: schema-only migration file. User applies it manually in the Supabase SQL editor.)
+-- content_approval_history INSERT for client_admin
+drop policy if exists content_approval_history_insert_client_admin on public.content_approval_history;
+create policy content_approval_history_insert_client_admin on public.content_approval_history
+  for insert to authenticated
+  with check (
+    public.is_client_admin(client_id)
+    and action in ('approved','rejected','changes_requested')
+    and actor_user_id = auth.uid()
+  );
 
-## 2. Client-side submit-for-approval flow
-
-For the agency editor to trigger the loop, we need a clean submit action with real pre-flight validation (not just "is there a channel"):
-
-- `src/lib/preflight-approval.ts` — `runApprovalPreflight(post, variants, mediaAssets, clientUsers)` → returns `{ ok: true } | { ok: false, errors: string[], actions?: Array<{label, path}> }`. Checks in order:
-  1. At least 1 channel in `post.channels[]` — error "Debes activar al menos un canal antes de enviar a aprobación"
-  2. Each enabled channel has a `post_variants` row with `caption.trim().length > 0` — error per channel: "Falta el caption para {channelName}"
-  3. `post.scheduled_for` is set AND > `now()` — error "Define una fecha de publicación futura antes de enviar"
-  4. If `isHealthcareClient(client)` AND `post.media_urls.length > 0`: every referenced asset has `consent_signed = true` (lookup via `useAssetsByUrls`). Error lists asset filenames missing consent + action "Ver biblioteca" → `/portal-or-vault link`
-  5. Client has at least 1 `client_users` row with role `client_admin` AND status in `('active','invited')`. Error: "Este cliente no tiene admin invitado al portal. Invita uno desde Stakeholders." + action → `/app/clientes/{slug}#stakeholders`
-- `src/hooks/usePostSubmitForApproval.ts` — mutation that:
-  1. Runs `runApprovalPreflight`; throws preflight errors if any
-  2. Calls Edge Function `send-content-approval-request` with body `{ post_id, source: 'manual', message: optionalNote }`
-  3. The Edge Function does the status transition `draft|changes_requested → pending_approval` server-side (NOT client-side, to ensure atomic with the email send)
-  4. Parses response `{ emailed, sent, failed, portalUrl, recipientEmails }`
-  5. Invalidates `social-posts`, `social-post-detail`, `content-approval-history` queries
-  6. Returns the full response object so UI can show success state or fallback
-- `src/components/calendar/editor/submit-for-approval-dialog.tsx` — Two-step:
-  - **Step 1 (Pre-flight check)**: runs `runApprovalPreflight` on dialog open. If preflight has errors, shows them with action buttons to resolve (e.g. "Ir a Stakeholders" navigates closing the dialog). Submit button disabled until all green.
-  - **Step 2 (Confirmation)**: shows summary "Se enviará a {N} admin(s) del cliente: {emails}" + optional `message` textarea (max 300 chars) included in the email body + "Enviar a cliente" CTA.
-- `src/components/calendar/editor/submit-success-state.tsx` — Post-submit:
-  - If `response.emailed === true`: green check + "Enviado a {N} admin(s)" + "El correo puede tardar 1-2 minutos en llegar" + Cerrar
-  - If `response.emailed === false` (Edge Function failed but post status was updated): orange info + read-only `portalUrl` input + "Copiar enlace" + "Copiar mensaje completo" (pre-formatted message ready to paste in WhatsApp/email):
-
+-- content_approval_history SELECT for client_users
+drop policy if exists content_approval_history_select_client_users on public.content_approval_history;
+create policy content_approval_history_select_client_users on public.content_approval_history
+  for select to authenticated
+  using (public.is_client_user(client_id));
 ```
-    Hola {clientName},
-    
-    Tienes un nuevo post pendiente de aprobación en el portal:
-    
-    {portalUrl}
-    
-    {optionalMessage}
-    
-    — {workspaceName}
+
+If `is_client_admin(client_id)` helper doesn't exist, create it:
+
+```sql
+create or replace function public.is_client_admin(_client_id uuid)
+returns boolean
+language sql security definer stable
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from client_users
+    where client_id = _client_id
+      and user_id = auth.uid()
+      and role = 'client_admin'
+      and status in ('active','invited')
+  );
+$$;
 ```
 
-- `src/components/calendar/editor/post-submit-for-approval-button.tsx` — primary CTA mounted prominently in `PostEditorPanel` header (left of `StateChangeDropdown`), only visible when status is `draft` / `pending_internal_review` / `changes_requested`. Label adapts:
-  - `draft` or `pending_internal_review` → "Enviar a cliente"
-  - `changes_requested` → "Reenviar a cliente"
-  - Style: secondary brand color background (`#ff7503`), white text, Send icon, prominent right side.
+## 2. Shared updates
 
-Edit `src/components/calendar/editor/post-editor-panel.tsx` to mount the button.
+- `src/lib/post-states.ts`: add `changes_requested` (label "Cambios solicitados", color `hsl(43 96% 56%)`); extend `POST_STATE_TRANSITIONS` with `pending_approval → changes_requested`, `changes_requested → draft`, `changes_requested → pending_approval`; include it in `POST_STATE_ORDER`.
+- `src/components/calendar/post-card.tsx` and `src/components/calendar/editor/state-change-dropdown.tsx`: pick up the new state via the existing meta map (no hardcoded lists).
 
-## 3. Real-time notifications hooks + UI
+## 3. Routing
 
-- `src/hooks/useNotifications.ts`
-  - `useNotifications()` — fetches unread + last 20 for current user, subscribes to `notifications` INSERT via `supabase.channel` filtered by `recipient_user_id`, invalidates query on event.
-  - `useMarkNotificationRead(id)` and `useMarkAllRead()` mutations.
-- `src/hooks/usePostStatusChanges.ts` — ambient subscription mounted in `AppShell` that listens to `social_posts` UPDATE filtered by active workspace and invalidates `useSocialPosts` cache. (Trigger handles notification insert server-side; this just ensures calendar refreshes everywhere, not only on the page that already subscribes.)
-- `src/components/notifications-bell.tsx` — replaces the placeholder bell in `top-bar.tsx`:
-  - Unread badge count (hidden when 0).
-  - Dropdown with last 20 (icon by type, title, body, relative time via `date-fns` locale `es`).
-  - Click row → navigates to `link` + marks read.
-  - Footer: "Marcar todas como leídas" + disabled "Ver todas" (full page deferred).
-  - Mobile: dropdown becomes a Sheet drawer for better touch targets.
-- Edit `src/components/top-bar.tsx` — swap the placeholder `<Button><Bell/></Button>` for `<NotificationsBell />`.
+`src/App.tsx`: replace the single `/portal/:slug` placeholder with a nested portal under `RequireClientAuth`:
 
-## 4. Edge Function fixes (un-blocks parked bugs)
+```text
+/portal                       -> PortalRedirect (logic below)
+/portal/:slug                 -> PortalShell
+  index                       -> ClientHome
+  aprobaciones                -> ClientApprovals
+  calendario | documentos
+  reportes | activos
+  credenciales                -> PortalComingSoon (Phase 5.2/5.3)
+```
 
-- `supabase/functions/send-content-approval-request/index.ts` — three changes:
-  1. Auth pattern: extract `Authorization` header, instantiate request-scoped Supabase client with `{ global: { headers: { Authorization: authHeader } } }`, call `client.auth.getUser()`. Return 401 with clear error message if missing/invalid.
-  2. Move the **post status transition** (`draft → pending_approval`) INSIDE the function, after auth + workspace check, so that "send email failed" doesn't leave the post in a half-updated state. Use a service-role client for the write.
-  3. Use Zod for body validation: `{ post_id: uuid, source: 'manual' | 'trigger', message?: string (max 300) }`. Validate before any side effects.
-- `supabase/functions/send-portal-invite/index.ts` — same auth pattern fix. Un-blocks the parked bug.
-- `supabase/functions/ping/index.ts` — new 10-line health-check returning `{ ok: true, ts, user_id: <if auth header present else null> }`. Useful for debugging the Test panel.
+`/portal` **(bare) redirect logic** (new component `PortalRedirect.tsx`):
 
-(Deploy steps for these are manual after merge since this is BYO Supabase.)
+1. If user is not authenticated → redirect to `/portal/login`
+2. Fetch user's `client_users` rows where status in ('active','invited')
+3. If 0 rows → "No tienes acceso a ningún portal" empty state with mailto to support
+4. If 1 row → redirect to `/portal/{client.slug}` (with `?post={id}` preserved if present in original URL)
+5. If 2+ rows → render `ClientSelector` page showing each accessible client as a card (logo + name) → click navigates to that client's portal
 
-## 5. Verification
+`src/pages/portal/Login.tsx`: after a successful sign-in, look up the user's first active/invited `client_users` row, then redirect:
 
-- After merge + manual deploy + migration apply:
-  1. **Auth pattern fix sanity** — invoke `ping` from Supabase Test panel with fresh JWT → must return `{ ok: true, user_id: <your uuid> }`. If yes, both other functions are fixed too.
-  2. **Submit flow** — open a draft post in calendar editor → click "Enviar a cliente" → confirm preflight passes → confirm dialog → invoke → email arrives + status moves to `pending_approval`.
-  3. **Trigger test (server-side)** — manually UPDATE a `social_posts.status` to `approved` via SQL editor → confirm a notification row appears for every active workspace member.
-  4. **Bell UI** — open dropdown after step 3 → unread count, click-to-navigate, mark-all-read all work.
-  5. **End-to-end** — agency submits → client logs into portal → approves → agency sees realtime notification + calendar updates color → no page reload.
+- if `pending_approval` count > 0 → `/portal/:slug/aprobaciones`
+- else → `/portal/:slug`
 
-## Out of scope (deferred)
+## 4. Layout & theming
 
-- Edge Function that emails the agency on approval result (in-app only for now).
-- Daily email digest.
-- Slack / WhatsApp / mobile push.
-- `/app/notificaciones` full-page list.
-- Email rate limiting / quotas.
-- Notification preferences per user (mute certain types).
+`src/layouts/PortalShell.tsx`:
 
-## Files
+- Top bar (h-16, white, border-b): client logo / initials in `brand_primary_color`, client name (Mulish Bold), "Powered by Astratta Agency" microtype, user avatar dropdown (Mi perfil / Cambiar contraseña / Cerrar sesión). Notifications bell deferred.
+- Sidebar (w-64, `bg-card`, mobile Sheet): Inicio, Aprobaciones (red badge w/ pending count), Calendario, Documentos, Reportes, Activos, Credenciales; bottom "Contactar mi equipo" `mailto:` to workspace owner.
+- Active item: 3px left bar in `--portal-primary` + same color at 8% opacity background.
+- On mount, read `client.brand_primary_color` / `brand_secondary_color` and set `--portal-primary` (fallback `#5140f2`) and `--portal-secondary` (fallback `#ff7503`) on the shell root. All portal CTAs use `bg-[var(--portal-primary)]` — never `bg-primary`. Astratta colors only appear in the footer microtype.
 
-**Created**
+**First-time invited splash + auto-activation**:
 
-- `docs/migrations/011_notifications.sql`
-- `supabase/functions/ping/index.ts`
-- `src/lib/preflight-approval.ts`
-- `src/hooks/usePostSubmitForApproval.ts`
-- `src/hooks/usePostStatusChanges.ts`
-- `src/hooks/useNotifications.ts`
-- `src/components/calendar/editor/post-submit-for-approval-button.tsx`
-- `src/components/calendar/editor/submit-for-approval-dialog.tsx`
-- `src/components/calendar/editor/submit-success-state.tsx`
-- `src/components/notifications-bell.tsx`
+- If `client_users.status = 'invited'` and `auth.users.last_sign_in_at` is null OR `client_users.accepted_at` is null, show a centered "Bienvenida" modal:
+  - Title: "Bienvenida al portal de {[client.name](http://client.name)}"
+  - Body: "Tu equipo en Astratta Agency te invitó a colaborar. Aquí podrás aprobar contenido, ver reportes y acceder a tus documentos."
+  - Button "Empezar" → updates `client_users.status='active'` AND `client_users.accepted_at=now()` → closes splash and reveals home
+- Splash is non-dismissable except via the "Empezar" button (prevents the user from skipping the status transition).
 
-**Edited**
+## 5. Hooks (`src/hooks/portal/`)
 
-- `supabase/functions/send-content-approval-request/index.ts` (auth pattern + status transition moved server-side + Zod)
-- `supabase/functions/send-portal-invite/index.ts` (auth pattern fix)
-- `src/components/calendar/editor/post-editor-panel.tsx` (mount Submit button + dialog)
-- `src/components/top-bar.tsx` (wire NotificationsBell)
-- `src/layouts/AppShell.tsx` (mount ambient usePostStatusChanges subscription)
+- `useClientPortalContext(slug)` — load `clients` by slug, verify caller is in `client_users` with status in (`active`, `invited`); returns `{ client, currentClientUser, role }`. Throws on missing → caught by route error boundary. `enabled: !!slug && !!session?.user?.id` (avoid the race condition bug pattern we fixed before).
+- `usePendingApprovals(clientId)` — `social_posts` where `client_id` matches & `status='pending_approval'`, joined with `post_variants[]`, ordered by `scheduled_for ASC`. Realtime: subscribe to `social_posts` UPDATE/INSERT filtered by `client_id` via `supabase.channel`, invalidate query on event. `enabled: !!clientId`.
+- `useApprovalActions()` — exposes `approvePost`, `requestChanges`, `rejectPost`. Each updates the post + inserts a `content_approval_history` row (action + comment/reason). Optimistic cache updates; rollback on error.
+- `useClientPortalKpis(clientId)` — counts: posts published this month, pending approvals, posts scheduled in next 7 days, nearest upcoming project deadline. **Each count is its own subquery**: don't share with the approvals list (different filter requirements).
+- `useClientTeam(clientId)` — up to 5 `workspace_members` assigned to this client's projects, joined to `profiles` for name/avatar/role. **Order by oldest project assignment first** (the team member who's been with this client longest shows first).
 
-## Manual steps after merge
+All hooks gated by `enabled: !!clientId` / `!!slug`, with React Query keys scoped by `clientId`.
 
-1. Apply `docs/migrations/011_notifications.sql` in Supabase SQL editor.
-2. Deploy `send-content-approval-request`, `send-portal-invite`, and new `ping` Edge Functions (Supabase CLI or web editor).
-3. From the Test panel, invoke `ping` with a fresh JWT — should return `{ ok: true, user_id }` not 401. This confirms the auth pattern fix worked.
-4. Then invoke `send-content-approval-request` with a real post_id — should return `{ emailed: true|false }`.
+## 6. Pages
+
+`src/pages/portal/ClientHome.tsx` (`/portal/:slug`):
+
+- Gradient welcome banner using portal primary/secondary; time-based greeting ("Buenos días/tardes/noches, {first_name}") + subtitle referencing `client.name`.
+- 4 KPI cards (`grid-cols-2 md:grid-cols-4`): published this month, pending approvals (highlighted + linked to `/aprobaciones` when > 0), next scheduled post (relative), next project deadline.
+- "Pendiente de tu acción" section (only when pending > 0): summary card + top 3 pending posts (channel icons, 60-char caption excerpt, relative scheduled time) with CTA to approvals page.
+- "Próximos posts" horizontal timeline: last 7 days of approved/scheduled posts (read-only, click opens `PostPublicView` side panel).
+- "Tu equipo en Astratta" widget: avatar group (max 5 + "+N"), list with name/role and per-member `mailto:` button.
+
+`src/pages/portal/ClientApprovals.tsx` (`/portal/:slug/aprobaciones`):
+
+- Header with H1 + pending badge.
+- Tabs: Pendientes (default), Aprobados, Cambios solicitados, Rechazados — pendientes sorted `scheduled_for ASC`, history tabs DESC.
+- List of `ApprovalCard`. Empty states: green checkmark "Estás al día…" for Pendientes; neutral text for the rest.
+- Deep link: `?post={id}` highlights & scrolls to that card on mount.
+- After action: optimistic move to target tab, success toast with 5s "Deshacer", counter badge updates; if it was the last pending one, stay on the page showing the empty state.
+
+## 7. Components (`src/components/portal/`)
+
+`portal-header.tsx`, `portal-sidebar.tsx`, `portal-greeting-banner.tsx`, `portal-kpi-card.tsx`, `portal-pending-actions.tsx`, `portal-upcoming-posts.tsx`, `portal-team-widget.tsx`, `approval-card.tsx`, `approval-channel-tabs.tsx` (read-only variants display), `approval-actions.tsx` (3 buttons + inline confirms), `request-changes-dialog.tsx` (textarea min 10 chars, char counter), `reject-dialog.tsx` (reason min 10 chars), `post-media-lightbox.tsx`, `post-public-view.tsx` (side panel read-only view), `portal-redirect.tsx` (the /portal bare router), `client-selector.tsx` (when user has multiple clients).
+
+UX details enforced in these components:
+
+- Mobile ApprovalCard stacks vertically with sticky bottom actions + iOS safe-area inset.
+- Action buttons show spinner + disable while mutation runs.
+- Dialogs in Spanish with live char counters.
+- Defensive: if any media asset has `consent_signed=false`, Aprobar shows an inline confirm before submitting.
+- **Role-gated UI**: if `currentClientUser.role === 'client_viewer'`, hide the 3 action buttons completely and replace with a "Solo lectura" tooltip. Viewers see content but cannot approve/reject.
+
+## 8. Out of scope (deferred)
+
+- Calendar / Documentos / Activos pages (Phase 5.2)
+- Reportes / Credenciales (Phase 5.3)
+- Wiring `send-content-approval-request` email (parked, tracked in `docs/follow-ups.md`)
+- Real-time push to client devices
+- Notifications bell inside the portal
+
+## 9. Files
+
+Created:
+
+- `docs/migrations/010_post_status_changes_requested.sql` (conditional + RLS audit if needed)
+- `src/layouts/PortalShell.tsx` (replaces current shell)
+- `src/hooks/portal/{useClientPortalContext,usePendingApprovals,useApprovalActions,useClientPortalKpis,useClientTeam}.ts`
+- `src/pages/portal/{ClientHome,ClientApprovals,PortalRedirect,ClientSelector}.tsx`
+- `src/components/portal/*` (14 components listed above)
+
+Edited:
+
+- `src/App.tsx` (nested portal routes + /portal bare router)
+- `src/lib/post-states.ts` (new status + transitions)
+- `src/components/calendar/post-card.tsx`, `src/components/calendar/editor/state-change-dropdown.tsx` (pick up new state)
+- `src/pages/portal/Login.tsx` (post-login smart redirect)
+- `src/pages/portal/Home.tsx` (removed — replaced by `ClientHome`)
+
+## 10. Verification
+
+- Sign in as a 180 Grados client user → land on home or approvals based on pending count.
+- Move a post in the agency calendar to `pending_approval` → portal list updates in realtime.
+- Approve / Request changes / Reject from the portal → status + history row written, agency calendar updates via Phase 4.4 trigger, notification row appears for agency members.
+- Deep link `/portal/:slug/aprobaciones?post=<id>` scrolls to the card.
+- Portal CTAs render in client brand colors; Astratta colors only in footer microtype.
+- **As** `client_viewer` **role**: cannot see approval buttons, only read-only display.
+- **First-time invited user**: welcome modal appears + status transitions to active after click.
+- **Bare /portal** with 1 client → redirects to that client. With 2+ → shows selector.
+
+Approve and I'll implement.

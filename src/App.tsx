@@ -88,17 +88,32 @@ const App = () => (
           <Route path="/portal/login" element={<PortalLogin />} />
           <Route path="/portal/forgot-password" element={<PortalForgotPassword />} />
 
-          {/* Client portal — gated shell */}
+          {/* Client portal — bare /portal: route by membership */}
           <Route
             path="/portal"
+            element={
+              <RequireClientAuth>
+                <PortalRedirect />
+              </RequireClientAuth>
+            }
+          />
+
+          {/* Client portal — gated shell */}
+          <Route
+            path="/portal/:slug"
             element={
               <RequireClientAuth>
                 <PortalShell />
               </RequireClientAuth>
             }
           >
-            <Route index element={<PortalHome />} />
-            <Route path=":slug" element={<PortalHome />} />
+            <Route index element={<ClientHome />} />
+            <Route path="aprobaciones" element={<ClientApprovals />} />
+            <Route path="calendario" element={<PortalComingSoon section="Calendario" />} />
+            <Route path="documentos" element={<PortalComingSoon section="Documentos" />} />
+            <Route path="reportes" element={<PortalComingSoon section="Reportes" />} />
+            <Route path="activos" element={<PortalComingSoon section="Activos" />} />
+            <Route path="credenciales" element={<PortalComingSoon section="Credenciales" />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

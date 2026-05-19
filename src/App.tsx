@@ -6,6 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import AppShell from "@/layouts/AppShell";
 import PortalShell from "@/layouts/PortalShell";
+import PortalRedirect from "@/pages/portal/PortalRedirect";
+import ClientHome from "@/pages/portal/ClientHome";
+import ClientApprovals from "@/pages/portal/ClientApprovals";
+import PortalComingSoon from "@/pages/portal/PortalComingSoon";
 import { RequireAgencyAuth } from "@/components/auth/RequireAgencyAuth";
 import { RequireClientAuth } from "@/components/auth/RequireClientAuth";
 

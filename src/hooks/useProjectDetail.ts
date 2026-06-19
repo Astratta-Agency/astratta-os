@@ -12,6 +12,7 @@ export type ProjectDetail = {
   start_date: string | null;
   end_date: string | null;
   budget_amount: number | null;
+  progress: number | null;
   retainer_monthly: boolean;
   description: string | null;
   assigned_team_ids: string[];

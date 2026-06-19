@@ -151,6 +151,62 @@ export function useUpdateProjectStatus() {
   });
 }
 
+export type UpdateProjectPatch = {
+  name?: string;
+  type?: ProjectType;
+  status?: ProjectStatus;
+  client_id?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  budget_amount?: number | null;
+  progress?: number | null;
+};
+
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      projectId: string;
+      patch: UpdateProjectPatch;
+      statusChange?: {
+        fromStatus: ProjectStatus;
+        toStatus: ProjectStatus;
+        workspaceId: string;
+        clientId: string;
+        projectName: string;
+      };
+    }) => {
+      const { error } = await (supabase as any)
+        .from("projects")
+        .update({ ...input.patch, updated_at: new Date().toISOString() })
+        .eq("id", input.projectId);
+      if (error) throw error;
+
+      if (input.statusChange && input.statusChange.fromStatus !== input.statusChange.toStatus) {
+        const { data: userRes } = await supabase.auth.getUser();
+        await (supabase as any).from("client_timeline_events").insert({
+          client_id: input.statusChange.clientId,
+          workspace_id: input.statusChange.workspaceId,
+          event_type: "project_status_changed",
+          title: `${input.statusChange.projectName}: ${input.statusChange.fromStatus} → ${input.statusChange.toStatus}`,
+          metadata: {
+            from_status: input.statusChange.fromStatus,
+            to_status: input.statusChange.toStatus,
+            project_id: input.projectId,
+          },
+          actor_id: userRes.user?.id ?? null,
+        });
+      }
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["projects-stats"] });
+      qc.invalidateQueries({ queryKey: ["project", vars.projectId] });
+      qc.invalidateQueries({ queryKey: ["client-timeline"] });
+    },
+  });
+}
+
 export type WorkspaceMember = {
   user_id: string;
   role: string;

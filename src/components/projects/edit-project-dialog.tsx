@@ -145,7 +145,7 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
       start_date: toDate(project.start_date),
       end_date: toDate(project.end_date),
       budget_amount: project.budget_amount,
-      progress: project.progress ?? null,
+      progress: project.progress ?? 0,
     }),
     [project],
   );

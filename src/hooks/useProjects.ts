@@ -162,6 +162,12 @@ export type UpdateProjectPatch = {
   progress?: number | null;
 };
 
+export type ProjectFieldChange = {
+  field: string;
+  from: string;
+  to: string;
+};
+
 export function useUpdateProject() {
   const qc = useQueryClient();
   return useMutation({
@@ -175,6 +181,12 @@ export function useUpdateProject() {
         clientId: string;
         projectName: string;
       };
+      fieldChanges?: {
+        workspaceId: string;
+        clientId: string;
+        projectName: string;
+        changes: ProjectFieldChange[];
+      };
     }) => {
       const { error } = await (supabase as any)
         .from("projects")
@@ -182,8 +194,10 @@ export function useUpdateProject() {
         .eq("id", input.projectId);
       if (error) throw error;
 
+      const { data: userRes } = await supabase.auth.getUser();
+      const actorId = userRes.user?.id ?? null;
+
       if (input.statusChange && input.statusChange.fromStatus !== input.statusChange.toStatus) {
-        const { data: userRes } = await supabase.auth.getUser();
         await (supabase as any).from("client_timeline_events").insert({
           client_id: input.statusChange.clientId,
           workspace_id: input.statusChange.workspaceId,
@@ -194,7 +208,25 @@ export function useUpdateProject() {
             to_status: input.statusChange.toStatus,
             project_id: input.projectId,
           },
-          actor_id: userRes.user?.id ?? null,
+          actor_id: actorId,
+        });
+      }
+
+      if (input.fieldChanges && input.fieldChanges.changes.length > 0) {
+        const lines = input.fieldChanges.changes
+          .map((c) => `• ${c.field}: ${c.from} → ${c.to}`)
+          .join("\n");
+        await (supabase as any).from("client_timeline_events").insert({
+          client_id: input.fieldChanges.clientId,
+          workspace_id: input.fieldChanges.workspaceId,
+          event_type: "project_updated",
+          title: `${input.fieldChanges.projectName}: proyecto actualizado`,
+          description: lines,
+          metadata: {
+            project_id: input.projectId,
+            changes: input.fieldChanges.changes,
+          },
+          actor_id: actorId,
         });
       }
     },
@@ -203,6 +235,7 @@ export function useUpdateProject() {
       qc.invalidateQueries({ queryKey: ["projects-stats"] });
       qc.invalidateQueries({ queryKey: ["project", vars.projectId] });
       qc.invalidateQueries({ queryKey: ["client-timeline"] });
+      qc.invalidateQueries({ queryKey: ["project-timeline", vars.projectId] });
     },
   });
 }

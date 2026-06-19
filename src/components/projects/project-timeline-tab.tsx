@@ -36,6 +36,8 @@ const iconFor = (t: ProjectTimelineEvent["event_type"]) => {
   switch (t) {
     case "project_status_changed":
       return CheckCircle2;
+    case "project_updated":
+      return Pencil;
     case "manual":
       return FilePen;
     default:

@@ -305,6 +305,7 @@ export default function ProyectoDetalle() {
       </Tabs>
 
       <EditProjectDialog
+        key={project.id}
         open={editOpen}
         onOpenChange={setEditOpen}
         project={{
@@ -317,7 +318,7 @@ export default function ProyectoDetalle() {
           start_date: project.start_date,
           end_date: project.end_date,
           budget_amount: project.budget_amount,
-          progress: (project as any).progress ?? null,
+          progress: project.progress ?? null,
         }}
         clients={activeClients}
       />

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, FilePen, Sparkles } from "lucide-react";
+import { CheckCircle2, FilePen, Pencil, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +36,8 @@ const iconFor = (t: ProjectTimelineEvent["event_type"]) => {
   switch (t) {
     case "project_status_changed":
       return CheckCircle2;
+    case "project_updated":
+      return Pencil;
     case "manual":
       return FilePen;
     default:
@@ -140,7 +142,7 @@ export function ProjectTimelineTab({
                         </div>
                       </div>
                       {ev.description && (
-                        <div className="mt-1 text-xs text-muted-foreground">{ev.description}</div>
+                        <div className="mt-1 whitespace-pre-line text-xs text-muted-foreground">{ev.description}</div>
                       )}
                     </CardContent>
                   </Card>

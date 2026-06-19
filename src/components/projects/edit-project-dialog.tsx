@@ -171,6 +171,55 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
       progress: values.progress ?? null,
     };
     const statusChanged = values.status !== project.status;
+
+    const fmtDate = (s: string | null) => (s ? s : "—");
+    const fmtMoney = (n: number | null) =>
+      n == null ? "—" : `$${n.toLocaleString("es-MX")}`;
+    const fmtProgress = (n: number | null | undefined) =>
+      n == null ? "—" : `${n}%`;
+    const clientName = (id: string) =>
+      clients.find((c) => c.id === id)?.name ?? id;
+
+    const changes: { field: string; from: string; to: string }[] = [];
+    if (patch.name !== project.name)
+      changes.push({ field: "Nombre", from: project.name, to: patch.name });
+    if (patch.type !== project.type)
+      changes.push({
+        field: "Tipo",
+        from: PROJECT_TYPE_LABEL[project.type],
+        to: PROJECT_TYPE_LABEL[patch.type],
+      });
+    if (patch.client_id !== project.client_id)
+      changes.push({
+        field: "Cliente",
+        from: clientName(project.client_id),
+        to: clientName(patch.client_id),
+      });
+    if (patch.start_date !== project.start_date)
+      changes.push({
+        field: "Fecha de inicio",
+        from: fmtDate(project.start_date),
+        to: fmtDate(patch.start_date),
+      });
+    if (patch.end_date !== project.end_date)
+      changes.push({
+        field: "Deadline",
+        from: fmtDate(project.end_date),
+        to: fmtDate(patch.end_date),
+      });
+    if ((patch.budget_amount ?? null) !== (project.budget_amount ?? null))
+      changes.push({
+        field: "Presupuesto",
+        from: fmtMoney(project.budget_amount),
+        to: fmtMoney(patch.budget_amount),
+      });
+    if ((patch.progress ?? null) !== (project.progress ?? null))
+      changes.push({
+        field: "Progreso",
+        from: fmtProgress(project.progress),
+        to: fmtProgress(patch.progress),
+      });
+
     try {
       await update.mutateAsync({
         projectId: project.id,
@@ -182,6 +231,14 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
               workspaceId: project.workspace_id,
               clientId: values.client_id,
               projectName: patch.name,
+            }
+          : undefined,
+        fieldChanges: changes.length
+          ? {
+              workspaceId: project.workspace_id,
+              clientId: values.client_id,
+              projectName: patch.name,
+              changes,
             }
           : undefined,
       });

@@ -53,6 +53,7 @@ export type ProjectTimelineEvent = {
   event_type:
     | "project_created"
     | "project_status_changed"
+    | "project_updated"
     | "manual"
     | "client_created"
     | "client_updated"

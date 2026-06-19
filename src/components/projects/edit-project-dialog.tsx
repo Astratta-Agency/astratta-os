@@ -156,7 +156,23 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
   });
 
   useEffect(() => {
-    if (open) form.reset(defaultValues);
+    form.register("progress");
+  }, [form]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const values = {
+      ...defaultValues,
+      progress: project.progress ?? 0,
+    };
+
+    form.reset(values);
+    form.setValue("progress", values.progress, {
+      shouldDirty: false,
+      shouldTouch: false,
+      shouldValidate: true,
+    });
   }, [open, defaultValues, form]);
 
   const onSubmit = async (values: FormValues) => {

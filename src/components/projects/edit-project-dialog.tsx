@@ -147,7 +147,16 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
       budget_amount: project.budget_amount,
       progress: project.progress ?? 0,
     }),
-    [project],
+    [
+      project.name,
+      project.type,
+      project.status,
+      project.client_id,
+      project.start_date,
+      project.end_date,
+      project.budget_amount,
+      project.progress,
+    ],
   );
 
   const form = useForm<FormValues>({
@@ -156,8 +165,24 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
   });
 
   useEffect(() => {
-    if (open) form.reset(defaultValues);
-  }, [open, defaultValues, form]);
+    form.register("progress");
+  }, [form]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const values = {
+      ...defaultValues,
+      progress: project.progress ?? 0,
+    };
+
+    form.reset(values);
+    form.setValue("progress", values.progress, {
+      shouldDirty: false,
+      shouldTouch: false,
+      shouldValidate: true,
+    });
+  }, [open, defaultValues, form, project.progress]);
 
   const onSubmit = async (values: FormValues) => {
     const patch = {

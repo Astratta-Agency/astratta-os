@@ -157,7 +157,15 @@ export function ProjectsTable({
               const overdue = isOverdue(p.status, p.end_date);
               const progress = computeProgress(p.status, p.start_date, p.end_date);
               return (
-                <TableRow key={p.id} className="group">
+                <TableRow
+                  key={p.id}
+                  className="group cursor-pointer"
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest("a,button,[role='menuitem'],[role='checkbox'],input")) return;
+                    onOpenProject(p);
+                  }}
+                >
                   <TableCell>
                     <button
                       type="button"

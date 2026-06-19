@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, FilePen, Sparkles } from "lucide-react";
+import { CheckCircle2, FilePen, Pencil, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";

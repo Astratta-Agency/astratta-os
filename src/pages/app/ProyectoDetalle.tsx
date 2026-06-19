@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { differenceInDays, format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -21,6 +22,7 @@ import { toast } from "@/hooks/use-toast";
 import { useProject } from "@/hooks/useProjectDetail";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useWorkspaceMembers } from "@/hooks/useProjects";
+import { useClients } from "@/hooks/useClients";
 import { ProjectAvatar } from "@/components/projects/project-avatar";
 import {
   ProjectStatusBadge,
@@ -34,6 +36,7 @@ import { TabComingSoon } from "@/components/clients/tab-coming-soon";
 import { ProjectDescriptionCard } from "@/components/projects/project-description-card";
 import { ProjectTeamCard } from "@/components/projects/project-team-card";
 import { ProjectTimelineTab } from "@/components/projects/project-timeline-tab";
+import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
 
 const fmtDate = (d: string | null) =>
   d ? format(new Date(d), "dd MMM yyyy", { locale: es }) : "—";

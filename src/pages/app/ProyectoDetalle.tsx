@@ -303,6 +303,24 @@ export default function ProyectoDetalle() {
           />
         </TabsContent>
       </Tabs>
+
+      <EditProjectDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        project={{
+          id: project.id,
+          workspace_id: project.workspace_id,
+          client_id: project.client_id,
+          name: project.name,
+          type: project.type,
+          status: project.status,
+          start_date: project.start_date,
+          end_date: project.end_date,
+          budget_amount: project.budget_amount,
+          progress: (project as any).progress ?? null,
+        }}
+        clients={activeClients}
+      />
     </div>
   );
 }

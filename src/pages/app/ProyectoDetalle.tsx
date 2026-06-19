@@ -56,8 +56,20 @@ export default function ProyectoDetalle() {
   const { workspace, isLoading: wsLoading } = useActiveWorkspace();
   const { data: project, isLoading } = useProject(id);
   const { data: members = [] } = useWorkspaceMembers(workspace?.id);
-
-  if (wsLoading || isLoading) {
+  const { data: allClients = [] } = useClients(workspace?.id, {
+    search: "",
+    status: "all",
+    industry: "all",
+    location: "all",
+  });
+  const activeClients = useMemo(
+    () =>
+      allClients
+        .filter((c) => c.status === "active" || c.id === project?.client_id)
+        .map((c) => ({ id: c.id, name: c.name })),
+    [allClients, project?.client_id],
+  );
+  const [editOpen, setEditOpen] = useState(false);
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />

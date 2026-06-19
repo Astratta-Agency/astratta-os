@@ -70,6 +70,8 @@ export default function ProyectoDetalle() {
     [allClients, project?.client_id],
   );
   const [editOpen, setEditOpen] = useState(false);
+
+  if (wsLoading || isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48" />

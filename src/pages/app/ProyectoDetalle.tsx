@@ -143,7 +143,7 @@ export default function ProyectoDetalle() {
         <div className="flex items-center gap-2">
           {/* Desktop */}
           <div className="hidden flex-wrap items-center gap-2 md:flex">
-            <Button variant="outline" onClick={() => toast({ title: "Editar próximamente" })}>
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Editar
             </Button>
             <Button onClick={() => toast({ title: "Tareas próximamente" })}>
@@ -174,7 +174,7 @@ export default function ProyectoDetalle() {
 
           {/* Mobile */}
           <div className="flex items-center gap-2 md:hidden">
-            <Button variant="outline" size="sm" onClick={() => toast({ title: "Editar próximamente" })}>
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" />
             </Button>
             <Button size="sm" onClick={() => toast({ title: "Tareas próximamente" })}>

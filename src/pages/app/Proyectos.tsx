@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useClients } from "@/hooks/useClients";
@@ -36,6 +36,7 @@ export default function Proyectos() {
   const { user } = useAuth();
   const { workspace } = useActiveWorkspace();
   const workspaceId = workspace?.id;
+  const navigate = useNavigate();
 
   const [params, setParams] = useSearchParams();
 
@@ -129,8 +130,8 @@ export default function Proyectos() {
     }
   };
 
-  const handleOpenProject = (_p: ProjectRow) => {
-    toast("Detalle de proyecto próximamente");
+  const handleOpenProject = (p: ProjectRow) => {
+    navigate(`/app/proyectos/${p.id}`);
   };
 
   const handleStatusChange = async (p: ProjectRow, to: ProjectStatus) => {

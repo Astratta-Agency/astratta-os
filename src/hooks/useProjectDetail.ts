@@ -33,7 +33,7 @@ export function useProject(projectId: string | undefined) {
       const { data, error } = await (supabase as any)
         .from("projects")
         .select(
-          "id, workspace_id, client_id, name, type, status, start_date, end_date, budget_amount, retainer_monthly, description, assigned_team_ids, created_at, client:clients(id, name, slug, logo_url, brand_primary_color)",
+          "id, workspace_id, client_id, name, type, status, start_date, end_date, budget_amount, progress, retainer_monthly, description, assigned_team_ids, created_at, client:clients(id, name, slug, logo_url, brand_primary_color)",
         )
         .eq("id", projectId)
         .maybeSingle();

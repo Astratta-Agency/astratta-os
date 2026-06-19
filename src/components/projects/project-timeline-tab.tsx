@@ -142,7 +142,7 @@ export function ProjectTimelineTab({
                         </div>
                       </div>
                       {ev.description && (
-                        <div className="mt-1 text-xs text-muted-foreground">{ev.description}</div>
+                        <div className="mt-1 whitespace-pre-line text-xs text-muted-foreground">{ev.description}</div>
                       )}
                     </CardContent>
                   </Card>

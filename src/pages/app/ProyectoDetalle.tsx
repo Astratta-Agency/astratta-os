@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { differenceInDays, format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -21,6 +22,7 @@ import { toast } from "@/hooks/use-toast";
 import { useProject } from "@/hooks/useProjectDetail";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useWorkspaceMembers } from "@/hooks/useProjects";
+import { useClients } from "@/hooks/useClients";
 import { ProjectAvatar } from "@/components/projects/project-avatar";
 import {
   ProjectStatusBadge,
@@ -34,6 +36,7 @@ import { TabComingSoon } from "@/components/clients/tab-coming-soon";
 import { ProjectDescriptionCard } from "@/components/projects/project-description-card";
 import { ProjectTeamCard } from "@/components/projects/project-team-card";
 import { ProjectTimelineTab } from "@/components/projects/project-timeline-tab";
+import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
 
 const fmtDate = (d: string | null) =>
   d ? format(new Date(d), "dd MMM yyyy", { locale: es }) : "—";
@@ -53,6 +56,20 @@ export default function ProyectoDetalle() {
   const { workspace, isLoading: wsLoading } = useActiveWorkspace();
   const { data: project, isLoading } = useProject(id);
   const { data: members = [] } = useWorkspaceMembers(workspace?.id);
+  const { data: allClients = [] } = useClients(workspace?.id, {
+    search: "",
+    status: "all",
+    industry: "all",
+    location: "all",
+  });
+  const activeClients = useMemo(
+    () =>
+      allClients
+        .filter((c) => c.status === "active" || c.id === project?.client_id)
+        .map((c) => ({ id: c.id, name: c.name })),
+    [allClients, project?.client_id],
+  );
+  const [editOpen, setEditOpen] = useState(false);
 
   if (wsLoading || isLoading) {
     return (
@@ -126,7 +143,7 @@ export default function ProyectoDetalle() {
         <div className="flex items-center gap-2">
           {/* Desktop */}
           <div className="hidden flex-wrap items-center gap-2 md:flex">
-            <Button variant="outline" onClick={() => toast({ title: "Editar próximamente" })}>
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Editar
             </Button>
             <Button onClick={() => toast({ title: "Tareas próximamente" })}>
@@ -157,7 +174,7 @@ export default function ProyectoDetalle() {
 
           {/* Mobile */}
           <div className="flex items-center gap-2 md:hidden">
-            <Button variant="outline" size="sm" onClick={() => toast({ title: "Editar próximamente" })}>
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" />
             </Button>
             <Button size="sm" onClick={() => toast({ title: "Tareas próximamente" })}>
@@ -286,6 +303,24 @@ export default function ProyectoDetalle() {
           />
         </TabsContent>
       </Tabs>
+
+      <EditProjectDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        project={{
+          id: project.id,
+          workspace_id: project.workspace_id,
+          client_id: project.client_id,
+          name: project.name,
+          type: project.type,
+          status: project.status,
+          start_date: project.start_date,
+          end_date: project.end_date,
+          budget_amount: project.budget_amount,
+          progress: (project as any).progress ?? null,
+        }}
+        clients={activeClients}
+      />
     </div>
   );
 }

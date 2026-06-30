@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 import { useUpdateClient, type ClientStatus } from "@/hooks/useClients";
+import { usePrimaryContact, useUpsertPrimaryContact } from "@/hooks/useClientDetail";
 import { INDUSTRIES } from "./clients-filters";
 
 const hex = z
@@ -45,6 +46,10 @@ const schema = z.object({
   brand_primary_color: hex,
   brand_secondary_color: hex,
   logo_url: z.string().trim().max(500).url("URL inválida").optional().or(z.literal("")),
+  contact_name: z.string().trim().min(1, "Requerido").max(120),
+  contact_email: z.string().trim().email("Email inválido").max(255),
+  contact_phone: z.string().trim().max(40).optional().or(z.literal("")),
+  contact_role: z.string().trim().max(80).optional().or(z.literal("")),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -68,6 +73,8 @@ interface Props {
 
 export function EditClientDialog({ open, onOpenChange, workspaceId, client }: Props) {
   const update = useUpdateClient(workspaceId);
+  const { data: primaryContact } = usePrimaryContact(client.id, open);
+  const upsertContact = useUpsertPrimaryContact(workspaceId, client.id);
   const [brandOpen, setBrandOpen] = useState(false);
 
   const buildDefaults = (): FormValues => ({
@@ -79,6 +86,10 @@ export function EditClientDialog({ open, onOpenChange, workspaceId, client }: Pr
     brand_primary_color: client.brand_primary_color ?? "",
     brand_secondary_color: client.brand_secondary_color ?? "",
     logo_url: client.logo_url ?? "",
+    contact_name: "",
+    contact_email: "",
+    contact_phone: "",
+    contact_role: "",
   });
 
   const form = useForm<FormValues>({
@@ -104,6 +115,15 @@ export function EditClientDialog({ open, onOpenChange, workspaceId, client }: Pr
     client.logo_url,
   ]);
 
+  useEffect(() => {
+    if (!open) return;
+    form.setValue("contact_name", primaryContact?.name ?? "");
+    form.setValue("contact_email", primaryContact?.email ?? "");
+    form.setValue("contact_phone", primaryContact?.phone ?? "");
+    form.setValue("contact_role", primaryContact?.role ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, primaryContact?.id, primaryContact?.name, primaryContact?.email, primaryContact?.phone, primaryContact?.role]);
+
   const onSubmit = async (v: FormValues) => {
     try {
       await update.mutateAsync({
@@ -118,6 +138,13 @@ export function EditClientDialog({ open, onOpenChange, workspaceId, client }: Pr
           brand_secondary_color: v.brand_secondary_color || undefined,
           logo_url: v.logo_url || undefined,
         },
+      });
+      await upsertContact.mutateAsync({
+        contactId: primaryContact?.id ?? null,
+        name: v.contact_name,
+        email: v.contact_email,
+        phone: v.contact_phone || undefined,
+        role: v.contact_role || undefined,
       });
       toast({ title: "Cliente actualizado", description: v.name });
       onOpenChange(false);
@@ -208,6 +235,47 @@ export function EditClientDialog({ open, onOpenChange, workspaceId, client }: Pr
             </div>
           </section>
 
+          <section className="space-y-3">
+            <h4 className="text-sm font-semibold text-foreground">Contacto principal</h4>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="contact_name">Nombre *</Label>
+              <Input id="contact_name" {...form.register("contact_name")} />
+              {errs.contact_name && (
+                <p className="text-xs text-destructive">{errs.contact_name.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="contact_email">Email *</Label>
+              <Input id="contact_email" type="email" {...form.register("contact_email")} />
+              {errs.contact_email && (
+                <p className="text-xs text-destructive">{errs.contact_email.message}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="contact_phone">Teléfono</Label>
+                <Input id="contact_phone" {...form.register("contact_phone")} />
+                {errs.contact_phone && (
+                  <p className="text-xs text-destructive">{errs.contact_phone.message}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="contact_role">Rol</Label>
+                <Input
+                  id="contact_role"
+                  placeholder="CEO, Marketing…"
+                  {...form.register("contact_role")}
+                />
+                {errs.contact_role && (
+                  <p className="text-xs text-destructive">{errs.contact_role.message}</p>
+                )}
+              </div>
+            </div>
+          </section>
+
           <Collapsible open={brandOpen} onOpenChange={setBrandOpen}>
             <CollapsibleTrigger asChild>
               <button
@@ -245,8 +313,8 @@ export function EditClientDialog({ open, onOpenChange, workspaceId, client }: Pr
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={update.isPending}>
-              {update.isPending ? "Guardando…" : "Guardar cambios"}
+            <Button type="submit" disabled={update.isPending || upsertContact.isPending}>
+              {update.isPending || upsertContact.isPending ? "Guardando…" : "Guardar cambios"}
             </Button>
           </DialogFooter>
         </form>

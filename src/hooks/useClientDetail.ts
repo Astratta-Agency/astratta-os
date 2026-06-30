@@ -315,3 +315,75 @@ export function useClientPendingTasksCount(clientId: string | undefined) {
     },
   });
 }
+
+// ---------------- Primary contact ----------------
+export function usePrimaryContact(clientId: string | undefined, enabled: boolean) {
+  return useQuery<ClientContact | null>({
+    queryKey: ["client-primary-contact", clientId],
+    enabled: !!clientId && enabled,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("client_contacts")
+        .select("id, name, email, phone, role, is_primary")
+        .eq("client_id", clientId)
+        .eq("is_primary", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data as ClientContact | null;
+    },
+  });
+}
+
+export function useUpsertPrimaryContact(workspaceId: string | undefined, clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      contactId?: string | null;
+      name: string;
+      email: string;
+      phone?: string | null;
+      role?: string | null;
+    }) => {
+      if (!clientId) throw new Error("clientId requerido");
+      if (input.contactId) {
+        const { error } = await (supabase as any)
+          .from("client_contacts")
+          .update({
+            name: input.name,
+            email: input.email,
+            phone: input.phone || null,
+            role: input.role || null,
+          })
+          .eq("id", input.contactId);
+        if (error) throw error;
+
+        if (workspaceId) {
+          const { data: userRes } = await supabase.auth.getUser();
+          await (supabase as any).from("client_timeline_events").insert({
+            client_id: clientId,
+            workspace_id: workspaceId,
+            event_type: "contact_updated",
+            title: `Contacto actualizado: ${input.name}`,
+            actor_id: userRes.user?.id ?? null,
+          });
+        }
+      } else {
+        const { error } = await (supabase as any).from("client_contacts").insert({
+          client_id: clientId,
+          name: input.name,
+          email: input.email,
+          phone: input.phone || null,
+          role: input.role || null,
+          is_primary: true,
+        });
+        if (error) throw error;
+        // el trigger tl_on_contact_insert ya registra el evento "contact_added" solo
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client"] });
+      qc.invalidateQueries({ queryKey: ["client-primary-contact", clientId] });
+      qc.invalidateQueries({ queryKey: ["client-timeline"] });
+    },
+  });
+}

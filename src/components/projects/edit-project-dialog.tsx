@@ -114,6 +114,7 @@ type ProjectShape = {
   end_date: string | null;
   budget_amount: number | null;
   progress?: number | null;
+  assigned_team_ids: string[];
 };
 
 interface ClientOption {
@@ -126,6 +127,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   project: ProjectShape;
   clients: ClientOption[];
+  members: WorkspaceMember[];
 }
 
 const toDate = (s: string | null) => (s ? parseISO(s) : null);

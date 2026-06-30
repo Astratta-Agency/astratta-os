@@ -49,7 +49,7 @@ import {
   PROJECT_TYPES,
   PROJECT_TYPE_LABEL,
 } from "@/components/projects/project-meta";
-import { useUpdateProject } from "@/hooks/useProjects";
+import { useUpdateProject, type WorkspaceMember } from "@/hooks/useProjects";
 import type {
   ProjectStatus,
   ProjectType,
@@ -114,6 +114,7 @@ type ProjectShape = {
   end_date: string | null;
   budget_amount: number | null;
   progress?: number | null;
+  assigned_team_ids: string[];
 };
 
 interface ClientOption {
@@ -126,15 +127,24 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   project: ProjectShape;
   clients: ClientOption[];
+  members: WorkspaceMember[];
 }
 
 const toDate = (s: string | null) => (s ? parseISO(s) : null);
 const toIso = (d: Date | null | undefined) =>
   d ? format(d, "yyyy-MM-dd") : null;
 
-export function EditProjectDialog({ open, onOpenChange, project, clients }: Props) {
+export function EditProjectDialog({ open, onOpenChange, project, clients, members }: Props) {
   const update = useUpdateProject();
   const [clientCbOpen, setClientCbOpen] = useState(false);
+  const [teamIds, setTeamIds] = useState<string[]>(project.assigned_team_ids ?? []);
+
+  useEffect(() => {
+    if (open) setTeamIds(project.assigned_team_ids ?? []);
+  }, [open, project.assigned_team_ids]);
+
+  const toggleMember = (id: string) =>
+    setTeamIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const defaultValues = useMemo<FormValues>(
     () => ({
@@ -194,6 +204,7 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
       end_date: toIso(values.end_date ?? null),
       budget_amount: values.budget_amount ?? null,
       progress: values.progress ?? null,
+      assigned_team_ids: teamIds,
     };
     const statusChanged = values.status !== project.status;
 
@@ -204,6 +215,12 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
       n == null ? "—" : `${n}%`;
     const clientName = (id: string) =>
       clients.find((c) => c.id === id)?.name ?? id;
+    const memberName = (id: string) => {
+      const m = members.find((mm) => mm.user_id === id);
+      return m?.full_name || m?.email || id.slice(0, 6);
+    };
+    const fmtTeam = (ids: string[]) =>
+      ids.length === 0 ? "Sin equipo" : ids.map(memberName).join(", ");
 
     const changes: { field: string; from: string; to: string }[] = [];
     if (patch.name !== project.name)
@@ -244,6 +261,18 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
         from: fmtProgress(project.progress),
         to: fmtProgress(patch.progress),
       });
+    const prevTeam = [...(project.assigned_team_ids ?? [])].sort();
+    const nextTeam = [...teamIds].sort();
+    const teamChanged =
+      prevTeam.length !== nextTeam.length ||
+      prevTeam.some((id, i) => id !== nextTeam[i]);
+    if (teamChanged)
+      changes.push({
+        field: "Equipo asignado",
+        from: fmtTeam(project.assigned_team_ids ?? []),
+        to: fmtTeam(teamIds),
+      });
+
 
     try {
       await update.mutateAsync({
@@ -537,6 +566,34 @@ export function EditProjectDialog({ open, onOpenChange, project, clients }: Prop
                 );
               }}
             />
+
+            <div className="space-y-1.5">
+              <FormLabel>Equipo asignado</FormLabel>
+              <div className="flex flex-wrap gap-2 rounded-md border p-2">
+                {members.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Sin miembros aún</p>
+                )}
+                {members.map((m) => {
+                  const active = teamIds.includes(m.user_id);
+                  return (
+                    <button
+                      key={m.user_id}
+                      type="button"
+                      onClick={() => toggleMember(m.user_id)}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs transition",
+                        active
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border hover:border-primary/60",
+                      )}
+                    >
+                      {m.full_name || m.email || m.user_id.slice(0, 6)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
 
             <DialogFooter className="gap-2">
               <Button

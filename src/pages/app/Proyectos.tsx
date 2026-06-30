@@ -198,7 +198,22 @@ export default function Proyectos() {
           loading={isLoading}
           onOpenProject={handleOpenProject}
           onChangeStatus={handleStatusChange}
-          onArchive={() => toast("Próximamente")}
+          onArchive={async (p) => {
+            if (!workspaceId) return;
+            try {
+              await updateStatus.mutateAsync({
+                projectId: p.id,
+                fromStatus: p.status,
+                toStatus: "closed",
+                workspaceId,
+                clientId: p.client_id,
+                projectName: p.name,
+              });
+              toast.success("Proyecto archivado");
+            } catch (e: any) {
+              toast.error("No se pudo archivar", { description: e?.message });
+            }
+          }}
           onClearFilters={clearFilters}
         />
       ) : (

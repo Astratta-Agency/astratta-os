@@ -143,3 +143,127 @@ export function useUpdateProjectDescription(projectId: string | undefined) {
     },
   });
 }
+
+export function useDuplicateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (project: ProjectDetail) => {
+      const payload = {
+        workspace_id: project.workspace_id,
+        client_id: project.client_id,
+        name: `${project.name} (copia)`,
+        type: project.type,
+        status: "planning",
+        start_date: project.start_date,
+        end_date: project.end_date,
+        budget_amount: project.budget_amount,
+        retainer_monthly: project.retainer_monthly,
+        description: project.description,
+        assigned_team_ids: project.assigned_team_ids,
+      };
+      const { data, error } = await (supabase as any)
+        .from("projects")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data as { id: string };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["projects-stats"] });
+    },
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      const { error } = await (supabase as any).from("projects").delete().eq("id", projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["projects-stats"] });
+      qc.invalidateQueries({ queryKey: ["client"] });
+    },
+  });
+}
+
+export type ProjectTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  assigned_to: string | null;
+  status: "todo" | "doing" | "review" | "done";
+  priority: "p0" | "p1" | "p2" | "p3";
+  due_date: string | null;
+  created_at: string;
+};
+
+export function useProjectTasks(projectId: string | undefined) {
+  return useQuery<ProjectTask[]>({
+    queryKey: ["project-tasks", projectId],
+    enabled: !!projectId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tasks")
+        .select("id, title, description, assigned_to, status, priority, due_date, created_at")
+        .eq("project_id", projectId)
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as ProjectTask[];
+    },
+  });
+}
+
+export function useCreateProjectTask(
+  workspaceId: string | undefined,
+  projectId: string | undefined,
+  clientId: string | undefined,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      title: string;
+      assigned_to?: string | null;
+      priority: ProjectTask["priority"];
+      due_date?: string | null;
+    }) => {
+      if (!workspaceId || !projectId) throw new Error("Faltan ids");
+      const { data: userRes } = await supabase.auth.getUser();
+      const { error } = await (supabase as any).from("tasks").insert({
+        workspace_id: workspaceId,
+        project_id: projectId,
+        client_id: clientId ?? null,
+        title: input.title,
+        assigned_to: input.assigned_to || null,
+        priority: input.priority,
+        due_date: input.due_date || null,
+        created_by: userRes.user?.id ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project-tasks", projectId] });
+    },
+  });
+}
+
+export function useUpdateProjectTaskStatus(projectId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { taskId: string; status: ProjectTask["status"] }) => {
+      const { error } = await (supabase as any)
+        .from("tasks")
+        .update({ status: input.status, updated_at: new Date().toISOString() })
+        .eq("id", input.taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["project-tasks", projectId] });
+    },
+  });
+}

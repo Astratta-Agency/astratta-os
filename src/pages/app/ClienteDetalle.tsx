@@ -21,6 +21,7 @@ import { KpiCard } from "@/components/clients/kpi-card";
 import { TabComingSoon } from "@/components/clients/tab-coming-soon";
 import { UpcomingDeliveries, StakeholdersList } from "@/components/clients/resumen-cards";
 import { ClientProjectsTab } from "@/components/clients/client-projects-tab";
+import { ClientCredentialsTab } from "@/components/clients/client-credentials-tab";
 import { ClientNotesTab } from "@/components/clients/client-notes-tab";
 import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
@@ -228,10 +229,7 @@ export default function ClienteDetalle() {
 
         {/* Credenciales */}
         <TabsContent value="credenciales">
-          <TabComingSoon
-            title="Bóveda de credenciales próximamente"
-            description="Almacenamiento cifrado con pgsodium en construcción. No subas credenciales reales aún."
-          />
+          <ClientCredentialsTab clientId={client.id} workspaceId={client.workspace_id} />
         </TabsContent>
 
         {/* Notas */}

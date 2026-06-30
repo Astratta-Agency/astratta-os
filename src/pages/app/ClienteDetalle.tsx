@@ -42,6 +42,7 @@ export default function ClienteDetalle() {
   const { data: pendingTasks } = useClientPendingTasksCount(client?.id);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   if (wsLoading || isLoading) {
     return (

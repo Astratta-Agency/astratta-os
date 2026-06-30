@@ -135,3 +135,42 @@ export function useCreateClient(workspaceId: string | undefined) {
     },
   });
 }
+
+export type UpdateClientInput = {
+  name: string;
+  industry: string;
+  website?: string;
+  location: string;
+  status: ClientStatus;
+  brand_primary_color?: string;
+  brand_secondary_color?: string;
+  logo_url?: string;
+};
+
+export function useUpdateClient(workspaceId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { clientId: string; patch: UpdateClientInput }) => {
+      const { error } = await (supabase as any)
+        .from("clients")
+        .update({
+          name: input.patch.name,
+          industry: input.patch.industry,
+          website: input.patch.website || null,
+          location: input.patch.location,
+          status: input.patch.status,
+          brand_primary_color: input.patch.brand_primary_color || null,
+          brand_secondary_color: input.patch.brand_secondary_color || null,
+          logo_url: input.patch.logo_url || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clients"] });
+      qc.invalidateQueries({ queryKey: ["client"] });
+      qc.invalidateQueries({ queryKey: ["client-timeline"] });
+    },
+  });
+}

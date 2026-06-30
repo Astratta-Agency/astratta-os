@@ -28,6 +28,7 @@ import { ClientLogo } from "./client-logo";
 import { HealthScoreBar } from "./health-score-bar";
 import { StatusBadge } from "./status-badge";
 import { ServicesChips } from "./services-chips";
+import { EditClientDialog } from "./edit-client-dialog";
 import { type ClientRow } from "@/hooks/useClients";
 
 type SortKey = "name" | "industry" | "health" | "status";

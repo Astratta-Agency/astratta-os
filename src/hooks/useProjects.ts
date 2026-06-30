@@ -12,6 +12,7 @@ export type ProjectRow = {
   start_date: string | null;
   end_date: string | null;
   budget_amount: number | null;
+  progress: number | null;
   retainer_monthly: boolean;
   description: string | null;
   assigned_team_ids: string[];
@@ -44,7 +45,7 @@ export function useProjects(workspaceId: string | undefined, filters: ProjectsFi
       let q = (supabase as any)
         .from("projects")
         .select(
-          "id, workspace_id, client_id, name, type, status, start_date, end_date, budget_amount, retainer_monthly, description, assigned_team_ids, created_at, client:clients!inner(id, name, slug, logo_url, brand_primary_color)",
+          "id, workspace_id, client_id, name, type, status, start_date, end_date, budget_amount, progress, retainer_monthly, description, assigned_team_ids, created_at, client:clients!inner(id, name, slug, logo_url, brand_primary_color)",
         )
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });

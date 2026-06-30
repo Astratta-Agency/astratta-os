@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { ServicesChips } from "@/components/clients/services-chips";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
 import type { ClientProject } from "@/hooks/useClientDetail";
-import { toast } from "@/hooks/use-toast";
 
 const statusLabel: Record<string, { label: string; className: string }> = {
   planning: { label: "Planificación", className: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30" },
@@ -35,6 +35,7 @@ interface Props {
 
 export function ClientProjectsTab({ workspaceId, clientId, projects }: Props) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-4">
@@ -71,7 +72,7 @@ export function ClientProjectsTab({ workspaceId, clientId, projects }: Props) {
                   <TableRow
                     key={p.id}
                     className="cursor-pointer"
-                    onClick={() => toast({ title: "Detalle de proyecto próximamente" })}
+                    onClick={() => navigate(`/app/proyectos/${p.id}`)}
                   >
                     <TableCell className="font-medium">
                       {p.name}

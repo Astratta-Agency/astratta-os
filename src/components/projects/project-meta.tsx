@@ -75,6 +75,16 @@ export function computeProgress(
   return Math.max(0, Math.min(100, Math.round(((t - s) / (e - s)) * 100)));
 }
 
+export function effectiveProgress(
+  status: ProjectStatus,
+  start: string | null,
+  end: string | null,
+  manualProgress?: number | null,
+): number | null {
+  if (manualProgress != null) return manualProgress;
+  return computeProgress(status, start, end);
+}
+
 export function isOverdue(status: ProjectStatus, end: string | null): boolean {
   if (!end) return false;
   if (status !== "planning" && status !== "in_progress") return false;

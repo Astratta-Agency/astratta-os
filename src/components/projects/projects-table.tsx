@@ -38,7 +38,7 @@ import {
   PROJECT_STATUS_ORDER,
   ProjectStatusBadge,
   ProjectTypeChip,
-  computeProgress,
+  effectiveProgress,
   isOverdue,
 } from "@/components/projects/project-meta";
 import type { ProjectRow } from "@/hooks/useProjects";
@@ -155,7 +155,7 @@ export function ProjectsTable({
             )}
             {current.map((p) => {
               const overdue = isOverdue(p.status, p.end_date);
-              const progress = computeProgress(p.status, p.start_date, p.end_date);
+              const progress = effectiveProgress(p.status, p.start_date, p.end_date, p.progress);
               return (
                 <TableRow
                   key={p.id}

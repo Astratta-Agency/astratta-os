@@ -134,9 +134,17 @@ const toDate = (s: string | null) => (s ? parseISO(s) : null);
 const toIso = (d: Date | null | undefined) =>
   d ? format(d, "yyyy-MM-dd") : null;
 
-export function EditProjectDialog({ open, onOpenChange, project, clients }: Props) {
+export function EditProjectDialog({ open, onOpenChange, project, clients, members }: Props) {
   const update = useUpdateProject();
   const [clientCbOpen, setClientCbOpen] = useState(false);
+  const [teamIds, setTeamIds] = useState<string[]>(project.assigned_team_ids ?? []);
+
+  useEffect(() => {
+    if (open) setTeamIds(project.assigned_team_ids ?? []);
+  }, [open, project.assigned_team_ids]);
+
+  const toggleMember = (id: string) =>
+    setTeamIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const defaultValues = useMemo<FormValues>(
     () => ({

@@ -34,9 +34,6 @@ export type ClientsFilters = {
   location?: string | "all";
 };
 
-export function mockHealthScore(id: string): number {
-  return parseInt(id.replace(/-/g, "").slice(0, 8), 16) % 101;
-}
 
 export function useClients(workspaceId: string | undefined, filters: ClientsFilters) {
   return useQuery<ClientRow[]>({

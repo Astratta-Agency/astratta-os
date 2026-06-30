@@ -178,7 +178,7 @@ export function ClientsTable({ clients }: Props) {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              )
+              ))}
           </TableBody>
         </Table>
       </div>

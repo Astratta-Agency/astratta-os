@@ -55,6 +55,10 @@ export function ClientsTable({ clients }: Props) {
   const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
   const [editingClient, setEditingClient] = useState<ClientRow | null>(null);
+  const [deletingClient, setDeletingClient] = useState<ClientRow | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const archive = useArchiveClient();
+  const del = useDeleteClient();
 
   const sorted = useMemo(() => {
     const arr = [...clients];

@@ -187,8 +187,19 @@ export function ClientsTable({ clients }: Props) {
                           Ver portal cliente
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setEditingClient(c)}>Editar</DropdownMenuItem>
-                        <DropdownMenuItem onClick={soon}>Archivar</DropdownMenuItem>
-                        <DropdownMenuItem onClick={soon} className="text-destructive">
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            try {
+                              await archive.mutateAsync(c.id);
+                              toast({ title: "Cliente archivado", description: `${c.name} se marcó como churned` });
+                            } catch (e: any) {
+                              toast({ title: "No se pudo archivar", description: e?.message, variant: "destructive" });
+                            }
+                          }}
+                        >
+                          Archivar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDeletingClient(c)} className="text-destructive">
                           Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>

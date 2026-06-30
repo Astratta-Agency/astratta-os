@@ -279,6 +279,51 @@ export function ClientsTable({ clients }: Props) {
           }}
         />
       )}
+      )}
+
+      <AlertDialog open={!!deletingClient} onOpenChange={(v) => { if (!v) { setDeletingClient(null); setConfirmText(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar {deletingClient?.name}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es permanente. Se eliminarán también todos sus proyectos, publicaciones de
+              redes sociales, historial de aprobaciones, archivos/media, notas internas, timeline e
+              invitaciones al portal asociadas a este cliente. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5 py-2">
+            <Label htmlFor="confirm-delete-client" className="text-sm">
+              Escribe <span className="font-semibold">{deletingClient?.name}</span> para confirmar
+            </Label>
+            <Input
+              id="confirm-delete-client"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmText("")}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={confirmText !== deletingClient?.name || del.isPending}
+              onClick={async () => {
+                if (!deletingClient) return;
+                try {
+                  await del.mutateAsync(deletingClient.id);
+                  toast({ title: "Cliente eliminado", description: deletingClient.name });
+                  setDeletingClient(null);
+                  setConfirmText("");
+                } catch (e: any) {
+                  toast({ title: "No se pudo eliminar", description: e?.message, variant: "destructive" });
+                }
+              }}
+            >
+              {del.isPending ? "Eliminando…" : "Eliminar definitivamente"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

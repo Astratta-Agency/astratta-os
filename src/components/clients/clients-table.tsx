@@ -171,7 +171,7 @@ export function ClientsTable({ clients }: Props) {
                         >
                           Ver portal cliente
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={soon}>Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEditingClient(c)}>Editar</DropdownMenuItem>
                         <DropdownMenuItem onClick={soon}>Archivar</DropdownMenuItem>
                         <DropdownMenuItem onClick={soon} className="text-destructive">
                           Eliminar

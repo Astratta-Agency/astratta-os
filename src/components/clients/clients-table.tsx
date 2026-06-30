@@ -43,6 +43,7 @@ export function ClientsTable({ clients }: Props) {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
+  const [editingClient, setEditingClient] = useState<ClientRow | null>(null);
 
   const sorted = useMemo(() => {
     const arr = [...clients];

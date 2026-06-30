@@ -279,7 +279,8 @@ export function ClientsTable({ clients }: Props) {
           }}
         />
       )}
-      )}
+
+
 
       <AlertDialog open={!!deletingClient} onOpenChange={(v) => { if (!v) { setDeletingClient(null); setConfirmText(""); } }}>
         <AlertDialogContent>

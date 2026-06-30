@@ -234,6 +234,25 @@ export function ClientsTable({ clients }: Props) {
           </div>
         </div>
       </div>
+
+      {editingClient && (
+        <EditClientDialog
+          open={!!editingClient}
+          onOpenChange={(v) => !v && setEditingClient(null)}
+          workspaceId={editingClient.workspace_id}
+          client={{
+            id: editingClient.id,
+            name: editingClient.name,
+            industry: editingClient.industry,
+            website: editingClient.website,
+            location: editingClient.location,
+            status: editingClient.status,
+            brand_primary_color: editingClient.brand_primary_color,
+            brand_secondary_color: editingClient.brand_secondary_color,
+            logo_url: editingClient.logo_url,
+          }}
+        />
+      )}
     </div>
   );
 }

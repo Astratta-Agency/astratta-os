@@ -49,7 +49,7 @@ import {
   PROJECT_TYPES,
   PROJECT_TYPE_LABEL,
 } from "@/components/projects/project-meta";
-import { useUpdateProject } from "@/hooks/useProjects";
+import { useUpdateProject, type WorkspaceMember } from "@/hooks/useProjects";
 import type {
   ProjectStatus,
   ProjectType,

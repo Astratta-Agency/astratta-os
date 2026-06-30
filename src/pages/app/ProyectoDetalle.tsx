@@ -7,21 +7,33 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
-import { useProject } from "@/hooks/useProjectDetail";
+import { toast as sonner } from "sonner";
+import {
+  useProject,
+  useDuplicateProject,
+  useDeleteProject,
+} from "@/hooks/useProjectDetail";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
-import { useWorkspaceMembers } from "@/hooks/useProjects";
+import {
+  useWorkspaceMembers,
+  useUpdateProjectStatus,
+} from "@/hooks/useProjects";
 import { useClients } from "@/hooks/useClients";
 import { ProjectAvatar } from "@/components/projects/project-avatar";
 import {
@@ -36,6 +48,7 @@ import { TabComingSoon } from "@/components/clients/tab-coming-soon";
 import { ProjectDescriptionCard } from "@/components/projects/project-description-card";
 import { ProjectTeamCard } from "@/components/projects/project-team-card";
 import { ProjectTimelineTab } from "@/components/projects/project-timeline-tab";
+import { ProjectTasksTab } from "@/components/projects/project-tasks-tab";
 import { EditProjectDialog } from "@/components/projects/edit-project-dialog";
 
 const fmtDate = (d: string | null) =>
@@ -70,6 +83,13 @@ export default function ProyectoDetalle() {
     [allClients, project?.client_id],
   );
   const [editOpen, setEditOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("resumen");
+  const [tasksDialogOpen, setTasksDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const duplicate = useDuplicateProject();
+  const deleteProject = useDeleteProject();
+  const updateStatus = useUpdateProjectStatus();
 
   if (wsLoading || isLoading) {
     return (
@@ -102,6 +122,51 @@ export default function ProyectoDetalle() {
   const daysLeft = project.end_date
     ? differenceInDays(new Date(project.end_date), new Date())
     : null;
+
+  const handleNewTask = () => {
+    setActiveTab("tareas");
+    setTasksDialogOpen(true);
+  };
+
+  const handleDuplicate = async () => {
+    try {
+      const res = await duplicate.mutateAsync(project);
+      sonner.success("Proyecto duplicado");
+      navigate(`/app/proyectos/${res.id}`);
+    } catch (e: any) {
+      sonner.error("No se pudo duplicar", { description: e?.message });
+    }
+  };
+
+  const handleArchive = async () => {
+    if (project.status === "closed") {
+      sonner("El proyecto ya está archivado");
+      return;
+    }
+    try {
+      await updateStatus.mutateAsync({
+        projectId: project.id,
+        fromStatus: project.status,
+        toStatus: "closed",
+        workspaceId: project.workspace_id,
+        clientId: project.client_id,
+        projectName: project.name,
+      });
+      sonner.success("Proyecto archivado");
+    } catch (e: any) {
+      sonner.error("No se pudo archivar", { description: e?.message });
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteProject.mutateAsync(project.id);
+      sonner.success("Proyecto eliminado");
+      navigate("/app/proyectos");
+    } catch (e: any) {
+      sonner.error("No se pudo eliminar", { description: e?.message });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -146,7 +211,7 @@ export default function ProyectoDetalle() {
             <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Editar
             </Button>
-            <Button onClick={() => toast({ title: "Tareas próximamente" })}>
+            <Button onClick={handleNewTask}>
               <Plus className="h-4 w-4" /> Nueva tarea
             </Button>
             <DropdownMenu>
@@ -156,15 +221,21 @@ export default function ProyectoDetalle() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => toast({ title: "Duplicar próximamente" })}>
+                <DropdownMenuItem
+                  onClick={handleDuplicate}
+                  disabled={duplicate.isPending}
+                >
                   Duplicar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast({ title: "Archivar próximamente" })}>
+                <DropdownMenuItem
+                  onClick={handleArchive}
+                  disabled={updateStatus.isPending}
+                >
                   Archivar
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive"
-                  onClick={() => toast({ title: "Eliminar próximamente" })}
+                  onClick={() => setDeleteOpen(true)}
                 >
                   Eliminar
                 </DropdownMenuItem>
@@ -177,7 +248,7 @@ export default function ProyectoDetalle() {
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button size="sm" onClick={() => toast({ title: "Tareas próximamente" })}>
+            <Button size="sm" onClick={handleNewTask}>
               <Plus className="h-4 w-4" /> Tarea
             </Button>
             <DropdownMenu>
@@ -187,15 +258,21 @@ export default function ProyectoDetalle() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => toast({ title: "Duplicar próximamente" })}>
+                <DropdownMenuItem
+                  onClick={handleDuplicate}
+                  disabled={duplicate.isPending}
+                >
                   Duplicar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast({ title: "Archivar próximamente" })}>
+                <DropdownMenuItem
+                  onClick={handleArchive}
+                  disabled={updateStatus.isPending}
+                >
                   Archivar
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive"
-                  onClick={() => toast({ title: "Eliminar próximamente" })}
+                  onClick={() => setDeleteOpen(true)}
                 >
                   Eliminar
                 </DropdownMenuItem>
@@ -206,7 +283,7 @@ export default function ProyectoDetalle() {
       </header>
 
       {/* Tabs */}
-      <Tabs defaultValue="resumen" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex w-full justify-start overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="tareas">Tareas</TabsTrigger>
@@ -264,24 +341,14 @@ export default function ProyectoDetalle() {
 
         {/* Tareas */}
         <TabsContent value="tareas" className="space-y-4">
-          <TabComingSoon
-            title="Las tareas de este proyecto aparecerán aquí"
-            description="Podrás crear, asignar y hacer seguimiento de tareas directamente desde el proyecto."
+          <ProjectTasksTab
+            projectId={project.id}
+            workspaceId={project.workspace_id}
+            clientId={project.client_id}
+            members={members}
+            createOpen={tasksDialogOpen}
+            onCreateOpenChange={setTasksDialogOpen}
           />
-          <div className="flex justify-center">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>
-                    <Button disabled>
-                      <Plus className="h-4 w-4" /> Nueva tarea
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>Próximamente</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
         </TabsContent>
 
         {/* Archivos */}
@@ -319,9 +386,36 @@ export default function ProyectoDetalle() {
           end_date: project.end_date,
           budget_amount: project.budget_amount,
           progress: project.progress ?? null,
+          assigned_team_ids: project.assigned_team_ids,
         }}
         clients={activeClients}
+        members={members}
       />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este proyecto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es permanente y no se puede deshacer. Se eliminará{" "}
+              <span className="font-semibold text-foreground">{project.name}</span> y
+              todos sus datos asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteProject.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteProject.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteProject.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

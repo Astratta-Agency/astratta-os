@@ -161,6 +161,7 @@ export type UpdateProjectPatch = {
   end_date?: string | null;
   budget_amount?: number | null;
   progress?: number | null;
+  assigned_team_ids?: string[];
 };
 
 export type ProjectFieldChange = {

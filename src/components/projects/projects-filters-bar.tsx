@@ -41,38 +41,59 @@ interface Props {
   activeFiltersCount: number;
 }
 
-function MultiChips<T extends string>({
+function MultiSelectDropdown<T extends string>({
   options,
   selected,
   onChange,
   labelMap,
+  placeholder,
+  width = "md:w-44",
 }: {
   options: T[];
   selected: T[];
   onChange: (v: T[]) => void;
   labelMap: Record<T, string>;
+  placeholder: string;
+  width?: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const label =
+    selected.length === 0
+      ? placeholder
+      : selected.length === 1
+        ? labelMap[selected[0]]
+        : `${selected.length} seleccionados`;
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((o) => {
-        const active = selected.includes(o);
-        return (
-          <button
-            key={o}
-            type="button"
-            onClick={() => onChange(active ? selected.filter((x) => x !== o) : [...selected, o])}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs font-medium transition",
-              active
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-muted-foreground hover:border-primary/60",
-            )}
-          >
-            {labelMap[o]}
-          </button>
-        );
-      })}
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className={cn("w-full justify-between", width)}>
+          <span className="truncate">{label}</span>
+          <Filter className="ml-2 h-3.5 w-3.5 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-0" align="start">
+        <Command>
+          <CommandList>
+            <CommandGroup>
+              {options.map((o) => {
+                const active = selected.includes(o);
+                return (
+                  <CommandItem
+                    key={o}
+                    onSelect={() =>
+                      onChange(active ? selected.filter((x) => x !== o) : [...selected, o])
+                    }
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", active ? "opacity-100" : "opacity-0")} />
+                    {labelMap[o]}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -139,22 +160,20 @@ function FiltersBody(props: Props) {
           onChange={props.onClientIds}
         />
       </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Tipo</Label>
-        <MultiChips
+      <div className="grid grid-cols-2 gap-2">
+        <MultiSelectDropdown
           options={PROJECT_TYPES}
           selected={props.types}
           onChange={props.onTypes}
           labelMap={PROJECT_TYPE_LABEL}
+          placeholder="Todos los tipos"
         />
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Status</Label>
-        <MultiChips
+        <MultiSelectDropdown
           options={PROJECT_STATUS_ORDER}
           selected={props.statuses}
           onChange={props.onStatuses}
           labelMap={PROJECT_STATUS_LABEL}
+          placeholder="Todos los status"
         />
       </div>
       <div className="flex items-center justify-between rounded-md border p-3">
@@ -174,7 +193,7 @@ function FiltersBody(props: Props) {
 export function ProjectsFiltersBar(props: Props) {
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:flex-wrap">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -195,12 +214,36 @@ export function ProjectsFiltersBar(props: Props) {
         </div>
 
         {/* Desktop inline filters */}
-        <div className="hidden md:flex md:items-center md:gap-2">
+        <div className="hidden md:flex md:flex-wrap md:items-center md:gap-2">
           <ClientMulti
             options={props.clientOptions}
             selected={props.clientIds}
             onChange={props.onClientIds}
           />
+          <MultiSelectDropdown
+            options={PROJECT_TYPES}
+            selected={props.types}
+            onChange={props.onTypes}
+            labelMap={PROJECT_TYPE_LABEL}
+            placeholder="Todos los tipos"
+          />
+          <MultiSelectDropdown
+            options={PROJECT_STATUS_ORDER}
+            selected={props.statuses}
+            onChange={props.onStatuses}
+            labelMap={PROJECT_STATUS_LABEL}
+            placeholder="Todos los status"
+          />
+          <div className="flex items-center gap-2">
+            <Label htmlFor="assigned-me-d" className="text-xs text-muted-foreground">
+              Asignados a mí
+            </Label>
+            <Switch
+              id="assigned-me-d"
+              checked={props.assignedToMe}
+              onCheckedChange={props.onAssignedToMe}
+            />
+          </div>
         </div>
 
         {/* Mobile sheet */}
@@ -245,38 +288,6 @@ export function ProjectsFiltersBar(props: Props) {
             <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
             Kanban
           </Button>
-        </div>
-      </div>
-
-      {/* Desktop chip rows */}
-      <div className="hidden flex-col gap-3 md:flex">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">Tipo:</span>
-          <MultiChips
-            options={PROJECT_TYPES}
-            selected={props.types}
-            onChange={props.onTypes}
-            labelMap={PROJECT_TYPE_LABEL}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">Status:</span>
-          <MultiChips
-            options={PROJECT_STATUS_ORDER}
-            selected={props.statuses}
-            onChange={props.onStatuses}
-            labelMap={PROJECT_STATUS_LABEL}
-          />
-          <div className="ml-auto flex items-center gap-2">
-            <Label htmlFor="assigned-me-d" className="text-xs text-muted-foreground">
-              Asignados a mí
-            </Label>
-            <Switch
-              id="assigned-me-d"
-              checked={props.assignedToMe}
-              onCheckedChange={props.onAssignedToMe}
-            />
-          </div>
         </div>
       </div>
     </div>

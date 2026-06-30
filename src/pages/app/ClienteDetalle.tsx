@@ -25,6 +25,7 @@ import { ClientNotesTab } from "@/components/clients/client-notes-tab";
 import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
 import { InviteClientUserDialog } from "@/components/clients/invite-client-user-dialog";
+import { EditClientDialog } from "@/components/clients/edit-client-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,7 @@ export default function ClienteDetalle() {
   const { data: pendingTasks } = useClientPendingTasksCount(client?.id);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   if (wsLoading || isLoading) {
     return (
@@ -119,7 +121,7 @@ export default function ClienteDetalle() {
         <div className="flex items-center gap-2">
           {/* Desktop */}
           <div className="hidden flex-wrap items-center gap-2 md:flex">
-            <Button variant="outline" onClick={() => toast({ title: "Editar próximamente" })}>
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Editar
             </Button>
             <Button onClick={() => setNewProjectOpen(true)}>
@@ -145,7 +147,7 @@ export default function ClienteDetalle() {
 
           {/* Mobile */}
           <div className="flex items-center gap-2 md:hidden">
-            <Button variant="outline" size="sm" onClick={() => toast({ title: "Editar próximamente" })}>
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" />
             </Button>
             <Button size="sm" onClick={() => setNewProjectOpen(true)}>
@@ -255,6 +257,22 @@ export default function ClienteDetalle() {
         clientId={client.id}
         clientSlug={client.slug}
         clientName={client.name}
+      />
+      <EditClientDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        workspaceId={client.workspace_id}
+        client={{
+          id: client.id,
+          name: client.name,
+          industry: client.industry,
+          website: client.website,
+          location: client.location,
+          status: client.status,
+          brand_primary_color: client.brand_primary_color,
+          brand_secondary_color: client.brand_secondary_color,
+          logo_url: client.logo_url,
+        }}
       />
     </div>
   );

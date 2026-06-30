@@ -28,6 +28,7 @@ import { ClientLogo } from "./client-logo";
 import { HealthScoreBar } from "./health-score-bar";
 import { StatusBadge } from "./status-badge";
 import { ServicesChips } from "./services-chips";
+import { EditClientDialog } from "./edit-client-dialog";
 import { type ClientRow } from "@/hooks/useClients";
 
 type SortKey = "name" | "industry" | "health" | "status";
@@ -42,6 +43,7 @@ export function ClientsTable({ clients }: Props) {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
+  const [editingClient, setEditingClient] = useState<ClientRow | null>(null);
 
   const sorted = useMemo(() => {
     const arr = [...clients];
@@ -169,7 +171,7 @@ export function ClientsTable({ clients }: Props) {
                         >
                           Ver portal cliente
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={soon}>Editar</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEditingClient(c)}>Editar</DropdownMenuItem>
                         <DropdownMenuItem onClick={soon}>Archivar</DropdownMenuItem>
                         <DropdownMenuItem onClick={soon} className="text-destructive">
                           Eliminar
@@ -232,6 +234,25 @@ export function ClientsTable({ clients }: Props) {
           </div>
         </div>
       </div>
+
+      {editingClient && (
+        <EditClientDialog
+          open={!!editingClient}
+          onOpenChange={(v) => !v && setEditingClient(null)}
+          workspaceId={editingClient.workspace_id}
+          client={{
+            id: editingClient.id,
+            name: editingClient.name,
+            industry: editingClient.industry,
+            website: editingClient.website,
+            location: editingClient.location,
+            status: editingClient.status,
+            brand_primary_color: editingClient.brand_primary_color,
+            brand_secondary_color: editingClient.brand_secondary_color,
+            logo_url: editingClient.logo_url,
+          }}
+        />
+      )}
     </div>
   );
 }

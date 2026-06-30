@@ -567,6 +567,34 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
               }}
             />
 
+            <div className="space-y-1.5">
+              <FormLabel>Equipo asignado</FormLabel>
+              <div className="flex flex-wrap gap-2 rounded-md border p-2">
+                {members.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Sin miembros aún</p>
+                )}
+                {members.map((m) => {
+                  const active = teamIds.includes(m.user_id);
+                  return (
+                    <button
+                      key={m.user_id}
+                      type="button"
+                      onClick={() => toggleMember(m.user_id)}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs transition",
+                        active
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border hover:border-primary/60",
+                      )}
+                    >
+                      {m.full_name || m.email || m.user_id.slice(0, 6)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+
             <DialogFooter className="gap-2">
               <Button
                 type="button"

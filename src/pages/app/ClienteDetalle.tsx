@@ -258,6 +258,22 @@ export default function ClienteDetalle() {
         clientSlug={client.slug}
         clientName={client.name}
       />
+      <EditClientDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        workspaceId={client.workspace_id}
+        client={{
+          id: client.id,
+          name: client.name,
+          industry: client.industry,
+          website: client.website,
+          location: client.location,
+          status: client.status,
+          brand_primary_color: client.brand_primary_color,
+          brand_secondary_color: client.brand_secondary_color,
+          logo_url: client.logo_url,
+        }}
+      />
     </div>
   );
 }

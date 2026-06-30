@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useClient, useClientPendingTasksCount } from "@/hooks/useClientDetail";
-import { mockHealthScore } from "@/hooks/useClients";
+
 import { ClientLogo } from "@/components/clients/client-logo";
 import { StatusBadge } from "@/components/clients/status-badge";
 import { HealthScoreDial } from "@/components/clients/health-score-dial";
@@ -68,7 +68,7 @@ export default function ClienteDetalle() {
     );
   }
 
-  const health = client.health_score ?? mockHealthScore(client.id);
+  const health = client.health_score;
   const activeProjects = client.projects.filter(
     (p) => p.status === "planning" || p.status === "in_progress",
   ).length;

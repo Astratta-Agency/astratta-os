@@ -28,7 +28,7 @@ import { ClientLogo } from "./client-logo";
 import { HealthScoreBar } from "./health-score-bar";
 import { StatusBadge } from "./status-badge";
 import { ServicesChips } from "./services-chips";
-import { mockHealthScore, type ClientRow } from "@/hooks/useClients";
+import { type ClientRow } from "@/hooks/useClients";
 
 type SortKey = "name" | "industry" | "health" | "status";
 
@@ -55,8 +55,8 @@ export function ClientsTable({ clients }: Props) {
         av = (a.industry ?? "").toLowerCase();
         bv = (b.industry ?? "").toLowerCase();
       } else if (sortKey === "health") {
-        av = a.health_score ?? mockHealthScore(a.id);
-        bv = b.health_score ?? mockHealthScore(b.id);
+        av = a.health_score ?? -1;
+        bv = b.health_score ?? -1;
       } else {
         av = a.status;
         bv = b.status;
@@ -123,10 +123,8 @@ export function ClientsTable({ clients }: Props) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paged.map((c) => {
-              const score = c.health_score ?? mockHealthScore(c.id);
-              return (
-                <TableRow
+            {paged.map((c) => (
+              <TableRow
                   key={c.id}
                   className="cursor-pointer"
                   onClick={() => navigate(`/app/clientes/${c.slug}`)}
@@ -149,7 +147,7 @@ export function ClientsTable({ clients }: Props) {
                     <ServicesChips projects={c.projects ?? []} />
                   </TableCell>
                   <TableCell>
-                    <HealthScoreBar score={score} />
+                    <HealthScoreBar score={c.health_score} />
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={c.status} />
@@ -180,8 +178,7 @@ export function ClientsTable({ clients }: Props) {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              );
-            })}
+              ))}
           </TableBody>
         </Table>
       </div>

@@ -204,6 +204,7 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
       end_date: toIso(values.end_date ?? null),
       budget_amount: values.budget_amount ?? null,
       progress: values.progress ?? null,
+      assigned_team_ids: teamIds,
     };
     const statusChanged = values.status !== project.status;
 
@@ -214,6 +215,12 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
       n == null ? "—" : `${n}%`;
     const clientName = (id: string) =>
       clients.find((c) => c.id === id)?.name ?? id;
+    const memberName = (id: string) => {
+      const m = members.find((mm) => mm.user_id === id);
+      return m?.full_name || m?.email || id.slice(0, 6);
+    };
+    const fmtTeam = (ids: string[]) =>
+      ids.length === 0 ? "Sin equipo" : ids.map(memberName).join(", ");
 
     const changes: { field: string; from: string; to: string }[] = [];
     if (patch.name !== project.name)

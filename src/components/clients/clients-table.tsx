@@ -23,13 +23,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ClientLogo } from "./client-logo";
 import { HealthScoreBar } from "./health-score-bar";
 import { StatusBadge } from "./status-badge";
 import { ServicesChips } from "./services-chips";
 import { EditClientDialog } from "./edit-client-dialog";
-import { type ClientRow } from "@/hooks/useClients";
+import { type ClientRow, useArchiveClient, useDeleteClient } from "@/hooks/useClients";
 
 type SortKey = "name" | "industry" | "health" | "status";
 
@@ -44,6 +55,10 @@ export function ClientsTable({ clients }: Props) {
   const [perPage, setPerPage] = useState(25);
   const [page, setPage] = useState(1);
   const [editingClient, setEditingClient] = useState<ClientRow | null>(null);
+  const [deletingClient, setDeletingClient] = useState<ClientRow | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const archive = useArchiveClient();
+  const del = useDeleteClient();
 
   const sorted = useMemo(() => {
     const arr = [...clients];
@@ -172,8 +187,19 @@ export function ClientsTable({ clients }: Props) {
                           Ver portal cliente
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setEditingClient(c)}>Editar</DropdownMenuItem>
-                        <DropdownMenuItem onClick={soon}>Archivar</DropdownMenuItem>
-                        <DropdownMenuItem onClick={soon} className="text-destructive">
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            try {
+                              await archive.mutateAsync(c.id);
+                              toast({ title: "Cliente archivado", description: `${c.name} se marcó como churned` });
+                            } catch (e: any) {
+                              toast({ title: "No se pudo archivar", description: e?.message, variant: "destructive" });
+                            }
+                          }}
+                        >
+                          Archivar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDeletingClient(c)} className="text-destructive">
                           Eliminar
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -253,6 +279,52 @@ export function ClientsTable({ clients }: Props) {
           }}
         />
       )}
+
+
+
+      <AlertDialog open={!!deletingClient} onOpenChange={(v) => { if (!v) { setDeletingClient(null); setConfirmText(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar {deletingClient?.name}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción es permanente. Se eliminarán también todos sus proyectos, publicaciones de
+              redes sociales, historial de aprobaciones, archivos/media, notas internas, timeline e
+              invitaciones al portal asociadas a este cliente. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-1.5 py-2">
+            <Label htmlFor="confirm-delete-client" className="text-sm">
+              Escribe <span className="font-semibold">{deletingClient?.name}</span> para confirmar
+            </Label>
+            <Input
+              id="confirm-delete-client"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmText("")}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={confirmText !== deletingClient?.name || del.isPending}
+              onClick={async () => {
+                if (!deletingClient) return;
+                try {
+                  await del.mutateAsync(deletingClient.id);
+                  toast({ title: "Cliente eliminado", description: deletingClient.name });
+                  setDeletingClient(null);
+                  setConfirmText("");
+                } catch (e: any) {
+                  toast({ title: "No se pudo eliminar", description: e?.message, variant: "destructive" });
+                }
+              }}
+            >
+              {del.isPending ? "Eliminando…" : "Eliminar definitivamente"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

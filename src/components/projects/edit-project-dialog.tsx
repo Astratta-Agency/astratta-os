@@ -261,6 +261,18 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
         from: fmtProgress(project.progress),
         to: fmtProgress(patch.progress),
       });
+    const prevTeam = [...(project.assigned_team_ids ?? [])].sort();
+    const nextTeam = [...teamIds].sort();
+    const teamChanged =
+      prevTeam.length !== nextTeam.length ||
+      prevTeam.some((id, i) => id !== nextTeam[i]);
+    if (teamChanged)
+      changes.push({
+        field: "Equipo asignado",
+        from: fmtTeam(project.assigned_team_ids ?? []),
+        to: fmtTeam(teamIds),
+      });
+
 
     try {
       await update.mutateAsync({

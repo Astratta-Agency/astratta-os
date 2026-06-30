@@ -25,6 +25,7 @@ import { ClientNotesTab } from "@/components/clients/client-notes-tab";
 import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
 import { InviteClientUserDialog } from "@/components/clients/invite-client-user-dialog";
+import { EditClientDialog } from "@/components/clients/edit-client-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,

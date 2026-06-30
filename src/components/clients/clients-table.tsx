@@ -23,13 +23,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { ClientLogo } from "./client-logo";
 import { HealthScoreBar } from "./health-score-bar";
 import { StatusBadge } from "./status-badge";
 import { ServicesChips } from "./services-chips";
 import { EditClientDialog } from "./edit-client-dialog";
-import { type ClientRow } from "@/hooks/useClients";
+import { type ClientRow, useArchiveClient, useDeleteClient } from "@/hooks/useClients";
 
 type SortKey = "name" | "industry" | "health" | "status";
 

@@ -27,7 +27,7 @@ import { ProjectAvatar } from "@/components/projects/project-avatar";
 import {
   ProjectStatusBadge,
   PROJECT_TYPE_LABEL,
-  computeProgress,
+  effectiveProgress,
   isOverdue,
 } from "@/components/projects/project-meta";
 import { HealthScoreDial } from "@/components/clients/health-score-dial";
@@ -97,7 +97,7 @@ export default function ProyectoDetalle() {
     );
   }
 
-  const progress = computeProgress(project.status, project.start_date, project.end_date) ?? 0;
+  const progress = effectiveProgress(project.status, project.start_date, project.end_date, project.progress) ?? 0;
   const overdue = isOverdue(project.status, project.end_date);
   const daysLeft = project.end_date
     ? differenceInDays(new Date(project.end_date), new Date())

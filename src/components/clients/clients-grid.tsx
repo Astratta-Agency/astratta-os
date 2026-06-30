@@ -4,15 +4,13 @@ import { ClientLogo } from "./client-logo";
 import { HealthScoreBar } from "./health-score-bar";
 import { StatusBadge } from "./status-badge";
 import { ServicesChips } from "./services-chips";
-import { mockHealthScore, type ClientRow } from "@/hooks/useClients";
+import { type ClientRow } from "@/hooks/useClients";
 
 export function ClientsGrid({ clients }: { clients: ClientRow[] }) {
   const navigate = useNavigate();
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {clients.map((c) => {
-        const score = c.health_score ?? mockHealthScore(c.id);
-        return (
+      {clients.map((c) => (
           <Card
             key={c.id}
             className="cursor-pointer p-5 transition-shadow hover:shadow-md"
@@ -39,12 +37,11 @@ export function ClientsGrid({ clients }: { clients: ClientRow[] }) {
               <ServicesChips projects={c.projects ?? []} />
               <div>
                 <p className="mb-1 text-xs text-muted-foreground">Health Score</p>
-                <HealthScoreBar score={score} />
+                <HealthScoreBar score={c.health_score} />
               </div>
             </div>
           </Card>
-        );
-      })}
+      ))}
     </div>
   );
 }

@@ -28,7 +28,7 @@ import { ClientLogo } from "./client-logo";
 import { HealthScoreBar } from "./health-score-bar";
 import { StatusBadge } from "./status-badge";
 import { ServicesChips } from "./services-chips";
-import { mockHealthScore, type ClientRow } from "@/hooks/useClients";
+import { type ClientRow } from "@/hooks/useClients";
 
 type SortKey = "name" | "industry" | "health" | "status";
 
@@ -178,8 +178,7 @@ export function ClientsTable({ clients }: Props) {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              );
-            })}
+              )
           </TableBody>
         </Table>
       </div>

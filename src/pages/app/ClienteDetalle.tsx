@@ -121,7 +121,7 @@ export default function ClienteDetalle() {
         <div className="flex items-center gap-2">
           {/* Desktop */}
           <div className="hidden flex-wrap items-center gap-2 md:flex">
-            <Button variant="outline" onClick={() => toast({ title: "Editar próximamente" })}>
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Editar
             </Button>
             <Button onClick={() => setNewProjectOpen(true)}>

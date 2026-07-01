@@ -280,6 +280,53 @@ export function PostEditorPanel({
     }
   };
 
+  const handleDuplicate = async () => {
+    if (!post) return;
+    try {
+      // Best-effort save current edits so the copy reflects the latest state.
+      try {
+        await flush();
+      } catch {
+        /* ignore — user can retry from the new copy */
+      }
+      const newId = await duplicatePost.mutateAsync(post.id);
+      toast.success("Publicación duplicada");
+      // Swap the editor to the new post via the same `post` query param the
+      // Calendar page uses to open the editor.
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set("post", newId);
+          return p;
+        },
+        { replace: true },
+      );
+    } catch (e: any) {
+      toast.error("No se pudo duplicar", { description: e?.message });
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!post) return;
+    try {
+      await deletePost.mutateAsync(post.id);
+      toast.success("Publicación eliminada");
+      setConfirmDelete(false);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.delete("post");
+          return p;
+        },
+        { replace: true },
+      );
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error("No se pudo eliminar", { description: e?.message });
+    }
+  };
+
+
 
   const captionLengths = useMemo(() => {
     const out: Partial<Record<Channel, number>> = {};

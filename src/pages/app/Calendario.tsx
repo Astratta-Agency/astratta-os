@@ -8,7 +8,7 @@ import {
   parseISO,
   isValid,
 } from "date-fns";
-import { Plus, CalendarPlus } from "lucide-react";
+import { Plus, CalendarPlus, Settings2 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
 
@@ -34,6 +34,7 @@ import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
 import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
+import { ManagePillarsDialog } from "@/components/calendar/manage-pillars-dialog";
 import { isHealthcareClient } from "@/lib/client-validation";
 
 const parseList = (v: string | null): string[] => (v ? v.split(",").filter(Boolean) : []);
@@ -153,6 +154,7 @@ export default function Calendario() {
   };
   const [createOpen, setCreateOpen] = useState(false);
   const [createDate, setCreateDate] = useState<Date | null>(null);
+  const [pillarsOpen, setPillarsOpen] = useState(false);
 
   const activeFiltersCount =
     (channels.length ? 1 : 0) +
@@ -270,6 +272,16 @@ export default function Calendario() {
               brand_primary_color: c.brand_primary_color,
             }))}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPillarsOpen(true)}
+            disabled={!clientId}
+            title="Gestionar pilares"
+          >
+            <Settings2 className="mr-2 h-4 w-4" />
+            Pilares
+          </Button>
           <CalendarNavigator
             date={anchor}
             view={view}
@@ -378,6 +390,12 @@ export default function Calendario() {
         pillarOptions={pillarOptions}
         submitting={createPost.isPending}
         onSubmit={handleCreate}
+      />
+
+      <ManagePillarsDialog
+        clientId={clientId}
+        open={pillarsOpen}
+        onOpenChange={setPillarsOpen}
       />
     </div>
   );

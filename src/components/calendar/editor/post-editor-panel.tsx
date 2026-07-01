@@ -21,6 +21,7 @@ import { StateChangeDropdown } from "./state-change-dropdown";
 import { PostSubmitForApprovalButton } from "./post-submit-for-approval-button";
 import { SubmitForApprovalDialog } from "./submit-for-approval-dialog";
 
+import { useSearchParams } from "react-router-dom";
 import {
   usePost,
   useUpdatePost,
@@ -28,6 +29,8 @@ import {
   useDeleteVariant,
   useBeforeUnloadGuard,
   useAutosave,
+  useDeletePost,
+  useDuplicatePost,
   type PostVariantRow,
 } from "@/hooks/usePostEditor";
 import type { Channel, PostStatus } from "@/lib/post-states";

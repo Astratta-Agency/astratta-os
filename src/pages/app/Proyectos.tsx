@@ -218,12 +218,20 @@ export default function Proyectos() {
           }}
           onClearFilters={clearFilters}
         />
-      ) : (
+      ) : view === "kanban" ? (
         <ProjectsKanban
           rows={projects}
           members={members}
           onOpenProject={handleOpenProject}
           onStatusChange={handleStatusChange}
+        />
+      ) : view === "calendario" ? (
+        <ProjectsCalendarView rows={projects} onOpenProject={handleOpenProject} />
+      ) : (
+        <ProjectsGanttView
+          rows={projects}
+          members={members}
+          onOpenProject={handleOpenProject}
         />
       )}
 

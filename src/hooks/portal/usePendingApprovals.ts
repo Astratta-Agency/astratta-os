@@ -35,6 +35,7 @@ export type ApprovalPost = {
 
 export function useApprovalsByStatus(clientId: string | undefined, statuses: PostStatus[]) {
   const qc = useQueryClient();
+  const instanceId = useId();
   const key = ["portal-approvals", clientId, statuses.slice().sort().join(",")];
 
   const query = useQuery<ApprovalPost[]>({

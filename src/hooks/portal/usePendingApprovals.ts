@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Channel, PostStatus } from "@/lib/post-states";
@@ -35,6 +35,7 @@ export type ApprovalPost = {
 
 export function useApprovalsByStatus(clientId: string | undefined, statuses: PostStatus[]) {
   const qc = useQueryClient();
+  const instanceId = useId();
   const key = ["portal-approvals", clientId, statuses.slice().sort().join(",")];
 
   const query = useQuery<ApprovalPost[]>({
@@ -64,7 +65,7 @@ export function useApprovalsByStatus(clientId: string | undefined, statuses: Pos
   useEffect(() => {
     if (!clientId) return;
     const channel = supabase
-      .channel(`portal-posts:${clientId}`)
+      .channel(`portal-posts:${clientId}:${instanceId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "social_posts", filter: `client_id=eq.${clientId}` },
@@ -78,7 +79,7 @@ export function useApprovalsByStatus(clientId: string | undefined, statuses: Pos
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [clientId, qc]);
+  }, [clientId, qc, instanceId]);
 
   return query;
 }

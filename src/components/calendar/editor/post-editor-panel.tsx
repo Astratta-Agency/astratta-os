@@ -602,12 +602,14 @@ export function PostEditorPanel({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                toast("Eliminación próximamente");
-                setConfirmDelete(false);
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmDelete();
               }}
+              disabled={deletePost.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Eliminar
+              {deletePost.isPending ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

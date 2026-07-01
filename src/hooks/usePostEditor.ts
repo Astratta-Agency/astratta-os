@@ -129,6 +129,88 @@ export function useDeleteVariant(postId: string | null) {
   });
 }
 
+export function useDeletePost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      const { error } = await (supabase as any)
+        .from("social_posts")
+        .delete()
+        .eq("id", postId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, postId) => {
+      qc.invalidateQueries({ queryKey: ["social-posts"] });
+      qc.removeQueries({ queryKey: ["post", postId] });
+    },
+  });
+}
+
+export function useDuplicatePost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string): Promise<string> => {
+      const { data: src, error: e1 } = await (supabase as any)
+        .from("social_posts")
+        .select(
+          "workspace_id, client_id, project_id, title, type, caption, channels, content_pillar, media_urls, hashtags",
+        )
+        .eq("id", postId)
+        .maybeSingle();
+      if (e1) throw e1;
+      if (!src) throw new Error("Publicación no encontrada");
+
+      const dupTitle = src.title ? `${src.title} (copia)` : "Publicación sin título (copia)";
+      const { data: inserted, error: e2 } = await (supabase as any)
+        .from("social_posts")
+        .insert({
+          workspace_id: src.workspace_id,
+          client_id: src.client_id,
+          project_id: src.project_id,
+          title: dupTitle,
+          type: src.type,
+          caption: src.caption,
+          channels: src.channels ?? [],
+          content_pillar: src.content_pillar,
+          media_urls: src.media_urls ?? [],
+          hashtags: src.hashtags,
+          status: "draft",
+          scheduled_for: null,
+        })
+        .select("id")
+        .single();
+      if (e2) throw e2;
+      const newId = inserted.id as string;
+
+      const { data: variants } = await (supabase as any)
+        .from("post_variants")
+        .select("channel, caption, hashtags, first_comment, mentions, location, is_enabled")
+        .eq("post_id", postId);
+
+      if (variants && variants.length > 0) {
+        const rows = variants.map((v: any) => ({
+          post_id: newId,
+          channel: v.channel,
+          caption: v.caption ?? "",
+          hashtags: v.hashtags,
+          first_comment: v.first_comment,
+          mentions: Array.isArray(v.mentions) ? v.mentions : [],
+          location: v.location,
+          utm_url: null,
+          is_enabled: v.is_enabled ?? true,
+        }));
+        const { error: e3 } = await (supabase as any).from("post_variants").insert(rows);
+        if (e3) throw e3;
+      }
+
+      return newId;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["social-posts"] });
+    },
+  });
+}
+
 export type AutosaveStatus = "idle" | "saving" | "saved" | "error";
 
 export function useAutosave<T>(

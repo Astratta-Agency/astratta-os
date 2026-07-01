@@ -289,7 +289,7 @@ export default function Calendario() {
             onChange={(d) => update({ anchor: d.toISOString() })}
           />
           <div className="ml-auto inline-flex rounded-md border">
-            {(["mes", "semana", "lista"] as CalView[]).map((v) => (
+            {(["mes", "semana", "lista", "canal"] as CalView[]).map((v) => (
               <Button
                 key={v}
                 variant={view === v ? "secondary" : "ghost"}

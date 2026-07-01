@@ -25,6 +25,7 @@ import ClienteDetalle from "@/pages/app/ClienteDetalle";
 import ProyectoDetalle from "@/pages/app/ProyectoDetalle";
 import Proyectos from "@/pages/app/Proyectos";
 import Calendario from "@/pages/app/Calendario";
+import Equipo from "@/pages/app/Equipo";
 import Tareas from "@/pages/app/Tareas";
 import Finanzas from "@/pages/app/Finanzas";
 import Reportes from "@/pages/app/Reportes";

@@ -30,6 +30,7 @@ import ProposalView from "@/pages/public/ProposalView";
 import Calendario from "@/pages/app/Calendario";
 import Equipo from "@/pages/app/Equipo";
 import Tareas from "@/pages/app/Tareas";
+
 import Finanzas from "@/pages/app/Finanzas";
 import Reportes from "@/pages/app/Reportes";
 import Configuracion from "@/pages/app/Configuracion";

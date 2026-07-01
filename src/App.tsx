@@ -24,6 +24,8 @@ import Clientes from "@/pages/app/Clientes";
 import ClienteDetalle from "@/pages/app/ClienteDetalle";
 import ProyectoDetalle from "@/pages/app/ProyectoDetalle";
 import Proyectos from "@/pages/app/Proyectos";
+import Ventas from "@/pages/app/Ventas";
+import LeadCapture from "@/pages/public/LeadCapture";
 import Calendario from "@/pages/app/Calendario";
 import Equipo from "@/pages/app/Equipo";
 import Tareas from "@/pages/app/Tareas";

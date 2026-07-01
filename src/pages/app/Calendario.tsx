@@ -154,6 +154,7 @@ export default function Calendario() {
   };
   const [createOpen, setCreateOpen] = useState(false);
   const [createDate, setCreateDate] = useState<Date | null>(null);
+  const [pillarsOpen, setPillarsOpen] = useState(false);
 
   const activeFiltersCount =
     (channels.length ? 1 : 0) +

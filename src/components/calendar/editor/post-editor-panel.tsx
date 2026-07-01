@@ -389,8 +389,25 @@ export function PostEditorPanel({
                     setSubmitOpen(true);
                   }}
                 />
-                <StateChangeDropdown status={post.status} onChange={handleStatusChange} />
-                <Button size="sm" variant="ghost" onClick={() => toast("Duplicar próximamente")}>
+                <StateChangeDropdown
+                  status={post.status}
+                  onChange={handleStatusChange}
+                  onRequestApproval={async () => {
+                    try {
+                      await flush();
+                    } catch {
+                      /* surfaced by save status */
+                    }
+                    setSubmitOpen(true);
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDuplicate}
+                  disabled={duplicatePost.isPending}
+                  aria-label="Duplicar"
+                >
                   <Copy className="h-4 w-4" />
                 </Button>
                 <Button

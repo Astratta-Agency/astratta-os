@@ -257,6 +257,11 @@ export default function Proyectos() {
         onOpenChange={setNewClientOpen}
         workspaceId={workspaceId}
       />
+      <ProjectTemplatesSheet
+        open={templatesOpen}
+        onOpenChange={setTemplatesOpen}
+        workspaceId={workspaceId}
+      />
     </div>
   );
 }

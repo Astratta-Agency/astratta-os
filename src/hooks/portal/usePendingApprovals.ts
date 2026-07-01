@@ -65,7 +65,7 @@ export function useApprovalsByStatus(clientId: string | undefined, statuses: Pos
   useEffect(() => {
     if (!clientId) return;
     const channel = supabase
-      .channel(`portal-posts:${clientId}`)
+      .channel(`portal-posts:${clientId}:${instanceId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "social_posts", filter: `client_id=eq.${clientId}` },

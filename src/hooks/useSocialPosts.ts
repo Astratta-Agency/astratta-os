@@ -126,6 +126,92 @@ export function useContentPillars(clientId: string | undefined) {
   });
 }
 
+export function useCreatePillar(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string; color: string }) => {
+      if (!clientId) throw new Error("clientId requerido");
+      // Compute next sort_order
+      const { data: existing } = await (supabase as any)
+        .from("content_pillars")
+        .select("sort_order")
+        .eq("client_id", clientId)
+        .order("sort_order", { ascending: false })
+        .limit(1);
+      const nextOrder = (existing?.[0]?.sort_order ?? -1) + 1;
+      const { data, error } = await (supabase as any)
+        .from("content_pillars")
+        .insert({
+          client_id: clientId,
+          name: input.name.trim(),
+          color: input.color,
+          sort_order: nextOrder,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content-pillars", clientId] });
+    },
+  });
+}
+
+export function useUpdatePillar(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; name?: string; color?: string }) => {
+      const patch: Record<string, any> = {};
+      if (input.name !== undefined) patch.name = input.name.trim();
+      if (input.color !== undefined) patch.color = input.color;
+      const { error } = await (supabase as any)
+        .from("content_pillars")
+        .update(patch)
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content-pillars", clientId] });
+    },
+  });
+}
+
+export function useDeletePillar(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any)
+        .from("content_pillars")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content-pillars", clientId] });
+    },
+  });
+}
+
+export function useReorderPillars(clientId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      await Promise.all(
+        orderedIds.map((id, idx) =>
+          (supabase as any)
+            .from("content_pillars")
+            .update({ sort_order: idx })
+            .eq("id", id),
+        ),
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content-pillars", clientId] });
+    },
+  });
+}
+
 export function useUpdatePostSchedule() {
   const qc = useQueryClient();
   return useMutation({

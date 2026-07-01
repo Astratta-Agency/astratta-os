@@ -164,9 +164,14 @@ export default function Proyectos() {
             Todos los proyectos activos en tu agencia
           </p>
         </div>
-        <Button onClick={() => setNewOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Nuevo proyecto
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setTemplatesOpen(true)}>
+            <LayoutTemplate className="mr-2 h-4 w-4" /> Plantillas de onboarding
+          </Button>
+          <Button onClick={() => setNewOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Nuevo proyecto
+          </Button>
+        </div>
       </header>
 
       <ProjectsKpiBar

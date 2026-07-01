@@ -32,6 +32,7 @@ import Configuracion from "@/pages/app/Configuracion";
 
 import PortalLogin from "@/pages/portal/Login";
 import PortalForgotPassword from "@/pages/portal/ForgotPassword";
+import PortalResetPassword from "@/pages/portal/ResetPassword";
 
 
 import NotFound from "@/pages/NotFound";

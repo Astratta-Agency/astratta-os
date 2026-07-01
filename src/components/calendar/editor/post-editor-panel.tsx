@@ -21,6 +21,7 @@ import { StateChangeDropdown } from "./state-change-dropdown";
 import { PostSubmitForApprovalButton } from "./post-submit-for-approval-button";
 import { SubmitForApprovalDialog } from "./submit-for-approval-dialog";
 
+import { useSearchParams } from "react-router-dom";
 import {
   usePost,
   useUpdatePost,
@@ -28,6 +29,8 @@ import {
   useDeleteVariant,
   useBeforeUnloadGuard,
   useAutosave,
+  useDeletePost,
+  useDuplicatePost,
   type PostVariantRow,
 } from "@/hooks/usePostEditor";
 import type { Channel, PostStatus } from "@/lib/post-states";
@@ -72,6 +75,9 @@ export function PostEditorPanel({
   const updatePost = useUpdatePost(postId);
   const upsertVariant = useUpsertVariant(postId);
   const deleteVariant = useDeleteVariant(postId);
+  const deletePost = useDeletePost();
+  const duplicatePost = useDuplicatePost();
+  const [, setSearchParams] = useSearchParams();
 
   const [meta, setMeta] = useState<PostMeta | null>(null);
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>({});
@@ -274,6 +280,53 @@ export function PostEditorPanel({
     }
   };
 
+  const handleDuplicate = async () => {
+    if (!post) return;
+    try {
+      // Best-effort save current edits so the copy reflects the latest state.
+      try {
+        await flush();
+      } catch {
+        /* ignore — user can retry from the new copy */
+      }
+      const newId = await duplicatePost.mutateAsync(post.id);
+      toast.success("Publicación duplicada");
+      // Swap the editor to the new post via the same `post` query param the
+      // Calendar page uses to open the editor.
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set("post", newId);
+          return p;
+        },
+        { replace: true },
+      );
+    } catch (e: any) {
+      toast.error("No se pudo duplicar", { description: e?.message });
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!post) return;
+    try {
+      await deletePost.mutateAsync(post.id);
+      toast.success("Publicación eliminada");
+      setConfirmDelete(false);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.delete("post");
+          return p;
+        },
+        { replace: true },
+      );
+      onOpenChange(false);
+    } catch (e: any) {
+      toast.error("No se pudo eliminar", { description: e?.message });
+    }
+  };
+
+
 
   const captionLengths = useMemo(() => {
     const out: Partial<Record<Channel, number>> = {};
@@ -336,8 +389,25 @@ export function PostEditorPanel({
                     setSubmitOpen(true);
                   }}
                 />
-                <StateChangeDropdown status={post.status} onChange={handleStatusChange} />
-                <Button size="sm" variant="ghost" onClick={() => toast("Duplicar próximamente")}>
+                <StateChangeDropdown
+                  status={post.status}
+                  onChange={handleStatusChange}
+                  onRequestApproval={async () => {
+                    try {
+                      await flush();
+                    } catch {
+                      /* surfaced by save status */
+                    }
+                    setSubmitOpen(true);
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDuplicate}
+                  disabled={duplicatePost.isPending}
+                  aria-label="Duplicar"
+                >
                   <Copy className="h-4 w-4" />
                 </Button>
                 <Button
@@ -532,12 +602,14 @@ export function PostEditorPanel({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                toast("Eliminación próximamente");
-                setConfirmDelete(false);
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmDelete();
               }}
+              disabled={deletePost.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Eliminar
+              {deletePost.isPending ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

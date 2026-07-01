@@ -79,7 +79,7 @@ export function useApprovalsByStatus(clientId: string | undefined, statuses: Pos
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [clientId, qc]);
+  }, [clientId, qc, instanceId]);
 
   return query;
 }

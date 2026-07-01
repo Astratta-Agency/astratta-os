@@ -1,5 +1,9 @@
 // Edge Function: send-portal-invite
 // Sends a branded portal invitation email via Amazon SES v2 (SigV4 signed).
+// Also provisions (or links) the Supabase Auth account for the invited
+// email so the link in the email actually works — previously the email
+// pointed at /portal/login with no way for a brand-new address to ever
+// create an account (no portal signup page, magic link is shouldCreateUser:false).
 // Returns { emailed: true, messageId } on success, { emailed: false, error } on failure
 // (always HTTP 200 so the client dialog can fall back to manual copy-link flow).
 
@@ -26,13 +30,15 @@ function renderEmail(args: {
   primaryColor: string;
   logoUrl: string | null;
   welcomeMessage: string | null;
-  portalUrl: string;
+  actionUrl: string;
   recipientEmail: string;
+  isNewAccount: boolean;
 }): { html: string; text: string; subject: string } {
-  const { clientName, primaryColor, logoUrl, welcomeMessage, portalUrl, recipientEmail } = args;
+  const { clientName, primaryColor, logoUrl, welcomeMessage, actionUrl, recipientEmail, isNewAccount } = args;
   const safeName = escapeHtml(clientName);
   const safeMsg = welcomeMessage ? escapeHtml(welcomeMessage) : null;
   const subject = `Te invitamos al portal de ${clientName} x Astratta`;
+  const ctaLabel = isNewAccount ? "Crear mi contraseña y acceder" : "Acceder al portal";
 
   const logoBlock = logoUrl
     ? `<img src="${escapeHtml(logoUrl)}" alt="${safeName} logo" height="48" style="display:block;margin:0 auto 24px;max-height:48px;" />`
@@ -56,7 +62,7 @@ function renderEmail(args: {
           ${msgBlock}
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:28px auto;">
             <tr><td style="border-radius:8px;background:${primaryColor};">
-              <a href="${escapeHtml(portalUrl)}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">Acceder al portal</a>
+              <a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">${ctaLabel}</a>
             </td></tr>
           </table>
           <p style="margin:24px 0 0;font-size:13px;color:#64748b;text-align:center;">Inicia sesión con tu correo: <strong>${escapeHtml(recipientEmail)}</strong></p>
@@ -74,7 +80,7 @@ function renderEmail(args: {
     "",
     `Desde tu portal vas a poder aprobar contenido, revisar reportes y acceder a los documentos que tu equipo en Astratta gestiona para ${clientName}.`,
     welcomeMessage ? `\n"${welcomeMessage}"\n` : "",
-    `Acceder al portal: ${portalUrl}`,
+    `${ctaLabel}: ${actionUrl}`,
     `Inicia sesión con tu correo: ${recipientEmail}`,
     "",
     "— Astratta Agency · astrattaagency.com",
@@ -118,19 +124,54 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!membership) return json({ error: "forbidden" }, 403);
 
-    // --- Build URLs + email content ---
+    // --- Build URLs ---
     const originHeader = req.headers.get("origin");
-    const siteBase = Deno.env.get("SITE_URL") ?? (originHeader ? new URL(originHeader).origin : "");
-    const portalUrl = `${siteBase.replace(/\/$/, "")}/portal/login`;
+    const siteBase = (Deno.env.get("SITE_URL") ?? (originHeader ? new URL(originHeader).origin : "")).replace(/\/$/, "");
+    const portalUrl = `${siteBase}/portal/login`;
 
+    // --- Provision the Auth account so the email link actually works ---
+    // Brand-new client contacts have no Supabase Auth account and no way to
+    // create one themselves. Create the account here and turn the CTA into a
+    // real recovery link so they can set a password and land in the portal.
+    let actionUrl = portalUrl;
+    let isNewAccount = false;
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+    });
+
+    if (!createErr && created?.user) {
+      isNewAccount = true;
+      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: { redirectTo: `${siteBase}/portal/reset-password` },
+      });
+      if (!linkErr && linkData?.properties?.action_link) {
+        actionUrl = linkData.properties.action_link;
+      }
+
+      // Link this new account to the client_users row the dialog just inserted.
+      await admin
+        .from("client_users")
+        .update({ user_id: created.user.id, status: "active", accepted_at: new Date().toISOString() })
+        .eq("client_id", client_id)
+        .eq("invited_email", email)
+        .is("user_id", null);
+    } else if (createErr && !`${createErr.message}`.toLowerCase().includes("already")) {
+      console.error("[send-portal-invite] createUser failed", createErr);
+    }
+
+    // --- Email content ---
     const primaryColor = client.brand_primary_color || "#5140f2";
     const { html, text, subject } = renderEmail({
       clientName: client.name,
       primaryColor,
       logoUrl: client.logo_url,
       welcomeMessage: welcome_message ?? null,
-      portalUrl,
+      actionUrl,
       recipientEmail: email,
+      isNewAccount,
     });
 
     // --- Send via SES v2 ---
@@ -141,7 +182,7 @@ Deno.serve(async (req) => {
 
     if (!accessKeyId || !secretAccessKey) {
       console.error("[send-portal-invite] missing AWS credentials");
-      return json({ emailed: false, error: "aws_credentials_missing" }, 200);
+      return json({ emailed: false, error: "aws_credentials_missing", actionUrl }, 200);
     }
 
     const sesResult = await sendSesEmail({
@@ -158,9 +199,9 @@ Deno.serve(async (req) => {
 
     if (!sesResult.ok) {
       console.error("[send-portal-invite] SES error", sesResult.status, sesResult.error);
-      return json({ emailed: false, error: `ses_${sesResult.status}`, detail: sesResult.error }, 200);
+      return json({ emailed: false, error: `ses_${sesResult.status}`, detail: sesResult.error, actionUrl }, 200);
     }
-    return json({ emailed: true, messageId: sesResult.messageId });
+    return json({ emailed: true, messageId: sesResult.messageId, isNewAccount });
   } catch (e) {
     console.error("[send-portal-invite] unexpected", e);
     return json({ emailed: false, error: "unexpected", detail: String(e) }, 200);

@@ -272,6 +272,16 @@ export default function Calendario() {
               brand_primary_color: c.brand_primary_color,
             }))}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPillarsOpen(true)}
+            disabled={!clientId}
+            title="Gestionar pilares"
+          >
+            <Settings2 className="mr-2 h-4 w-4" />
+            Pilares
+          </Button>
           <CalendarNavigator
             date={anchor}
             view={view}

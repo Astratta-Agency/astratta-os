@@ -26,6 +26,7 @@ import ProyectoDetalle from "@/pages/app/ProyectoDetalle";
 import Proyectos from "@/pages/app/Proyectos";
 import Ventas from "@/pages/app/Ventas";
 import LeadCapture from "@/pages/public/LeadCapture";
+import ProposalView from "@/pages/public/ProposalView";
 import Calendario from "@/pages/app/Calendario";
 import Equipo from "@/pages/app/Equipo";
 import Tareas from "@/pages/app/Tareas";
@@ -60,6 +61,9 @@ const App = () => (
 
           {/* Public lead capture (embeddable in astrattaagency.com) */}
           <Route path="/leads/nuevo/:workspaceSlug" element={<LeadCapture />} />
+
+          {/* Public proposal view (e-signature) */}
+          <Route path="/propuestas/:token" element={<ProposalView />} />
 
           {/* Onboarding (gated, but allowed before onboarded_at is set) */}
           <Route

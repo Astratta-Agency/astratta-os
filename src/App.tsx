@@ -58,6 +58,9 @@ const App = () => (
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
+          {/* Public lead capture (embeddable in astrattaagency.com) */}
+          <Route path="/leads/nuevo/:workspaceSlug" element={<LeadCapture />} />
+
           {/* Onboarding (gated, but allowed before onboarded_at is set) */}
           <Route
             path="/onboarding"

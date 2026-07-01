@@ -353,6 +353,12 @@ export default function Calendario() {
           onCreate={openCreate}
           onReschedule={handleReschedule}
         />
+      ) : view === "canal" ? (
+        <CalendarChannelView
+          posts={posts}
+          pillarMap={pillarMap}
+          onPostClick={(p) => openPost(p.id)}
+        />
       ) : (
         <CalendarListView
           posts={posts}

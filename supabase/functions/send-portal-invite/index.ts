@@ -1,9 +1,14 @@
 // Edge Function: send-portal-invite
 // Sends a branded portal invitation email via Amazon SES v2 (SigV4 signed).
 // Also provisions (or links) the Supabase Auth account for the invited
-// email so the link in the email actually works — previously the email
-// pointed at /portal/login with no way for a brand-new address to ever
-// create an account (no portal signup page, magic link is shouldCreateUser:false).
+// email so the link in the email actually works. Handles two cases:
+//   1. Brand-new email -> createUser() provisions the account.
+//   2. Email already has an account (e.g. already a contact for a
+//      different client) -> generateLink() still resolves the existing
+//      user's id so we can link THIS client's client_users row to it.
+// Without step 2, a contact who is already a portal user elsewhere would
+// get a client_users row that never gets user_id set, so they'd never see
+// the new client in their portal even after logging in successfully.
 // Returns { emailed: true, messageId } on success, { emailed: false, error } on failure
 // (always HTTP 200 so the client dialog can fall back to manual copy-link flow).
 
@@ -129,12 +134,11 @@ Deno.serve(async (req) => {
     const siteBase = (Deno.env.get("SITE_URL") ?? (originHeader ? new URL(originHeader).origin : "")).replace(/\/$/, "");
     const portalUrl = `${siteBase}/portal/login`;
 
-    // --- Provision the Auth account so the email link actually works ---
-    // Brand-new client contacts have no Supabase Auth account and no way to
-    // create one themselves. Create the account here and turn the CTA into a
-    // real recovery link so they can set a password and land in the portal.
+    // --- Provision the Auth account (or resolve the existing one) ---
     let actionUrl = portalUrl;
     let isNewAccount = false;
+    let resolvedUserId: string | null = null;
+
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email,
       email_confirm: true,
@@ -142,24 +146,37 @@ Deno.serve(async (req) => {
 
     if (!createErr && created?.user) {
       isNewAccount = true;
-      const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-        type: "recovery",
-        email,
-        options: { redirectTo: `${siteBase}/portal/reset-password` },
-      });
-      if (!linkErr && linkData?.properties?.action_link) {
-        actionUrl = linkData.properties.action_link;
-      }
+      resolvedUserId = created.user.id;
+    } else if (createErr && !`${createErr.message}`.toLowerCase().includes("already")) {
+      console.error("[send-portal-invite] createUser failed", createErr);
+    }
 
-      // Link this new account to the client_users row the dialog just inserted.
+    // Whether the account is brand new or already existed, generateLink
+    // resolves the user id AND gives us a real, working action link — for an
+    // existing user this doubles as a password-reset link, which is fine
+    // even if they already know their password (they can just ignore it and
+    // use /portal/login directly).
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo: `${siteBase}/portal/reset-password` },
+    });
+    if (!linkErr && linkData?.properties?.action_link) {
+      actionUrl = linkData.properties.action_link;
+    }
+    if (!resolvedUserId && linkData?.user?.id) {
+      resolvedUserId = linkData.user.id;
+    }
+
+    // Link this account (new or pre-existing) to the client_users row the
+    // dialog just inserted, whichever client this invite is for.
+    if (resolvedUserId) {
       await admin
         .from("client_users")
-        .update({ user_id: created.user.id, status: "active", accepted_at: new Date().toISOString() })
+        .update({ user_id: resolvedUserId, status: "active", accepted_at: new Date().toISOString() })
         .eq("client_id", client_id)
         .eq("invited_email", email)
         .is("user_id", null);
-    } else if (createErr && !`${createErr.message}`.toLowerCase().includes("already")) {
-      console.error("[send-portal-invite] createUser failed", createErr);
     }
 
     // --- Email content ---

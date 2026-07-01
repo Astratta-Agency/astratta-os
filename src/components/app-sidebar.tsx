@@ -31,6 +31,7 @@ const mainItems = [
   { title: "Clientes", url: "/app/clientes", icon: Users },
   { title: "Proyectos", url: "/app/proyectos", icon: Briefcase },
   { title: "Calendario de contenido", url: "/app/calendario", icon: CalendarDays },
+  { title: "Equipo", url: "/app/equipo", icon: UsersRound },
   { title: "Tareas", url: "/app/tareas", icon: CheckSquare },
   { title: "Finanzas", url: "/app/finanzas", icon: DollarSign },
   { title: "Reportes", url: "/app/reportes", icon: BarChart3 },

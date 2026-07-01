@@ -27,6 +27,9 @@ import Proyectos from "@/pages/app/Proyectos";
 import Ventas from "@/pages/app/Ventas";
 import LeadCapture from "@/pages/public/LeadCapture";
 import ProposalView from "@/pages/public/ProposalView";
+import ContractView from "@/pages/public/ContractView";
+import Contratos from "@/pages/app/Contratos";
+import ContratoDetalle from "@/pages/app/ContratoDetalle";
 import Calendario from "@/pages/app/Calendario";
 import Equipo from "@/pages/app/Equipo";
 import Tareas from "@/pages/app/Tareas";
@@ -65,6 +68,7 @@ const App = () => (
 
           {/* Public proposal view (e-signature) */}
           <Route path="/propuestas/:token" element={<ProposalView />} />
+          <Route path="/contratos/:token" element={<ContractView />} />
 
           {/* Onboarding (gated, but allowed before onboarded_at is set) */}
           <Route
@@ -90,6 +94,8 @@ const App = () => (
             <Route path="clientes" element={<Clientes />} />
             <Route path="clientes/:slug" element={<ClienteDetalle />} />
             <Route path="ventas" element={<Ventas />} />
+            <Route path="contratos" element={<Contratos />} />
+            <Route path="contratos/:id" element={<ContratoDetalle />} />
             <Route path="proyectos" element={<Proyectos />} />
             <Route path="proyectos/:id" element={<ProyectoDetalle />} />
             <Route path="calendario" element={<Calendario />} />

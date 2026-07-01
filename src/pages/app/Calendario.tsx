@@ -32,6 +32,7 @@ import { CalendarFiltersBar } from "@/components/calendar/calendar-filters-bar";
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
+import { CalendarChannelView } from "@/components/calendar/calendar-channel-view";
 import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
 import { ManagePillarsDialog } from "@/components/calendar/manage-pillars-dialog";

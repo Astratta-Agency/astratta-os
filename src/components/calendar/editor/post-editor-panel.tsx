@@ -448,7 +448,6 @@ export function PostEditorPanel({
                     onActive={setActive}
                     onAdd={handleAddChannel}
                     onRemove={handleRemoveChannel}
-                    captionLengths={captionLengths}
                   />
                   <div className="p-3">
                     {active && drafts[active] ? (

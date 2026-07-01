@@ -73,6 +73,16 @@ export function PostEditorPanel({
   const duplicatePost = useDuplicatePost();
   const [, setSearchParams] = useSearchParams();
 
+  const postClient = useMemo(
+    () => clients.find((c) => c.id === post?.client_id),
+    [clients, post?.client_id],
+  );
+  const clientName = postClient?.name ?? "Cliente";
+  const clientSlug = (postClient as any)?.slug ?? "cliente";
+  const clientLogo = postClient?.logo_url ?? null;
+  const brandColor = postClient?.brand_primary_color ?? null;
+  const isHealthcare = isHealthcareClient(postClient);
+
   const [meta, setMeta] = useState<PostMeta | null>(null);
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>({});
   const [active, setActive] = useState<Channel | null>(null);

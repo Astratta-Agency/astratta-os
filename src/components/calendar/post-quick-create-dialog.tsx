@@ -192,7 +192,6 @@ export function PostQuickCreateDialog({
                   <SelectItem value="idea">Idea</SelectItem>
                   <SelectItem value="draft">Borrador</SelectItem>
                   <SelectItem value="pending_internal_review">Revisión interna</SelectItem>
-                  <SelectItem value="pending_approval">Esperando cliente</SelectItem>
                 </SelectContent>
               </Select>
             </div>

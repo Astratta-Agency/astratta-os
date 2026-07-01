@@ -391,6 +391,12 @@ export default function Calendario() {
         submitting={createPost.isPending}
         onSubmit={handleCreate}
       />
+
+      <ManagePillarsDialog
+        clientId={clientId}
+        open={pillarsOpen}
+        onOpenChange={setPillarsOpen}
+      />
     </div>
   );
 }

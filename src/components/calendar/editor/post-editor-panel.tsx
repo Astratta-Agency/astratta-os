@@ -35,17 +35,15 @@ import {
 } from "@/hooks/usePostEditor";
 import type { Channel, PostStatus } from "@/lib/post-states";
 import { useContentPillars } from "@/hooks/useSocialPosts";
+import type { ClientRow } from "@/hooks/useClients";
+import { isHealthcareClient } from "@/lib/client-validation";
 
 interface Props {
   postId: string | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  clientName: string;
-  clientSlug: string;
-  clientLogo?: string | null;
-  brandColor?: string | null;
+  clients: ClientRow[];
   workspaceId: string;
-  isHealthcare: boolean;
   onChangeStatus: (postId: string, from: PostStatus, to: PostStatus, clientId: string) => Promise<void>;
 }
 
@@ -62,12 +60,8 @@ export function PostEditorPanel({
   postId,
   open,
   onOpenChange,
-  clientName,
-  clientSlug,
-  clientLogo,
-  brandColor,
+  clients,
   workspaceId,
-  isHealthcare,
   onChangeStatus,
 }: Props) {
   const { data: post, isLoading } = usePost(postId);
@@ -78,6 +72,16 @@ export function PostEditorPanel({
   const deletePost = useDeletePost();
   const duplicatePost = useDuplicatePost();
   const [, setSearchParams] = useSearchParams();
+
+  const postClient = useMemo(
+    () => clients.find((c) => c.id === post?.client_id),
+    [clients, post?.client_id],
+  );
+  const clientName = postClient?.name ?? "Cliente";
+  const clientSlug = (postClient as any)?.slug ?? "cliente";
+  const clientLogo = postClient?.logo_url ?? null;
+  const brandColor = postClient?.brand_primary_color ?? null;
+  const isHealthcare = isHealthcareClient(postClient);
 
   const [meta, setMeta] = useState<PostMeta | null>(null);
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>({});

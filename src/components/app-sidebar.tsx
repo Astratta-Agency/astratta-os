@@ -4,6 +4,7 @@ import {
   Users,
   Briefcase,
   CalendarDays,
+  UsersRound,
   CheckSquare,
   DollarSign,
   BarChart3,

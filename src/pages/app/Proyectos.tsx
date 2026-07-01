@@ -11,7 +11,8 @@ import {
   type ProjectRow,
 } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { LayoutTemplate, Plus } from "lucide-react";
+import { ProjectTemplatesSheet } from "@/components/projects/project-templates-sheet";
 import { toast } from "sonner";
 import { useDebounce } from "use-debounce";
 import { ProjectsKpiBar } from "@/components/projects/projects-kpi-bar";

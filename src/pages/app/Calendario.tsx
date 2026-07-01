@@ -8,7 +8,7 @@ import {
   parseISO,
   isValid,
 } from "date-fns";
-import { Plus, CalendarPlus } from "lucide-react";
+import { Plus, CalendarPlus, Settings2 } from "lucide-react";
 import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
 

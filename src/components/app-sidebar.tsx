@@ -2,6 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
+  Target,
   Briefcase,
   CalendarDays,
   UsersRound,
@@ -29,6 +30,7 @@ import { SidebarUserMenu } from "@/components/sidebar-user-menu";
 const mainItems = [
   { title: "Dashboard", url: "/app/dashboard", icon: LayoutDashboard },
   { title: "Clientes", url: "/app/clientes", icon: Users },
+  { title: "Ventas", url: "/app/ventas", icon: Target },
   { title: "Proyectos", url: "/app/proyectos", icon: Briefcase },
   { title: "Calendario de contenido", url: "/app/calendario", icon: CalendarDays },
   { title: "Equipo", url: "/app/equipo", icon: UsersRound },

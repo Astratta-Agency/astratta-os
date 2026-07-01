@@ -24,6 +24,8 @@ import Clientes from "@/pages/app/Clientes";
 import ClienteDetalle from "@/pages/app/ClienteDetalle";
 import ProyectoDetalle from "@/pages/app/ProyectoDetalle";
 import Proyectos from "@/pages/app/Proyectos";
+import Ventas from "@/pages/app/Ventas";
+import LeadCapture from "@/pages/public/LeadCapture";
 import Calendario from "@/pages/app/Calendario";
 import Equipo from "@/pages/app/Equipo";
 import Tareas from "@/pages/app/Tareas";
@@ -56,6 +58,9 @@ const App = () => (
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
 
+          {/* Public lead capture (embeddable in astrattaagency.com) */}
+          <Route path="/leads/nuevo/:workspaceSlug" element={<LeadCapture />} />
+
           {/* Onboarding (gated, but allowed before onboarded_at is set) */}
           <Route
             path="/onboarding"
@@ -79,6 +84,7 @@ const App = () => (
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="clientes" element={<Clientes />} />
             <Route path="clientes/:slug" element={<ClienteDetalle />} />
+            <Route path="ventas" element={<Ventas />} />
             <Route path="proyectos" element={<Proyectos />} />
             <Route path="proyectos/:id" element={<ProyectoDetalle />} />
             <Route path="calendario" element={<Calendario />} />

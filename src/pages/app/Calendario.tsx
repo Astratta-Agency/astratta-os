@@ -34,6 +34,7 @@ import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
 import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
+import { ManagePillarsDialog } from "@/components/calendar/manage-pillars-dialog";
 import { isHealthcareClient } from "@/lib/client-validation";
 
 const parseList = (v: string | null): string[] => (v ? v.split(",").filter(Boolean) : []);

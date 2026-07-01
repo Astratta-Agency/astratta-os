@@ -26,7 +26,7 @@ import {
 } from "@/components/projects/project-meta";
 import type { ProjectStatus, ProjectType } from "@/integrations/supabase/database.types";
 
-export type View = "lista" | "kanban";
+export type View = "lista" | "kanban" | "calendario" | "gantt";
 
 interface ClientOption {
   id: string;

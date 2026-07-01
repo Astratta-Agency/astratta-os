@@ -496,7 +496,8 @@ export function PostEditorPanel({
                       clientName={clientName}
                       clientLogo={clientLogo}
                       brandColor={brandColor}
-                      mediaUrl={meta.media_urls[0]}
+                      mediaUrls={meta.media_urls}
+                      postType={meta.type as any}
                       draft={drafts[active]}
                     />
                   ) : (

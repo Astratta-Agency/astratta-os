@@ -88,6 +88,7 @@ export default function Proyectos() {
 
   const [newOpen, setNewOpen] = useState(false);
   const [newClientOpen, setNewClientOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const activeFiltersCount = useMemo(() => {
     let n = 0;

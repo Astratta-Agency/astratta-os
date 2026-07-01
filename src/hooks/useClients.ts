@@ -128,6 +128,28 @@ export function useCreateClient(workspaceId: string | undefined) {
       });
       if (ctErr) throw ctErr;
 
+      // Best-effort: copy workspace default pillars to the new client.
+      try {
+        const { data: defaults } = await (supabase as any)
+          .from("workspace_default_pillars")
+          .select("name, color, description, sort_order")
+          .eq("workspace_id", workspaceId)
+          .order("sort_order", { ascending: true });
+        if (defaults && defaults.length > 0) {
+          const rows = defaults.map((d: any) => ({
+            client_id: client.id,
+            name: d.name,
+            color: d.color,
+            description: d.description ?? null,
+            sort_order: d.sort_order,
+          }));
+          const { error: pErr } = await (supabase as any).from("content_pillars").insert(rows);
+          if (pErr) console.error("Failed to copy default pillars", pErr);
+        }
+      } catch (e) {
+        console.error("Failed to copy default pillars", e);
+      }
+
       return client as { id: string; slug: string };
     },
     onSuccess: () => {

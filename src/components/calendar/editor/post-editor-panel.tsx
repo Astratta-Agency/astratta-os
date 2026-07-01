@@ -328,11 +328,6 @@ export function PostEditorPanel({
 
 
 
-  const captionLengths = useMemo(() => {
-    const out: Partial<Record<Channel, number>> = {};
-    Object.entries(drafts).forEach(([k, v]) => (out[k as Channel] = v.caption.length));
-    return out;
-  }, [drafts]);
 
   const saveLabel =
     saveStatus === "saving"

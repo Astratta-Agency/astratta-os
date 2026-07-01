@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import {
   Copy,
   Eye,
   FileText,
+  FileSignature,
   GitBranch,
   Loader2,
   Pencil,
@@ -37,6 +39,8 @@ import {
   type ProposalStatus,
 } from "@/hooks/useProposals";
 import { ProposalEditor } from "./proposal-editor";
+import { useCreateContractFromProposal } from "@/hooks/useContracts";
+import { toast as sonnerToast } from "sonner";
 
 const statusColor: Record<ProposalStatus, string> = {
   draft: "bg-muted text-foreground",
@@ -55,10 +59,22 @@ type Props = {
 };
 
 export function ProposalsTab({ leadId, workspaceId, isOwner }: Props) {
+  const navigate = useNavigate();
   const { data: proposals = [], isLoading } = useProposalsForLead(leadId);
   const mark = useMarkProposalSent();
   const dup = useDuplicateAsNewVersion();
   const del = useDeleteProposal();
+  const createContract = useCreateContractFromProposal(workspaceId);
+
+  const handleGenerateContract = async (p: ProposalRow) => {
+    try {
+      const c = await createContract.mutateAsync(p.id);
+      sonnerToast.success("Contrato creado en borrador");
+      navigate(`/app/contratos/${c.id}`);
+    } catch (e: any) {
+      sonnerToast.error(e?.message ?? "No se pudo crear el contrato");
+    }
+  };
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<"create" | "edit">("create");
@@ -149,6 +165,8 @@ export function ProposalsTab({ leadId, workspaceId, isOwner }: Props) {
               onMarkSent={() => handleMarkSent(p)}
               onDuplicate={() => handleDuplicate(p)}
               onDelete={() => setConfirmDelete(p)}
+              onGenerateContract={() => handleGenerateContract(p)}
+              contractPending={createContract.isPending}
             />
           ))}
         </ul>
@@ -202,6 +220,8 @@ function ProposalRowCard({
   onMarkSent,
   onDuplicate,
   onDelete,
+  onGenerateContract,
+  contractPending,
 }: {
   proposal: ProposalRow;
   isOwner: boolean;
@@ -211,6 +231,8 @@ function ProposalRowCard({
   onMarkSent: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onGenerateContract: () => void;
+  contractPending: boolean;
 }) {
   const events = useProposalEvents(p.status !== "draft" ? p.id : undefined);
   const sig = useProposalSignature(p.status === "signed" ? p.id : undefined);
@@ -276,6 +298,16 @@ function ProposalRowCard({
             <Button size="sm" variant="outline" onClick={onDuplicate}>
               <GitBranch className="mr-1 h-3.5 w-3.5" />
               Nueva versión
+            </Button>
+          )}
+          {p.status === "signed" && (
+            <Button size="sm" onClick={onGenerateContract} disabled={contractPending}>
+              {contractPending ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <FileSignature className="mr-1 h-3.5 w-3.5" />
+              )}
+              Generar contrato
             </Button>
           )}
           {isOwner && (

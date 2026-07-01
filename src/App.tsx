@@ -90,6 +90,7 @@ const App = () => (
           {/* Client portal — public auth */}
           <Route path="/portal/login" element={<PortalLogin />} />
           <Route path="/portal/forgot-password" element={<PortalForgotPassword />} />
+          <Route path="/portal/reset-password" element={<PortalResetPassword />} />
 
           {/* Client portal — bare /portal: route by membership */}
           <Route

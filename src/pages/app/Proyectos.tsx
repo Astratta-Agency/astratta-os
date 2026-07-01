@@ -11,7 +11,8 @@ import {
   type ProjectRow,
 } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { LayoutTemplate, Plus } from "lucide-react";
+import { ProjectTemplatesSheet } from "@/components/projects/project-templates-sheet";
 import { toast } from "sonner";
 import { useDebounce } from "use-debounce";
 import { ProjectsKpiBar } from "@/components/projects/projects-kpi-bar";
@@ -87,6 +88,7 @@ export default function Proyectos() {
 
   const [newOpen, setNewOpen] = useState(false);
   const [newClientOpen, setNewClientOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const activeFiltersCount = useMemo(() => {
     let n = 0;
@@ -162,9 +164,14 @@ export default function Proyectos() {
             Todos los proyectos activos en tu agencia
           </p>
         </div>
-        <Button onClick={() => setNewOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Nuevo proyecto
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setTemplatesOpen(true)}>
+            <LayoutTemplate className="mr-2 h-4 w-4" /> Plantillas de onboarding
+          </Button>
+          <Button onClick={() => setNewOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Nuevo proyecto
+          </Button>
+        </div>
       </header>
 
       <ProjectsKpiBar
@@ -248,6 +255,11 @@ export default function Proyectos() {
       <NewClientDialog
         open={newClientOpen}
         onOpenChange={setNewClientOpen}
+        workspaceId={workspaceId}
+      />
+      <ProjectTemplatesSheet
+        open={templatesOpen}
+        onOpenChange={setTemplatesOpen}
         workspaceId={workspaceId}
       />
     </div>

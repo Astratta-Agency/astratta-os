@@ -75,6 +75,9 @@ export function PostEditorPanel({
   const updatePost = useUpdatePost(postId);
   const upsertVariant = useUpsertVariant(postId);
   const deleteVariant = useDeleteVariant(postId);
+  const deletePost = useDeletePost();
+  const duplicatePost = useDuplicatePost();
+  const [, setSearchParams] = useSearchParams();
 
   const [meta, setMeta] = useState<PostMeta | null>(null);
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>({});

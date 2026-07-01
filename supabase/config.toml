@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.capture-lead]
 verify_jwt = false
+
+[functions.get-proposal]
+verify_jwt = false
+
+[functions.sign-proposal]
+verify_jwt = false

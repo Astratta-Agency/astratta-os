@@ -44,6 +44,7 @@ import {
 } from "@/hooks/useSales";
 import type { TeamMember } from "@/hooks/useTeam";
 import { DiagnosticChecklist } from "./diagnostic-checklist";
+import { ProposalsTab } from "./proposals/proposals-tab";
 
 type Props = {
   lead: LeadRow | null;
@@ -321,9 +322,7 @@ export function LeadDetailDialog({
             </TabsContent>
 
             <TabsContent value="propuestas" className="pt-4">
-              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                Próximamente en esta pasada.
-              </div>
+              <ProposalsTab leadId={lead.id} workspaceId={workspaceId} isOwner={isOwner} />
             </TabsContent>
           </Tabs>
         </DialogContent>

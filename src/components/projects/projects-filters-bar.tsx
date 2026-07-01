@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { Search, Filter, LayoutGrid, List as ListIcon, Check, X } from "lucide-react";
+import {
+  Search,
+  Filter,
+  LayoutGrid,
+  List as ListIcon,
+  Check,
+  X,
+  CalendarDays,
+  GanttChartSquare,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

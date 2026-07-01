@@ -18,6 +18,8 @@ import { ProjectsKpiBar } from "@/components/projects/projects-kpi-bar";
 import { ProjectsFiltersBar, type View } from "@/components/projects/projects-filters-bar";
 import { ProjectsTable } from "@/components/projects/projects-table";
 import { ProjectsKanban } from "@/components/projects/projects-kanban";
+import { ProjectsCalendarView } from "@/components/projects/projects-calendar-view";
+import { ProjectsGanttView } from "@/components/projects/projects-gantt-view";
 import { NewProjectGlobalDialog } from "@/components/projects/new-project-global-dialog";
 import { NewClientDialog } from "@/components/clients/new-client-dialog";
 import {
@@ -216,12 +218,20 @@ export default function Proyectos() {
           }}
           onClearFilters={clearFilters}
         />
-      ) : (
+      ) : view === "kanban" ? (
         <ProjectsKanban
           rows={projects}
           members={members}
           onOpenProject={handleOpenProject}
           onStatusChange={handleStatusChange}
+        />
+      ) : view === "calendario" ? (
+        <ProjectsCalendarView rows={projects} onOpenProject={handleOpenProject} />
+      ) : (
+        <ProjectsGanttView
+          rows={projects}
+          members={members}
+          onOpenProject={handleOpenProject}
         />
       )}
 

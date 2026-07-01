@@ -17,6 +17,14 @@ const STATUS_CLASS: Record<ProjectStatus, string> = {
   closed: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30",
 };
 
+export const PROJECT_STATUS_BAR_CLASS: Record<ProjectStatus, string> = {
+  planning: "bg-sky-500 text-white",
+  in_progress: "bg-emerald-500 text-white",
+  paused: "bg-amber-500 text-white",
+  delivered: "bg-indigo-500 text-white",
+  closed: "bg-slate-400 text-white",
+};
+
 export const PROJECT_STATUS_ORDER: ProjectStatus[] = [
   "planning",
   "in_progress",

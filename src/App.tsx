@@ -11,6 +11,7 @@ import ClientHome from "@/pages/portal/ClientHome";
 import ClientApprovals from "@/pages/portal/ClientApprovals";
 import ClientPayments from "@/pages/portal/ClientPayments";
 import ClientCalendar from "@/pages/portal/ClientCalendar";
+import ClientDocuments from "@/pages/portal/ClientDocuments";
 import PortalComingSoon from "@/pages/portal/PortalComingSoon";
 import { RequireAgencyAuth } from "@/components/auth/RequireAgencyAuth";
 import { RequireClientAuth } from "@/components/auth/RequireClientAuth";

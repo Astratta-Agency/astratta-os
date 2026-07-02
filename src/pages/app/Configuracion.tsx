@@ -79,6 +79,7 @@ export default function Configuracion() {
             <WorkspacePillarsCard workspaceId={workspace.id} isOwner={!!isOwner} />
             <WorkspaceTemplatesCard workspaceId={workspace.id} isOwner={!!isOwner} />
             <WorkspaceServicesCard workspaceId={workspace.id} isOwner={!!isOwner} />
+            <ContentSubtaskTemplatesCard workspaceId={workspace.id} isOwner={!!isOwner} />
           </TabsContent>
 
           <TabsContent value="integraciones" className="space-y-4 pt-2">

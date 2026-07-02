@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { ServicePriceType } from "@/hooks/useWorkspaceSettings";
 
 export type ProposalType = "web" | "social" | "ads" | "branding" | "bundle";
 export type ProposalStatus =

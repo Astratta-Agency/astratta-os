@@ -9,7 +9,11 @@ export type NotificationType =
   | "post_changes_requested"
   | "invite_accepted"
   | "payment_received"
-  | "contract_expiring";
+  | "contract_expiring"
+  | "invoice_sent"
+  | "invoice_paid"
+  | "invoice_overdue"
+  | "invoice_payment_failed";
 
 export type NotificationRow = {
   id: string;

@@ -25,6 +25,9 @@ import { useCreateInvoice, useWorkspaceFinanceDefaults } from "@/hooks/useInvoic
 import { useClients } from "@/hooks/useClients";
 import { useProjects } from "@/hooks/useProjects";
 import { formatMoney } from "@/lib/money";
+import { ServiceCatalogSelect } from "@/components/settings/service-catalog-select";
+import { SERVICE_PRICE_TYPE_LABEL } from "@/hooks/useWorkspaceSettings";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   open: boolean;

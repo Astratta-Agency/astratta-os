@@ -172,23 +172,15 @@ export function NewInvoiceDialog({ open, onOpenChange, workspaceId, presetClient
             {items.map((it, i) => {
               const amount = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
               return (
-                <div key={i} className="grid grid-cols-12 items-start gap-2 rounded-md border border-border p-2">
-                  <div className="col-span-6">
-                    <Input placeholder="Descripción" value={it.description} onChange={(e) => updateItem(i, { description: e.target.value })} />
-                  </div>
-                  <div className="col-span-2">
-                    <Input type="number" step="0.01" min="0" placeholder="Cantidad" value={it.quantity} onChange={(e) => updateItem(i, { quantity: Number(e.target.value) })} />
-                  </div>
-                  <div className="col-span-2">
-                    <Input type="number" step="0.01" min="0" placeholder="Precio unit." value={it.unit_price} onChange={(e) => updateItem(i, { unit_price: Number(e.target.value) })} />
-                  </div>
-                  <div className="col-span-1 pt-2 text-right text-sm text-muted-foreground">{formatMoney(amount)}</div>
-                  <div className="col-span-1 flex justify-end">
-                    <Button size="icon" variant="ghost" onClick={() => removeItem(i)} disabled={items.length === 1}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                <InvoiceItemRow
+                  key={i}
+                  workspaceId={workspaceId}
+                  item={it}
+                  amount={amount}
+                  disabled={items.length === 1}
+                  onChange={(patch) => updateItem(i, patch)}
+                  onRemove={() => removeItem(i)}
+                />
               );
             })}
           </div>

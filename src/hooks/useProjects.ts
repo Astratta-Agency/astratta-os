@@ -256,33 +256,40 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
     enabled: !!workspaceId,
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data: members, error } = await (supabase as any)
         .from("workspace_members")
-        .select("user_id, role, profiles:profiles!inner(full_name, email, avatar_url)")
+        .select("user_id, role")
         .eq("workspace_id", workspaceId)
         .eq("status", "active");
-      if (error) {
-        // Fallback if profiles relation isn't joinable
-        const { data: d2 } = await (supabase as any)
-          .from("workspace_members")
-          .select("user_id, role")
-          .eq("workspace_id", workspaceId)
-          .eq("status", "active");
-        return (d2 ?? []).map((m: any) => ({
+      if (error) throw error;
+
+      const rows = (members ?? []) as any[];
+      const userIds = Array.from(new Set(rows.map((m) => m.user_id).filter(Boolean)));
+      const profileMap = new Map<string, { full_name: string | null; email: string | null; avatar_url: string | null }>();
+      if (userIds.length > 0) {
+        const { data: profs } = await (supabase as any)
+          .from("profiles")
+          .select("id, full_name, email, avatar_url")
+          .in("id", userIds);
+        for (const p of (profs ?? []) as any[]) {
+          profileMap.set(p.id, {
+            full_name: p.full_name ?? null,
+            email: p.email ?? null,
+            avatar_url: p.avatar_url ?? null,
+          });
+        }
+      }
+
+      return rows.map((m) => {
+        const p = profileMap.get(m.user_id);
+        return {
           user_id: m.user_id,
           role: m.role,
-          full_name: null,
-          email: null,
-          avatar_url: null,
-        }));
-      }
-      return (data ?? []).map((m: any) => ({
-        user_id: m.user_id,
-        role: m.role,
-        full_name: m.profiles?.full_name ?? null,
-        email: m.profiles?.email ?? null,
-        avatar_url: m.profiles?.avatar_url ?? null,
-      }));
+          full_name: p?.full_name ?? null,
+          email: p?.email ?? null,
+          avatar_url: p?.avatar_url ?? null,
+        };
+      });
     },
   });
 }

@@ -187,40 +187,38 @@ export function useCredentialAccessLog(
       const { data, error } = await (supabase as any)
         .from("client_credential_access_log")
         .select(
-          "id, credential_id, accessed_at, actor_id, credential:client_credentials!inner(label, client_id), profiles:profiles(full_name, email)",
+          "id, credential_id, accessed_at, actor_id, credential:client_credentials!inner(label, client_id)",
         )
         .eq("workspace_id", workspaceId)
         .eq("credential.client_id", clientId)
         .order("accessed_at", { ascending: false })
         .limit(30);
-      if (error) {
-        // Fallback without profiles join
-        const { data: d2 } = await (supabase as any)
-          .from("client_credential_access_log")
-          .select(
-            "id, credential_id, accessed_at, actor_id, credential:client_credentials!inner(label, client_id)",
-          )
-          .eq("workspace_id", workspaceId)
-          .eq("credential.client_id", clientId)
-          .order("accessed_at", { ascending: false })
-          .limit(30);
-        return (d2 ?? []).map((r: any) => ({
+      if (error) throw error;
+
+      const rows = (data ?? []) as any[];
+      const actorIds = Array.from(new Set(rows.map((r) => r.actor_id).filter(Boolean)));
+      const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
+      if (actorIds.length > 0) {
+        const { data: profs } = await (supabase as any)
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", actorIds);
+        for (const p of (profs ?? []) as any[]) {
+          profileMap.set(p.id, { full_name: p.full_name ?? null, email: p.email ?? null });
+        }
+      }
+
+      return rows.map((r) => {
+        const p = r.actor_id ? profileMap.get(r.actor_id) : undefined;
+        return {
           id: r.id,
           credential_id: r.credential_id,
           accessed_at: r.accessed_at,
           actor_id: r.actor_id,
-          actor_name: null,
+          actor_name: p?.full_name ?? p?.email ?? null,
           credential_label: r.credential?.label ?? "—",
-        }));
-      }
-      return (data ?? []).map((r: any) => ({
-        id: r.id,
-        credential_id: r.credential_id,
-        accessed_at: r.accessed_at,
-        actor_id: r.actor_id,
-        actor_name: r.profiles?.full_name ?? r.profiles?.email ?? null,
-        credential_label: r.credential?.label ?? "—",
-      }));
+        };
+      });
     },
   });
 }

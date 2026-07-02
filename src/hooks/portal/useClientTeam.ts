@@ -20,21 +20,40 @@ export function useClientTeam(workspaceId: string | undefined) {
     enabled: !!workspaceId,
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data: members, error } = await (supabase as any)
         .from("workspace_members")
-        .select("user_id, role, created_at, profile:profiles!inner(full_name, avatar_url, email)")
+        .select("user_id, role, created_at")
         .eq("workspace_id", workspaceId)
         .eq("status", "active")
         .order("created_at", { ascending: true })
         .limit(5);
       if (error) return [];
-      return (data ?? []).map((r: any) => ({
-        user_id: r.user_id,
-        full_name: r.profile?.full_name ?? null,
-        avatar_url: r.profile?.avatar_url ?? null,
-        email: r.profile?.email ?? null,
-        role: r.role,
-      })) as TeamMember[];
+      const rows = (members ?? []) as any[];
+      const userIds = Array.from(new Set(rows.map((r) => r.user_id).filter(Boolean)));
+      const profileMap = new Map<string, { full_name: string | null; avatar_url: string | null; email: string | null }>();
+      if (userIds.length > 0) {
+        const { data: profs } = await (supabase as any)
+          .from("profiles")
+          .select("id, full_name, avatar_url, email")
+          .in("id", userIds);
+        for (const p of (profs ?? []) as any[]) {
+          profileMap.set(p.id, {
+            full_name: p.full_name ?? null,
+            avatar_url: p.avatar_url ?? null,
+            email: p.email ?? null,
+          });
+        }
+      }
+      return rows.map((r) => {
+        const p = profileMap.get(r.user_id);
+        return {
+          user_id: r.user_id,
+          full_name: p?.full_name ?? null,
+          avatar_url: p?.avatar_url ?? null,
+          email: p?.email ?? null,
+          role: r.role,
+        };
+      }) as TeamMember[];
     },
   });
 }

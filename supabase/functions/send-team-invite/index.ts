@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
     const raw = await req.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);
     if (!parsed.success) return json({ error: "invalid_body", details: parsed.error.flatten() }, 400);
-    const { workspace_id, email, role, title, weekly_capacity_hours, hourly_rate } = parsed.data;
+    const { workspace_id, email, role, title, weekly_capacity_hours, hourly_rate, full_name } = parsed.data;
 
     const admin = createClient(supabaseUrl, serviceKey);
 

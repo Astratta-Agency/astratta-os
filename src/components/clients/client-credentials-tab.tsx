@@ -298,6 +298,11 @@ function CredentialRow({
             {credential.notes && (
               <div className="text-xs text-muted-foreground line-clamp-2">{credential.notes}</div>
             )}
+            <div className="text-[11px] text-muted-foreground">
+              {lastClientAccess
+                ? `Último acceso del cliente: hace ${formatDistanceToNow(new Date(lastClientAccess), { locale: es })}`
+                : "Sin accesos del cliente"}
+            </div>
           </div>
         </div>
 

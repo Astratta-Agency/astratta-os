@@ -33,6 +33,10 @@ import {
   type ProposalRow,
   type ProposalType,
 } from "@/hooks/useProposals";
+import { Badge } from "@/components/ui/badge";
+import { ServiceCatalogSelect } from "@/components/settings/service-catalog-select";
+import { SERVICE_PRICE_TYPE_LABEL, SERVICE_PRICE_TYPE_SUFFIX } from "@/hooks/useWorkspaceSettings";
+import { formatMoney } from "@/lib/money";
 
 type Mode = "create" | "edit";
 type Props = {

@@ -82,6 +82,19 @@ export default function ClienteDetalle() {
   ).length;
   const daysAsClient = Math.max(0, differenceInDays(new Date(), new Date(client.created_at)));
 
+  const ltv = clientInvoices
+    .filter((i) => i.status === "paid")
+    .reduce((s, i) => s + Number(i.total), 0);
+  const mrrCutoff = subDays(new Date(), 35).toISOString().slice(0, 10);
+  const mrr = clientInvoices
+    .filter(
+      (i) =>
+        i.is_recurring &&
+        (i.status === "sent" || i.status === "paid" || i.status === "partial") &&
+        i.issue_date >= mrrCutoff,
+    )
+    .reduce((s, i) => s + Number(i.total), 0);
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}

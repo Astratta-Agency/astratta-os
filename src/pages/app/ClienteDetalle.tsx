@@ -207,8 +207,8 @@ export default function ClienteDetalle() {
         {/* Resumen */}
         <TabsContent value="resumen" className="space-y-6">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-            <KpiCard label="LTV" value="—" hint="Próximamente" />
-            <KpiCard label="MRR" value="—" hint="Próximamente" />
+            <KpiCard label="LTV" value={formatMoney(ltv)} hint="Suma de facturas pagadas" />
+            <KpiCard label="MRR" value={formatMoney(mrr)} hint="Recurrentes últimos 35 días (heurístico)" />
             <KpiCard label="Proyectos activos" value={activeProjects} />
             <KpiCard label="Posts este mes" value="—" hint="Próximamente" />
             <KpiCard label="Tareas pendientes" value={pendingTasks ?? 0} />

@@ -276,6 +276,7 @@ export function ProposalEditor({
                 <BlockEditor
                   key={b.id}
                   block={b}
+                  workspaceId={workspaceId}
                   onChange={(p) => updateBlock(idx, p)}
                   onRemove={() => removeBlock(idx)}
                   onUp={() => move(idx, -1)}

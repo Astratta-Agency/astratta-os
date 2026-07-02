@@ -82,6 +82,7 @@ export function CalendarWeekView({
   onPostClick,
   onCreate,
   onReschedule,
+  readonly = false,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const scrollRef = useRef<HTMLDivElement>(null);

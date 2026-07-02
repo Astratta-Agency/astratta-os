@@ -348,6 +348,7 @@ export function ProposalEditor({
 
 function BlockEditor({
   block,
+  workspaceId,
   onChange,
   onRemove,
   onUp,
@@ -356,6 +357,7 @@ function BlockEditor({
   canDown,
 }: {
   block: ProposalBlock;
+  workspaceId: string | undefined;
   onChange: (patch: Partial<ProposalBlock>) => void;
   onRemove: () => void;
   onUp: () => void;
@@ -395,14 +397,10 @@ function BlockEditor({
       )}
 
       {block.type === "services" && (
-        <ItemsList
+        <ServicesFromCatalog
+          workspaceId={workspaceId}
           items={block.items}
           onChange={(items) => onChange({ items } as any)}
-          columns={[
-            { key: "name", label: "Servicio", placeholder: "Nombre del servicio" },
-            { key: "description", label: "Descripción", placeholder: "Descripción breve" },
-          ]}
-          empty={{ name: "", description: "" }}
         />
       )}
 

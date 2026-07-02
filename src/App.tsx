@@ -10,6 +10,7 @@ import PortalRedirect from "@/pages/portal/PortalRedirect";
 import ClientHome from "@/pages/portal/ClientHome";
 import ClientApprovals from "@/pages/portal/ClientApprovals";
 import ClientPayments from "@/pages/portal/ClientPayments";
+import ClientCalendar from "@/pages/portal/ClientCalendar";
 import PortalComingSoon from "@/pages/portal/PortalComingSoon";
 import { RequireAgencyAuth } from "@/components/auth/RequireAgencyAuth";
 import { RequireClientAuth } from "@/components/auth/RequireClientAuth";
@@ -134,7 +135,7 @@ const App = () => (
             <Route index element={<ClientHome />} />
             <Route path="aprobaciones" element={<ClientApprovals />} />
             <Route path="pagos" element={<ClientPayments />} />
-            <Route path="calendario" element={<PortalComingSoon section="Calendario" />} />
+            <Route path="calendario" element={<ClientCalendar />} />
             <Route path="documentos" element={<PortalComingSoon section="Documentos" />} />
             <Route path="reportes" element={<PortalComingSoon section="Reportes" />} />
             <Route path="activos" element={<PortalComingSoon section="Activos" />} />

@@ -15,6 +15,7 @@ interface Props {
   onPostClick: (p: SocialPostRow) => void;
   onCreate: (date: Date) => void;
   isOver: boolean;
+  readonly?: boolean;
 }
 
 const MAX_VISIBLE = 3;
@@ -27,9 +28,10 @@ export function DayCell({
   onPostClick,
   onCreate,
   isOver,
+  readonly = false,
 }: Props) {
   const id = `day:${format(date, "yyyy-MM-dd")}`;
-  const { setNodeRef } = useDroppable({ id, data: { date: date.toISOString() } });
+  const { setNodeRef } = useDroppable({ id, data: { date: date.toISOString() }, disabled: readonly });
   const outside = !isSameMonth(date, monthAnchor);
   const today = isToday(date);
   const [popOpen, setPopOpen] = useState(false);
@@ -42,9 +44,10 @@ export function DayCell({
       className={cn(
         "group flex min-h-[120px] flex-col gap-1 rounded-md border bg-card p-1.5 transition md:min-h-[140px]",
         outside && "bg-muted/30",
-        isOver && "border-primary ring-2 ring-primary/30",
+        isOver && !readonly && "border-primary ring-2 ring-primary/30",
       )}
       onClick={(e) => {
+        if (readonly) return;
         if (e.target === e.currentTarget) onCreate(date);
       }}
     >
@@ -58,18 +61,20 @@ export function DayCell({
         >
           {format(date, "d")}
         </span>
-        <button
-          type="button"
-          aria-label="Nueva publicación"
-          onClick={() => onCreate(date)}
-          className="rounded p-0.5 text-xs text-muted-foreground opacity-0 transition hover:bg-muted group-hover:opacity-100"
-        >
-          +
-        </button>
+        {!readonly && (
+          <button
+            type="button"
+            aria-label="Nueva publicación"
+            onClick={() => onCreate(date)}
+            className="rounded p-0.5 text-xs text-muted-foreground opacity-0 transition hover:bg-muted group-hover:opacity-100"
+          >
+            +
+          </button>
+        )}
       </div>
       <div className="flex flex-1 flex-col gap-1">
         {visible.map((p) => (
-          <PostCard key={p.id} post={p} pillarMap={pillarMap} onClick={() => onPostClick(p)} />
+          <PostCard key={p.id} post={p} pillarMap={pillarMap} onClick={() => onPostClick(p)} draggable={!readonly} />
         ))}
         {extra > 0 && (
           <Popover open={popOpen} onOpenChange={setPopOpen}>

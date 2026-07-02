@@ -70,6 +70,7 @@ import { EmptyState } from "@/components/empty-state";
 import { toast } from "@/hooks/use-toast";
 import {
   useCanManageCredentials,
+  useClientCredentialClientAccess,
   useClientCredentials,
   useCreateCredential,
   useCredentialAccessLog,
@@ -118,6 +119,7 @@ interface Props {
 export function ClientCredentialsTab({ clientId, workspaceId }: Props) {
   const { data: canManage } = useCanManageCredentials(workspaceId);
   const { data: credentials, isLoading } = useClientCredentials(clientId);
+  const { data: clientAccessMap } = useClientCredentialClientAccess(clientId, workspaceId);
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<ClientCredential | null>(null);
   const [deleting, setDeleting] = useState<ClientCredential | null>(null);
@@ -160,6 +162,7 @@ export function ClientCredentialsTab({ clientId, workspaceId }: Props) {
               key={c.id}
               credential={c}
               canManage={!!canManage}
+              lastClientAccess={clientAccessMap?.[c.id] ?? null}
               onEdit={() => setEditing(c)}
               onDelete={() => setDeleting(c)}
             />
@@ -224,11 +227,13 @@ export function ClientCredentialsTab({ clientId, workspaceId }: Props) {
 function CredentialRow({
   credential,
   canManage,
+  lastClientAccess,
   onEdit,
   onDelete,
 }: {
   credential: ClientCredential;
   canManage: boolean;
+  lastClientAccess?: string | null;
   onEdit: () => void;
   onDelete: () => void;
 }) {

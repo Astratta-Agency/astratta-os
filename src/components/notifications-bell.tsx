@@ -26,6 +26,10 @@ const TYPE_DOT: Record<NotificationType, string> = {
   invite_accepted: "bg-sky-500",
   payment_received: "bg-emerald-500",
   contract_expiring: "bg-amber-500",
+  invoice_sent: "bg-sky-500",
+  invoice_paid: "bg-emerald-500",
+  invoice_overdue: "bg-rose-500",
+  invoice_payment_failed: "bg-destructive",
 };
 
 export function NotificationsBell() {

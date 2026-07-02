@@ -144,32 +144,48 @@ function EditMemberDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const update = useUpdateTeamMember(workspaceId);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [title, setTitle] = useState("");
   const [role, setRole] = useState<string>("team_member");
   const [cap, setCap] = useState<string>("40");
   const [rate, setRate] = useState<string>("");
+  const [hydratedFor, setHydratedFor] = useState<string | null>(null);
 
-  // sync when opening
   const open = !!member;
-  if (member && title === "" && role === "team_member" && cap === "40" && rate === "") {
+  if (member && hydratedFor !== member.user_id) {
+    const fn = (member.full_name ?? "").trim();
+    const idx = fn.indexOf(" ");
+    setFirstName(idx === -1 ? fn : fn.slice(0, idx));
+    setLastName(idx === -1 ? "" : fn.slice(idx + 1).trim());
     setTitle(member.title ?? "");
     setRole(member.role);
     setCap(String(member.weekly_capacity_hours ?? 40));
     setRate(member.hourly_rate != null ? String(member.hourly_rate) : "");
+    setHydratedFor(member.user_id);
   }
 
   const handleClose = (v: boolean) => {
     if (!v) {
+      setFirstName("");
+      setLastName("");
       setTitle("");
       setRole("team_member");
       setCap("40");
       setRate("");
+      setHydratedFor(null);
     }
     onOpenChange(v);
   };
 
   const save = async () => {
     if (!member) return;
+    const trimmedFirst = firstName.trim();
+    if (!trimmedFirst) {
+      toast({ title: "Nombre requerido", variant: "destructive" });
+      return;
+    }
+    const newFullName = [trimmedFirst, lastName.trim()].filter(Boolean).join(" ");
     try {
       await update.mutateAsync({
         user_id: member.user_id,
@@ -179,6 +195,7 @@ function EditMemberDialog({
           weekly_capacity_hours: cap ? Number(cap) : null,
           hourly_rate: rate ? Number(rate) : null,
         },
+        full_name: newFullName !== (member.full_name ?? "") ? newFullName : undefined,
       });
       toast({ title: "Miembro actualizado" });
       handleClose(false);
@@ -194,6 +211,16 @@ function EditMemberDialog({
           <DialogTitle>Editar miembro</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Nombre *</Label>
+              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Apellido</Label>
+              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </div>
+          </div>
           <div className="space-y-1">
             <Label>Título</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Community Manager" />

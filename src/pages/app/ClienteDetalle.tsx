@@ -239,10 +239,7 @@ export default function ClienteDetalle() {
 
         {/* Finanzas */}
         <TabsContent value="finanzas">
-          <TabComingSoon
-            title="Finanzas próximamente"
-            description="Revenue, balance pendiente, MRR y facturas requieren la tabla de invoices que aún no existe."
-          />
+          <ClientFinancesTab workspaceId={client.workspace_id} clientId={client.id} />
         </TabsContent>
 
         {/* Credenciales */}

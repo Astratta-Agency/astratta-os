@@ -122,50 +122,57 @@ export function CalendarWeekView({
     onReschedule(post.id, new Date(iso));
   };
 
-  return (
-    <DndContext sensors={sensors} onDragEnd={handleEnd}>
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b bg-muted/30">
-          <div className="border-r" />
-          {days.map((d) => (
-            <div
-              key={d.toISOString()}
-              className={cn(
-                "border-r p-2 text-center text-xs font-medium",
-                isToday(d) && "text-primary",
-              )}
-            >
-              <div className="uppercase text-muted-foreground">{format(d, "EEE", { locale: es })}</div>
-              <div className="text-base">{format(d, "d")}</div>
+  const body = (
+    <div className="overflow-hidden rounded-lg border bg-card">
+      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b bg-muted/30">
+        <div className="border-r" />
+        {days.map((d) => (
+          <div
+            key={d.toISOString()}
+            className={cn(
+              "border-r p-2 text-center text-xs font-medium",
+              isToday(d) && "text-primary",
+            )}
+          >
+            <div className="uppercase text-muted-foreground">{format(d, "EEE", { locale: es })}</div>
+            <div className="text-base">{format(d, "d")}</div>
+          </div>
+        ))}
+      </div>
+      <div ref={scrollRef} className="max-h-[600px] overflow-y-auto">
+        <div className="grid grid-cols-[60px_repeat(7,1fr)]">
+          {HOURS.map((h) => (
+            <div key={h} className="contents">
+              <div className="border-b border-r p-1 text-right text-[10px] text-muted-foreground">
+                {h.toString().padStart(2, "0")}:00
+              </div>
+              {days.map((d) => {
+                const key = `${format(d, "yyyy-MM-dd")}_${h}`;
+                return (
+                  <Slot
+                    key={`${d.toISOString()}_${h}`}
+                    date={d}
+                    hour={h}
+                    posts={byDayHour.get(key) ?? []}
+                    pillarMap={pillarMap}
+                    onPostClick={onPostClick}
+                    onCreate={onCreate}
+                    readonly={readonly}
+                  />
+                );
+              })}
             </div>
           ))}
         </div>
-        <div ref={scrollRef} className="max-h-[600px] overflow-y-auto">
-          <div className="grid grid-cols-[60px_repeat(7,1fr)]">
-            {HOURS.map((h) => (
-              <div key={h} className="contents">
-                <div className="border-b border-r p-1 text-right text-[10px] text-muted-foreground">
-                  {h.toString().padStart(2, "0")}:00
-                </div>
-                {days.map((d) => {
-                  const key = `${format(d, "yyyy-MM-dd")}_${h}`;
-                  return (
-                    <Slot
-                      key={`${d.toISOString()}_${h}`}
-                      date={d}
-                      hour={h}
-                      posts={byDayHour.get(key) ?? []}
-                      pillarMap={pillarMap}
-                      onPostClick={onPostClick}
-                      onCreate={onCreate}
-                    />
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
+    </div>
+  );
+
+  if (readonly) return body;
+
+  return (
+    <DndContext sensors={sensors} onDragEnd={handleEnd}>
+      {body}
     </DndContext>
   );
 }

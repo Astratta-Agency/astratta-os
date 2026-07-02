@@ -20,6 +20,7 @@ import { HealthScoreDial } from "@/components/clients/health-score-dial";
 import { KpiCard } from "@/components/clients/kpi-card";
 import { TabComingSoon } from "@/components/clients/tab-coming-soon";
 import { UpcomingDeliveries, StakeholdersList } from "@/components/clients/resumen-cards";
+import { ClientContentRolesCard } from "@/components/clients/client-content-roles-card";
 import { ClientProjectsTab } from "@/components/clients/client-projects-tab";
 import { ClientCredentialsTab } from "@/components/clients/client-credentials-tab";
 import { ClientDocumentsTab } from "@/components/clients/client-documents-tab";
@@ -218,6 +219,7 @@ export default function ClienteDetalle() {
           <div className="grid gap-4 md:grid-cols-2">
             <UpcomingDeliveries projects={client.projects} />
             <StakeholdersList contacts={client.client_contacts} clientId={client.id} />
+            <ClientContentRolesCard clientId={client.id} workspaceId={client.workspace_id} />
           </div>
         </TabsContent>
 

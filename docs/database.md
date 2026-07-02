@@ -36,3 +36,10 @@ After applying, run the smoke tests in `docs/security-tests.sql` and check:
 - Every table has RLS enabled (Supabase Dashboard → Authentication → Policies).
 - Creating a workspace auto-creates a `workspace_members` row with `role='owner'`.
 - A second user cannot SELECT another workspace's clients.
+
+## Migration history
+- `001_astratta_core_schema.sql` — core tables (workspaces, clients, projects, ...).
+- `009_media_assets_and_buckets.sql` — media_assets + Storage buckets.
+- `011_notifications.sql` — notifications + fan-out triggers.
+- `013_timeline_project_updated.sql` — project field-change timeline entries.
+- `014_finance_module.sql` — **invoices**, **invoice_items**, **payments** + `clients.stripe_customer_id` + `workspaces.default_tax_rate` / `default_payment_terms_days` / `invoice_notes_default`. Notification types extended: `invoice_sent`, `invoice_paid`, `invoice_overdue`, `invoice_payment_failed`.

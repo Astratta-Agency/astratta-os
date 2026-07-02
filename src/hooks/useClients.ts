@@ -220,7 +220,17 @@ export function useDeleteClient() {
   return useMutation({
     mutationFn: async (clientId: string) => {
       const { error } = await (supabase as any).from("clients").delete().eq("id", clientId);
-      if (error) throw error;
+      if (error) {
+        const code = (error as any)?.code;
+        if (code === "23503") {
+          const friendly = new Error(
+            "Este cliente tiene facturas o pagos registrados y no se puede eliminar. Archívalo en su lugar (estado → churned).",
+          ) as Error & { code?: string };
+          friendly.code = code;
+          throw friendly;
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients"] });

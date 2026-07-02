@@ -484,6 +484,12 @@ export function PostEditorPanel({
                   />
                 </div>
 
+                <PostSubtasksChecklist
+                  postId={post.id}
+                  workspaceId={workspaceId}
+                  postStatus={post.status}
+                />
+
               </div>
 
               {/* Right: preview — desktop sticky, mobile accordion */}

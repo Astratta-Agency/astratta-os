@@ -68,10 +68,11 @@ export function useUploadClientDocument(
         clientId,
         subfolder: "documents",
       });
-      if (!res.ok) {
-        if (res.error === "file_too_large") throw new Error("El archivo supera el tamaño máximo.");
-        if (res.error === "invalid_type") throw new Error("Tipo de archivo no permitido. Solo PDF.");
-        throw new Error(res.message ?? "No se pudo subir el archivo.");
+      if (res.ok !== true) {
+        const err = res as { error: string; message?: string };
+        if (err.error === "file_too_large") throw new Error("El archivo supera el tamaño máximo.");
+        if (err.error === "invalid_type") throw new Error("Tipo de archivo no permitido. Solo PDF.");
+        throw new Error(err.message ?? "No se pudo subir el archivo.");
       }
       const { data: userData } = await supabase.auth.getUser();
       const { data, error } = await (supabase as any)

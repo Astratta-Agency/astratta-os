@@ -48,6 +48,9 @@ function memberLabel(members: WorkspaceMember[], id: string | null) {
 }
 
 export function TasksTable({ tasks, members, onOpen, onStatusChange }: Props) {
+  const postIds = tasks.map((t) => t.related_post_id).filter((x): x is string => !!x);
+  const { data: postMap = {} } = usePostsByIds(postIds);
+
   if (tasks.length === 0) {
     return (
       <div className="rounded-lg border border-dashed py-12 text-center">

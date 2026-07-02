@@ -222,3 +222,51 @@ export function useCredentialAccessLog(
     },
   });
 }
+
+/**
+ * Latest access timestamp per credential, restricted to accesses performed by
+ * client-portal users of the given client (i.e. excludes agency team accesses).
+ * Returns a map: credential_id → ISO timestamp (or absent if never accessed by the client).
+ */
+export function useClientCredentialClientAccess(
+  clientId: string | undefined,
+  workspaceId: string | undefined,
+) {
+  return useQuery<Record<string, string>>({
+    queryKey: ["credential-client-access", clientId, workspaceId],
+    enabled: !!clientId && !!workspaceId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      // 1. Get user_ids of all client_users for this client.
+      const { data: cu, error: cuErr } = await (supabase as any)
+        .from("client_users")
+        .select("user_id")
+        .eq("client_id", clientId);
+      if (cuErr) return {};
+      const userIds = Array.from(
+        new Set(((cu ?? []) as any[]).map((r) => r.user_id).filter(Boolean)),
+      );
+      if (userIds.length === 0) return {};
+
+      // 2. Fetch access logs authored by those users, scoped to credentials
+      // belonging to this client via the inner join.
+      const { data, error } = await (supabase as any)
+        .from("client_credential_access_log")
+        .select(
+          "credential_id, accessed_at, actor_id, credential:client_credentials!inner(client_id)",
+        )
+        .eq("workspace_id", workspaceId)
+        .eq("credential.client_id", clientId)
+        .in("actor_id", userIds)
+        .order("accessed_at", { ascending: false });
+      if (error) return {};
+
+      const map: Record<string, string> = {};
+      for (const row of (data ?? []) as any[]) {
+        if (!map[row.credential_id]) map[row.credential_id] = row.accessed_at;
+      }
+      return map;
+    },
+  });
+}
+

@@ -219,6 +219,7 @@ export default function ClienteDetalle() {
           <div className="grid gap-4 md:grid-cols-2">
             <UpcomingDeliveries projects={client.projects} />
             <StakeholdersList contacts={client.client_contacts} clientId={client.id} />
+            <ClientContentRolesCard clientId={client.id} workspaceId={client.workspace_id} />
           </div>
         </TabsContent>
 

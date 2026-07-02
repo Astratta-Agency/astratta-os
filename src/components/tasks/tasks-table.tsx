@@ -1,5 +1,7 @@
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
+import { Link } from "react-router-dom";
+import { FileImage } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,6 +23,7 @@ import {
 import type { Task, TaskStatus } from "@/hooks/useTasks";
 import type { WorkspaceMember } from "@/hooks/useProjects";
 import { PRIORITY_CLASS, PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL } from "@/lib/task-labels";
+import { usePostsByIds } from "@/hooks/useContentSubtasks";
 
 interface Props {
   tasks: Task[];

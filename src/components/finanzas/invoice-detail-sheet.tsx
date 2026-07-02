@@ -235,15 +235,16 @@ export function InvoiceDetailSheet({ invoiceId, open, onOpenChange, workspaceId 
                 {isDraft ? (
                   <div className="space-y-2">
                     {draftItems.map((it, i) => (
-                      <div key={i} className="grid grid-cols-12 items-center gap-2">
-                        <div className="col-span-6"><Input value={it.description} onChange={(e) => setDraftItems((a) => a.map((x, idx) => idx === i ? { ...x, description: e.target.value } : x))} placeholder="Descripción" /></div>
-                        <div className="col-span-2"><Input type="number" step="0.01" value={it.quantity} onChange={(e) => setDraftItems((a) => a.map((x, idx) => idx === i ? { ...x, quantity: Number(e.target.value) } : x))} /></div>
-                        <div className="col-span-2"><Input type="number" step="0.01" value={it.unit_price} onChange={(e) => setDraftItems((a) => a.map((x, idx) => idx === i ? { ...x, unit_price: Number(e.target.value) } : x))} /></div>
-                        <div className="col-span-1 text-right text-sm">{formatMoney(it.quantity * it.unit_price, invoice.currency)}</div>
-                        <div className="col-span-1 flex justify-end">
-                          <Button size="icon" variant="ghost" onClick={() => setDraftItems((a) => a.filter((_, idx) => idx !== i))}><Trash2 className="h-4 w-4" /></Button>
-                        </div>
-                      </div>
+                      <InvoiceDraftItemRow
+                        key={i}
+                        workspaceId={workspaceId}
+                        item={it}
+                        currency={invoice.currency}
+                        onChange={(patch) =>
+                          setDraftItems((a) => a.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))
+                        }
+                        onRemove={() => setDraftItems((a) => a.filter((_, idx) => idx !== i))}
+                      />
                     ))}
                     <Button size="sm" onClick={saveItems} disabled={updateItems.isPending}>
                       {updateItems.isPending ? "Guardando…" : "Guardar ítems"}

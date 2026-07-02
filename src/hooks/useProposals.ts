@@ -199,7 +199,7 @@ export function defaultContentForType(type: ProposalType): ProposalBlock[] {
           type: "services",
           id: uid(),
           title: "Servicios incluidos",
-          items: [{ name: "Servicio 1", description: "" }],
+          items: [],
         },
         {
           type: "pricing",

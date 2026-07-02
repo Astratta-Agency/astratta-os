@@ -15,6 +15,7 @@ const BodySchema = z.object({
   title: z.string().max(120).optional().nullable(),
   weekly_capacity_hours: z.number().min(0).max(168).optional().nullable(),
   hourly_rate: z.number().min(0).optional().nullable(),
+  full_name: z.string().trim().min(1).max(200).optional().nullable(),
 });
 
 const json = (body: unknown, status = 200) =>

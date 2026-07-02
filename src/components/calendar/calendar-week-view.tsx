@@ -29,6 +29,7 @@ interface Props {
   onPostClick: (p: SocialPostRow) => void;
   onCreate: (d: Date) => void;
   onReschedule: (postId: string, newDate: Date) => void;
+  readonly?: boolean;
 }
 
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 6); // 6 .. 23

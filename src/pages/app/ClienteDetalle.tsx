@@ -27,6 +27,10 @@ import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
 import { InviteClientUserDialog } from "@/components/clients/invite-client-user-dialog";
 import { EditClientDialog } from "@/components/clients/edit-client-dialog";
+import { ClientFinancesTab } from "@/components/clients/client-finances-tab";
+import { useInvoices } from "@/hooks/useInvoices";
+import { formatMoney } from "@/lib/money";
+import { subDays } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,

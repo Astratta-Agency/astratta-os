@@ -32,6 +32,7 @@ interface Props {
   onPostClick: (p: SocialPostRow) => void;
   onCreate: (d: Date) => void;
   onReschedule: (postId: string, newDate: Date) => void;
+  readonly?: boolean;
 }
 
 export function CalendarMonthView({
@@ -41,6 +42,7 @@ export function CalendarMonthView({
   onPostClick,
   onCreate,
   onReschedule,
+  readonly = false,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const [overId, setOverId] = useState<string | null>(null);

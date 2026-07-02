@@ -13,6 +13,7 @@ import { WorkspaceBrandingCard } from "@/components/settings/workspace-branding-
 import { WorkspacePillarsCard } from "@/components/settings/workspace-pillars-card";
 import { WorkspaceTemplatesCard } from "@/components/settings/workspace-templates-card";
 import { WorkspaceServicesCard } from "@/components/settings/workspace-services-card";
+import { ContentSubtaskTemplatesCard } from "@/components/settings/content-subtask-templates-card";
 import { IntegrationsGrid } from "@/components/settings/integrations-grid";
 import { GoogleCalendarCard } from "@/components/settings/google-calendar-card";
 import { NotificationPreferencesCard } from "@/components/settings/notification-preferences-card";

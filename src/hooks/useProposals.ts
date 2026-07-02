@@ -99,11 +99,7 @@ export function defaultContentForType(type: ProposalType): ProposalBlock[] {
           type: "services",
           id: uid(),
           title: "Servicios incluidos",
-          items: [
-            { name: "Diseño UI/UX", description: "Wireframes, sistema visual y prototipo interactivo." },
-            { name: "Desarrollo frontend", description: "Implementación responsive con React + Tailwind." },
-            { name: "SEO on-page técnico", description: "Metadatos, sitemap, performance y accesibilidad." },
-          ],
+          items: [],
         },
         {
           type: "pricing",

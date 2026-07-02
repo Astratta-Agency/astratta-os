@@ -48,7 +48,7 @@ export function InviteTeamMemberDialog({ open, onOpenChange, workspaceId }: Prop
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", role: "team_member", title: "", weekly_capacity_hours: 40 },
+    defaultValues: { first_name: "", last_name: "", email: "", role: "team_member", title: "", weekly_capacity_hours: 40 },
   });
   const role = form.watch("role");
 

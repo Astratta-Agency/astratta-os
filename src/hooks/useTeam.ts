@@ -129,13 +129,24 @@ export function useUpdateTeamMember(workspaceId: string | undefined) {
     mutationFn: async (input: {
       user_id: string;
       patch: Partial<Pick<TeamMember, "title" | "role" | "weekly_capacity_hours" | "hourly_rate" | "status">>;
+      full_name?: string | null;
     }) => {
-      const { error } = await (supabase as any)
-        .from("workspace_members")
-        .update(input.patch)
-        .eq("workspace_id", workspaceId)
-        .eq("user_id", input.user_id);
-      if (error) throw error;
+      if (Object.keys(input.patch).length > 0) {
+        const { error } = await (supabase as any)
+          .from("workspace_members")
+          .update(input.patch)
+          .eq("workspace_id", workspaceId)
+          .eq("user_id", input.user_id);
+        if (error) throw error;
+      }
+      if (input.full_name !== undefined && workspaceId) {
+        const { error: rpcErr } = await (supabase as any).rpc("update_member_full_name", {
+          _workspace_id: workspaceId,
+          _user_id: input.user_id,
+          _full_name: input.full_name ?? "",
+        });
+        if (rpcErr) throw rpcErr;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["team-members", workspaceId] });
@@ -152,6 +163,7 @@ export function useInviteTeamMember(workspaceId: string | undefined) {
       title?: string;
       weekly_capacity_hours?: number;
       hourly_rate?: number;
+      full_name?: string;
     }): Promise<{ emailed: boolean; actionUrl?: string; isNewAccount?: boolean }> => {
       if (!workspaceId) throw new Error("workspaceId requerido");
       const { data, error } = await supabase.functions.invoke("send-team-invite", {

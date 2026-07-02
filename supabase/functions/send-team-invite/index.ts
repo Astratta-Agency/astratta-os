@@ -15,6 +15,7 @@ const BodySchema = z.object({
   title: z.string().max(120).optional().nullable(),
   weekly_capacity_hours: z.number().min(0).max(168).optional().nullable(),
   hourly_rate: z.number().min(0).optional().nullable(),
+  full_name: z.string().trim().min(1).max(200).optional().nullable(),
 });
 
 const json = (body: unknown, status = 200) =>
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
     const raw = await req.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);
     if (!parsed.success) return json({ error: "invalid_body", details: parsed.error.flatten() }, 400);
-    const { workspace_id, email, role, title, weekly_capacity_hours, hourly_rate } = parsed.data;
+    const { workspace_id, email, role, title, weekly_capacity_hours, hourly_rate, full_name } = parsed.data;
 
     const admin = createClient(supabaseUrl, serviceKey);
 
@@ -119,6 +120,7 @@ Deno.serve(async (req) => {
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email: normalizedEmail,
       email_confirm: true,
+      user_metadata: full_name ? { full_name } : undefined,
     });
 
     if (!createErr && created?.user) {
@@ -143,6 +145,17 @@ Deno.serve(async (req) => {
     if (!resolvedUserId) {
       return json({ emailed: false, error: "user_resolve_failed" }, 200);
     }
+
+    // Ensure profile full_name is set for both new and existing accounts
+    if (full_name) {
+      const { error: profileErr } = await admin
+        .from("profiles")
+        .upsert({ id: resolvedUserId, full_name }, { onConflict: "id" });
+      if (profileErr) {
+        console.error("[send-team-invite] profile upsert failed", profileErr);
+      }
+    }
+
 
     // Upsert workspace_members row
     const memberRow = {

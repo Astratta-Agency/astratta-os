@@ -25,6 +25,8 @@ import { useInviteTeamMember } from "@/hooks/useTeam";
 import { toast } from "@/hooks/use-toast";
 
 const schema = z.object({
+  first_name: z.string().trim().min(1, "Nombre requerido").max(100),
+  last_name: z.string().trim().max(100).optional(),
   email: z.string().email("Correo inválido").max(255),
   role: z.enum(["team_member", "collaborator"]),
   title: z.string().max(120).optional(),
@@ -46,7 +48,7 @@ export function InviteTeamMemberDialog({ open, onOpenChange, workspaceId }: Prop
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", role: "team_member", title: "", weekly_capacity_hours: 40 },
+    defaultValues: { first_name: "", last_name: "", email: "", role: "team_member", title: "", weekly_capacity_hours: 40 },
   });
   const role = form.watch("role");
 
@@ -59,6 +61,7 @@ export function InviteTeamMemberDialog({ open, onOpenChange, workspaceId }: Prop
   };
 
   const onSubmit = async (values: FormValues) => {
+    const full_name = [values.first_name, values.last_name].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
     try {
       const res = await invite.mutateAsync({
         email: values.email,
@@ -66,6 +69,7 @@ export function InviteTeamMemberDialog({ open, onOpenChange, workspaceId }: Prop
         title: values.title || undefined,
         weekly_capacity_hours: values.weekly_capacity_hours,
         hourly_rate: values.role === "collaborator" ? values.hourly_rate : undefined,
+        full_name: full_name || undefined,
       });
       if (res.emailed) {
         toast({ title: `Invitación enviada a ${values.email}` });
@@ -102,6 +106,20 @@ export function InviteTeamMemberDialog({ open, onOpenChange, workspaceId }: Prop
                 La persona recibirá un correo con el link para activar su cuenta.
               </DialogDescription>
             </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="first_name">Nombre *</Label>
+                <Input id="first_name" {...form.register("first_name")} />
+                {form.formState.errors.first_name && (
+                  <p className="text-xs text-destructive">{form.formState.errors.first_name.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="last_name">Apellido</Label>
+                <Input id="last_name" {...form.register("last_name")} />
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Correo *</Label>

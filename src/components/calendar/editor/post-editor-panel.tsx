@@ -20,6 +20,7 @@ import { PostFormatWarnings } from "./post-format-warnings";
 import { StateChangeDropdown } from "./state-change-dropdown";
 import { PostSubmitForApprovalButton } from "./post-submit-for-approval-button";
 import { SubmitForApprovalDialog } from "./submit-for-approval-dialog";
+import { PostSubtasksChecklist } from "./post-subtasks-checklist";
 
 import { useSearchParams } from "react-router-dom";
 import {

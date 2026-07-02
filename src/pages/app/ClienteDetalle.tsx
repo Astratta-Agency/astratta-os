@@ -231,10 +231,7 @@ export default function ClienteDetalle() {
 
         {/* Documentos */}
         <TabsContent value="documentos">
-          <TabComingSoon
-            title="Documentos próximamente"
-            description="Contratos, propuestas, recibos, briefs y brand assets se subirán a Supabase Storage en la siguiente iteración."
-          />
+          <ClientDocumentsTab clientId={client.id} workspaceId={client.workspace_id} />
         </TabsContent>
 
         {/* Finanzas */}

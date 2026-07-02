@@ -37,7 +37,13 @@ export type BlockServices = {
   type: "services";
   id: string;
   title: string;
-  items: Array<{ name: string; description?: string }>;
+  items: Array<{
+    service_id: string | null;
+    name: string;
+    description: string;
+    price: number | null;
+    price_type: ServicePriceType | null;
+  }>;
 };
 export type BlockDeliverables = {
   type: "deliverables";

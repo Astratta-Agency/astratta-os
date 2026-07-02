@@ -10,6 +10,7 @@ import PortalRedirect from "@/pages/portal/PortalRedirect";
 import ClientHome from "@/pages/portal/ClientHome";
 import ClientApprovals from "@/pages/portal/ClientApprovals";
 import ClientPayments from "@/pages/portal/ClientPayments";
+import ClientCalendar from "@/pages/portal/ClientCalendar";
 import PortalComingSoon from "@/pages/portal/PortalComingSoon";
 import { RequireAgencyAuth } from "@/components/auth/RequireAgencyAuth";
 import { RequireClientAuth } from "@/components/auth/RequireClientAuth";

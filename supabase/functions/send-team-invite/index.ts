@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
     const { data: created, error: createErr } = await admin.auth.admin.createUser({
       email: normalizedEmail,
       email_confirm: true,
+      user_metadata: full_name ? { full_name } : undefined,
     });
 
     if (!createErr && created?.user) {

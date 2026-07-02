@@ -27,6 +27,10 @@ import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
 import { InviteClientUserDialog } from "@/components/clients/invite-client-user-dialog";
 import { EditClientDialog } from "@/components/clients/edit-client-dialog";
+import { ClientFinancesTab } from "@/components/clients/client-finances-tab";
+import { useInvoices } from "@/hooks/useInvoices";
+import { formatMoney } from "@/lib/money";
+import { subDays } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +45,7 @@ export default function ClienteDetalle() {
   const { workspace, isLoading: wsLoading } = useActiveWorkspace();
   const { data: client, isLoading } = useClient(workspace?.id, slug);
   const { data: pendingTasks } = useClientPendingTasksCount(client?.id);
+  const { data: clientInvoices = [] } = useInvoices(client?.workspace_id, { clientId: client?.id });
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -76,6 +81,19 @@ export default function ClienteDetalle() {
     (p) => p.status === "planning" || p.status === "in_progress",
   ).length;
   const daysAsClient = Math.max(0, differenceInDays(new Date(), new Date(client.created_at)));
+
+  const ltv = clientInvoices
+    .filter((i) => i.status === "paid")
+    .reduce((s, i) => s + Number(i.total), 0);
+  const mrrCutoff = subDays(new Date(), 35).toISOString().slice(0, 10);
+  const mrr = clientInvoices
+    .filter(
+      (i) =>
+        i.is_recurring &&
+        (i.status === "sent" || i.status === "paid" || i.status === "partial") &&
+        i.issue_date >= mrrCutoff,
+    )
+    .reduce((s, i) => s + Number(i.total), 0);
 
   return (
     <div className="space-y-6">
@@ -189,8 +207,8 @@ export default function ClienteDetalle() {
         {/* Resumen */}
         <TabsContent value="resumen" className="space-y-6">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-            <KpiCard label="LTV" value="—" hint="Próximamente" />
-            <KpiCard label="MRR" value="—" hint="Próximamente" />
+            <KpiCard label="LTV" value={formatMoney(ltv)} hint="Suma de facturas pagadas" />
+            <KpiCard label="MRR" value={formatMoney(mrr)} hint="Recurrentes últimos 35 días (heurístico)" />
             <KpiCard label="Proyectos activos" value={activeProjects} />
             <KpiCard label="Posts este mes" value="—" hint="Próximamente" />
             <KpiCard label="Tareas pendientes" value={pendingTasks ?? 0} />
@@ -221,10 +239,7 @@ export default function ClienteDetalle() {
 
         {/* Finanzas */}
         <TabsContent value="finanzas">
-          <TabComingSoon
-            title="Finanzas próximamente"
-            description="Revenue, balance pendiente, MRR y facturas requieren la tabla de invoices que aún no existe."
-          />
+          <ClientFinancesTab workspaceId={client.workspace_id} clientId={client.id} />
         </TabsContent>
 
         {/* Credenciales */}

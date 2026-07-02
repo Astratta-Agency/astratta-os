@@ -12,6 +12,8 @@ import { InvoicesTable } from "@/components/finanzas/invoices-table";
 import { PaymentsTable } from "@/components/finanzas/payments-table";
 import { NewInvoiceDialog } from "@/components/finanzas/new-invoice-dialog";
 import { InvoiceDetailSheet } from "@/components/finanzas/invoice-detail-sheet";
+import { GastosTab } from "@/components/finanzas/gastos-tab";
+import { FinanceReportsTab } from "@/components/finanzas/finance-reports-tab";
 import { formatMoney } from "@/lib/money";
 
 export default function Finanzas() {
@@ -93,6 +95,8 @@ export default function Finanzas() {
         <TabsList>
           <TabsTrigger value="facturas">Facturas</TabsTrigger>
           <TabsTrigger value="pagos">Pagos</TabsTrigger>
+          <TabsTrigger value="gastos">Gastos</TabsTrigger>
+          <TabsTrigger value="reportes">Reportes financieros</TabsTrigger>
         </TabsList>
 
         <TabsContent value="facturas" className="space-y-4">
@@ -124,6 +128,14 @@ export default function Finanzas() {
 
         <TabsContent value="pagos">
           <PaymentsTable payments={allPayments} />
+        </TabsContent>
+
+        <TabsContent value="gastos">
+          <GastosTab />
+        </TabsContent>
+
+        <TabsContent value="reportes">
+          <FinanceReportsTab />
         </TabsContent>
       </Tabs>
 

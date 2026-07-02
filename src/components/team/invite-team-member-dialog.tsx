@@ -25,6 +25,8 @@ import { useInviteTeamMember } from "@/hooks/useTeam";
 import { toast } from "@/hooks/use-toast";
 
 const schema = z.object({
+  first_name: z.string().trim().min(1, "Nombre requerido").max(100),
+  last_name: z.string().trim().max(100).optional(),
   email: z.string().email("Correo inválido").max(255),
   role: z.enum(["team_member", "collaborator"]),
   title: z.string().max(120).optional(),

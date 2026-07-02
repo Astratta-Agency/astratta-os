@@ -61,18 +61,20 @@ export function DayCell({
         >
           {format(date, "d")}
         </span>
-        <button
-          type="button"
-          aria-label="Nueva publicación"
-          onClick={() => onCreate(date)}
-          className="rounded p-0.5 text-xs text-muted-foreground opacity-0 transition hover:bg-muted group-hover:opacity-100"
-        >
-          +
-        </button>
+        {!readonly && (
+          <button
+            type="button"
+            aria-label="Nueva publicación"
+            onClick={() => onCreate(date)}
+            className="rounded p-0.5 text-xs text-muted-foreground opacity-0 transition hover:bg-muted group-hover:opacity-100"
+          >
+            +
+          </button>
+        )}
       </div>
       <div className="flex flex-1 flex-col gap-1">
         {visible.map((p) => (
-          <PostCard key={p.id} post={p} pillarMap={pillarMap} onClick={() => onPostClick(p)} />
+          <PostCard key={p.id} post={p} pillarMap={pillarMap} onClick={() => onPostClick(p)} draggable={!readonly} />
         ))}
         {extra > 0 && (
           <Popover open={popOpen} onOpenChange={setPopOpen}>

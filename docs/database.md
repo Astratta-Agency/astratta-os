@@ -43,3 +43,4 @@ After applying, run the smoke tests in `docs/security-tests.sql` and check:
 - `011_notifications.sql` — notifications + fan-out triggers.
 - `013_timeline_project_updated.sql` — project field-change timeline entries.
 - `014_finance_module.sql` — **invoices**, **invoice_items**, **payments** + `clients.stripe_customer_id` + `workspaces.default_tax_rate` / `default_payment_terms_days` / `invoice_notes_default`. Notification types extended: `invoice_sent`, `invoice_paid`, `invoice_overdue`, `invoice_payment_failed`.
+- `016_client_documents.sql` — **client_documents** table for general-purpose client uploads (briefs, kickoffs, brand guidelines, other). Reuses the existing `client-media` Storage bucket under a `documents/` subfolder.

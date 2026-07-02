@@ -146,6 +146,17 @@ Deno.serve(async (req) => {
       return json({ emailed: false, error: "user_resolve_failed" }, 200);
     }
 
+    // Ensure profile full_name is set for both new and existing accounts
+    if (full_name) {
+      const { error: profileErr } = await admin
+        .from("profiles")
+        .upsert({ id: resolvedUserId, full_name }, { onConflict: "id" });
+      if (profileErr) {
+        console.error("[send-team-invite] profile upsert failed", profileErr);
+      }
+    }
+
+
     // Upsert workspace_members row
     const memberRow = {
       workspace_id,

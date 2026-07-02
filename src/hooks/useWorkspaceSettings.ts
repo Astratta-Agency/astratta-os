@@ -1,13 +1,59 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { ProjectType } from "@/integrations/supabase/database.types";
+
+export type ServicePriceType = "daily" | "weekly" | "monthly" | "annual" | "one_time";
+
+export const SERVICE_PRICE_TYPE_LABEL: Record<ServicePriceType, string> = {
+  daily: "Diario",
+  weekly: "Semanal",
+  monthly: "Mensual",
+  annual: "Anual",
+  one_time: "Una vez",
+};
+
+export const SERVICE_PRICE_TYPE_SUFFIX: Record<ServicePriceType, string> = {
+  daily: "/día",
+  weekly: "/sem",
+  monthly: "/mes",
+  annual: "/año",
+  one_time: "",
+};
 
 export type WorkspaceService = {
   id: string;
+  category: ProjectType;
   name: string;
   description: string;
+  target_audience: string;
+  not_included: string;
+  expected_result: string;
   price: number | null;
-  unit: string;
+  price_type: ServicePriceType;
 };
+
+function normalizeService(raw: any): WorkspaceService {
+  const validCategories: ProjectType[] = [
+    "web_dev",
+    "social_media",
+    "paid_ads",
+    "graphic_design",
+    "branding",
+    "audit",
+  ];
+  const validPriceTypes: ServicePriceType[] = ["daily", "weekly", "monthly", "annual", "one_time"];
+  return {
+    id: raw?.id ?? (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random())),
+    category: validCategories.includes(raw?.category) ? raw.category : "social_media",
+    name: typeof raw?.name === "string" ? raw.name : "",
+    description: typeof raw?.description === "string" ? raw.description : "",
+    target_audience: typeof raw?.target_audience === "string" ? raw.target_audience : "",
+    not_included: typeof raw?.not_included === "string" ? raw.not_included : "",
+    expected_result: typeof raw?.expected_result === "string" ? raw.expected_result : "",
+    price: raw?.price === null || raw?.price === undefined || raw?.price === "" ? null : Number(raw.price),
+    price_type: validPriceTypes.includes(raw?.price_type) ? raw.price_type : "one_time",
+  };
+}
 
 export type WorkspaceDetail = {
   id: string;
@@ -35,7 +81,7 @@ export function useWorkspaceDetail(workspaceId: string | undefined) {
       if (!data) return null;
       return {
         ...data,
-        services: Array.isArray(data.services) ? (data.services as WorkspaceService[]) : [],
+        services: Array.isArray(data.services) ? (data.services as any[]).map(normalizeService) : [],
       } as WorkspaceDetail;
     },
   });

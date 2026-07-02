@@ -120,11 +120,7 @@ export function defaultContentForType(type: ProposalType): ProposalBlock[] {
           type: "services",
           id: uid(),
           title: "Servicios incluidos",
-          items: [
-            { name: "Gestión de redes", description: "Community management y respuesta a DMs/comentarios." },
-            { name: "Calendario de contenido mensual", description: "12-16 piezas por mes por canal." },
-            { name: "Reporte mensual", description: "Métricas clave y aprendizajes." },
-          ],
+          items: [],
         },
         {
           type: "pricing",

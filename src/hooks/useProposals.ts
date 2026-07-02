@@ -141,10 +141,7 @@ export function defaultContentForType(type: ProposalType): ProposalBlock[] {
           type: "services",
           id: uid(),
           title: "Servicios",
-          items: [
-            { name: "Setup y estrategia", description: "Pixel, conversiones, estructura de campañas." },
-            { name: "Gestión mensual", description: "Optimización continua y creative testing." },
-          ],
+          items: [],
         },
         {
           type: "pricing",

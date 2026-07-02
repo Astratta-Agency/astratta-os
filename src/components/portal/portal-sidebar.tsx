@@ -8,6 +8,7 @@ import {
   ImagePlus,
   Lock,
   Mail,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ export function PortalSidebar({ client, pendingCount }: Props) {
     { to: base, label: "Inicio", icon: Home, end: true },
     { to: `${base}/aprobaciones`, label: "Aprobaciones", icon: CheckSquare, badge: pendingCount },
     { to: `${base}/calendario`, label: "Calendario", icon: CalendarDays },
+    { to: `${base}/pagos`, label: "Pagos", icon: Wallet },
     { to: `${base}/documentos`, label: "Documentos", icon: FileText },
     { to: `${base}/reportes`, label: "Reportes", icon: BarChart3 },
     { to: `${base}/activos`, label: "Activos", icon: ImagePlus },

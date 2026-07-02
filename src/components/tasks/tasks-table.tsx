@@ -88,15 +88,26 @@ export function TasksTable({ tasks, members, onOpen, onStatusChange }: Props) {
                 <TableCell className="font-medium">
                   <div className="flex flex-col">
                     <span className="truncate">{t.title}</span>
-                    {t.tags.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {t.tags.slice(0, 3).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-[10px]">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      {t.related_post_id && postMap[t.related_post_id] && (
+                        <Link
+                          to={`/app/calendario?post=${t.related_post_id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex max-w-[220px] items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10"
+                          title={postMap[t.related_post_id].title ?? "Post"}
+                        >
+                          <FileImage className="h-3 w-3 shrink-0" />
+                          <span className="truncate">
+                            {postMap[t.related_post_id].title || "Post sin título"}
+                          </span>
+                        </Link>
+                      )}
+                      {t.tags.slice(0, 3).map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-[10px]">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">

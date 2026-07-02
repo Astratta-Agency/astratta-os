@@ -22,6 +22,7 @@ import { TabComingSoon } from "@/components/clients/tab-coming-soon";
 import { UpcomingDeliveries, StakeholdersList } from "@/components/clients/resumen-cards";
 import { ClientProjectsTab } from "@/components/clients/client-projects-tab";
 import { ClientCredentialsTab } from "@/components/clients/client-credentials-tab";
+import { ClientDocumentsTab } from "@/components/clients/client-documents-tab";
 import { ClientNotesTab } from "@/components/clients/client-notes-tab";
 import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";

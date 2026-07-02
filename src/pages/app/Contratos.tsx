@@ -61,6 +61,8 @@ import {
   type ContractClauseRow,
   type ContractBlock,
 } from "@/hooks/useContracts";
+import { ServiceCatalogSelect } from "@/components/settings/service-catalog-select";
+import { SERVICE_PRICE_TYPE_LABEL } from "@/hooks/useWorkspaceSettings";
 
 const SERVICE_TYPES: ContractServiceType[] = ["web", "social", "ads", "branding", "bundle"];
 const STATUSES: ContractStatus[] = [
@@ -298,6 +300,8 @@ function NewContractDialog({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [alcance, setAlcance] = useState("");
+  const [selectedCatalogId, setSelectedCatalogId] = useState<string | null>(null);
+  const [priceTypeBadge, setPriceTypeBadge] = useState<string | null>(null);
 
   const activeTemplate = useMemo(
     () => templates.find((t) => t.service_type === serviceType && t.is_active),
@@ -312,6 +316,8 @@ function NewContractDialog({
       setStartDate("");
       setEndDate("");
       setAlcance("");
+      setSelectedCatalogId(null);
+      setPriceTypeBadge(null);
     }
   }, [open]);
 
@@ -409,6 +415,38 @@ function NewContractDialog({
           <div>
             <Label>Fecha fin</Label>
             <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Servicio del catálogo (opcional)</Label>
+            <ServiceCatalogSelect
+              workspaceId={workspaceId}
+              value={selectedCatalogId}
+              allowCustom
+              placeholder="Elegir servicio del catálogo"
+              onChange={({ service, custom }) => {
+                if (custom) {
+                  setSelectedCatalogId("__custom__");
+                  setPriceTypeBadge(null);
+                  setAlcance("");
+                  setAmount("");
+                  return;
+                }
+                if (service) {
+                  setSelectedCatalogId(service.id);
+                  setPriceTypeBadge(SERVICE_PRICE_TYPE_LABEL[service.price_type]);
+                  setAlcance(service.description);
+                  setAmount(service.price !== null ? String(service.price) : "");
+                } else {
+                  setSelectedCatalogId(null);
+                  setPriceTypeBadge(null);
+                }
+              }}
+            />
+            {priceTypeBadge && (
+              <Badge variant="outline" className="mt-1.5">
+                {priceTypeBadge}
+              </Badge>
+            )}
           </div>
           <div className="md:col-span-2">
             <Label>Alcance</Label>

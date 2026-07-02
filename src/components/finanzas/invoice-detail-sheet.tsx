@@ -45,6 +45,9 @@ import { InvoiceStatusBadge } from "./invoice-status-badge";
 import { ClientLogo } from "@/components/clients/client-logo";
 import { formatMoney, PAYMENT_METHOD_LABEL } from "@/lib/money";
 import { RegisterPaymentDialog } from "./register-payment-dialog";
+import { ServiceCatalogSelect } from "@/components/settings/service-catalog-select";
+import { SERVICE_PRICE_TYPE_LABEL } from "@/hooks/useWorkspaceSettings";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   invoiceId: string | null;

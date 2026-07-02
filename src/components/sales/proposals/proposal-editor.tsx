@@ -52,7 +52,7 @@ const emptyBlock = (type: ProposalBlock["type"]): ProposalBlock => {
     case "text":
       return { type, id: uid(), title: "Sección", body: "" };
     case "services":
-      return { type, id: uid(), title: "Servicios", items: [{ name: "", description: "" }] };
+      return { type, id: uid(), title: "Servicios", items: [] };
     case "deliverables":
       return { type, id: uid(), title: "Entregables", items: [{ label: "" }] };
     case "timeline":

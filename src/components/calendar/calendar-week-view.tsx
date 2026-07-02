@@ -41,6 +41,7 @@ function Slot({
   pillarMap,
   onPostClick,
   onCreate,
+  readonly = false,
 }: {
   date: Date;
   hour: number;
@@ -48,24 +49,26 @@ function Slot({
   pillarMap: Map<string, ContentPillar>;
   onPostClick: (p: SocialPostRow) => void;
   onCreate: (d: Date) => void;
+  readonly?: boolean;
 }) {
   const slotDate = setMinutes(setHours(date, hour), 0);
   const id = `slot:${format(slotDate, "yyyy-MM-dd'T'HH:mm")}`;
-  const { setNodeRef, isOver } = useDroppable({ id, data: { iso: slotDate.toISOString() } });
+  const { setNodeRef, isOver } = useDroppable({ id, data: { iso: slotDate.toISOString() }, disabled: readonly });
   return (
     <div
       ref={setNodeRef}
       onClick={(e) => {
+        if (readonly) return;
         if (e.target === e.currentTarget) onCreate(slotDate);
       }}
       className={cn(
         "min-h-[48px] border-b border-r p-0.5",
-        isOver && "bg-primary/10",
+        isOver && !readonly && "bg-primary/10",
       )}
     >
       <div className="flex flex-col gap-1">
         {posts.map((p) => (
-          <PostCard key={p.id} post={p} pillarMap={pillarMap} onClick={() => onPostClick(p)} />
+          <PostCard key={p.id} post={p} pillarMap={pillarMap} onClick={() => onPostClick(p)} draggable={!readonly} />
         ))}
       </div>
     </div>

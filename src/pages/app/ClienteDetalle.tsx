@@ -45,6 +45,7 @@ export default function ClienteDetalle() {
   const { workspace, isLoading: wsLoading } = useActiveWorkspace();
   const { data: client, isLoading } = useClient(workspace?.id, slug);
   const { data: pendingTasks } = useClientPendingTasksCount(client?.id);
+  const { data: clientInvoices = [] } = useInvoices(client?.workspace_id, { clientId: client?.id });
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);

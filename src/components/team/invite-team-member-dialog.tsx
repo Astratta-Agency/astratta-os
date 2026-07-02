@@ -61,6 +61,7 @@ export function InviteTeamMemberDialog({ open, onOpenChange, workspaceId }: Prop
   };
 
   const onSubmit = async (values: FormValues) => {
+    const full_name = [values.first_name, values.last_name].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
     try {
       const res = await invite.mutateAsync({
         email: values.email,
@@ -68,6 +69,7 @@ export function InviteTeamMemberDialog({ open, onOpenChange, workspaceId }: Prop
         title: values.title || undefined,
         weekly_capacity_hours: values.weekly_capacity_hours,
         hourly_rate: values.role === "collaborator" ? values.hourly_rate : undefined,
+        full_name: full_name || undefined,
       });
       if (res.emailed) {
         toast({ title: `Invitación enviada a ${values.email}` });

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { ServicePriceType } from "@/hooks/useWorkspaceSettings";
 
 export type ProposalType = "web" | "social" | "ads" | "branding" | "bundle";
 export type ProposalStatus =
@@ -36,7 +37,13 @@ export type BlockServices = {
   type: "services";
   id: string;
   title: string;
-  items: Array<{ name: string; description?: string }>;
+  items: Array<{
+    service_id: string | null;
+    name: string;
+    description: string;
+    price: number | null;
+    price_type: ServicePriceType | null;
+  }>;
 };
 export type BlockDeliverables = {
   type: "deliverables";
@@ -92,11 +99,7 @@ export function defaultContentForType(type: ProposalType): ProposalBlock[] {
           type: "services",
           id: uid(),
           title: "Servicios incluidos",
-          items: [
-            { name: "Diseño UI/UX", description: "Wireframes, sistema visual y prototipo interactivo." },
-            { name: "Desarrollo frontend", description: "Implementación responsive con React + Tailwind." },
-            { name: "SEO on-page técnico", description: "Metadatos, sitemap, performance y accesibilidad." },
-          ],
+          items: [],
         },
         {
           type: "pricing",
@@ -117,11 +120,7 @@ export function defaultContentForType(type: ProposalType): ProposalBlock[] {
           type: "services",
           id: uid(),
           title: "Servicios incluidos",
-          items: [
-            { name: "Gestión de redes", description: "Community management y respuesta a DMs/comentarios." },
-            { name: "Calendario de contenido mensual", description: "12-16 piezas por mes por canal." },
-            { name: "Reporte mensual", description: "Métricas clave y aprendizajes." },
-          ],
+          items: [],
         },
         {
           type: "pricing",
@@ -142,10 +141,7 @@ export function defaultContentForType(type: ProposalType): ProposalBlock[] {
           type: "services",
           id: uid(),
           title: "Servicios",
-          items: [
-            { name: "Setup y estrategia", description: "Pixel, conversiones, estructura de campañas." },
-            { name: "Gestión mensual", description: "Optimización continua y creative testing." },
-          ],
+          items: [],
         },
         {
           type: "pricing",
@@ -192,7 +188,7 @@ export function defaultContentForType(type: ProposalType): ProposalBlock[] {
           type: "services",
           id: uid(),
           title: "Servicios incluidos",
-          items: [{ name: "Servicio 1", description: "" }],
+          items: [],
         },
         {
           type: "pricing",

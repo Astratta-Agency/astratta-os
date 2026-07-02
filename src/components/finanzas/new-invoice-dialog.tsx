@@ -25,6 +25,9 @@ import { useCreateInvoice, useWorkspaceFinanceDefaults } from "@/hooks/useInvoic
 import { useClients } from "@/hooks/useClients";
 import { useProjects } from "@/hooks/useProjects";
 import { formatMoney } from "@/lib/money";
+import { ServiceCatalogSelect } from "@/components/settings/service-catalog-select";
+import { SERVICE_PRICE_TYPE_LABEL } from "@/hooks/useWorkspaceSettings";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   open: boolean;
@@ -169,23 +172,15 @@ export function NewInvoiceDialog({ open, onOpenChange, workspaceId, presetClient
             {items.map((it, i) => {
               const amount = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
               return (
-                <div key={i} className="grid grid-cols-12 items-start gap-2 rounded-md border border-border p-2">
-                  <div className="col-span-6">
-                    <Input placeholder="Descripción" value={it.description} onChange={(e) => updateItem(i, { description: e.target.value })} />
-                  </div>
-                  <div className="col-span-2">
-                    <Input type="number" step="0.01" min="0" placeholder="Cantidad" value={it.quantity} onChange={(e) => updateItem(i, { quantity: Number(e.target.value) })} />
-                  </div>
-                  <div className="col-span-2">
-                    <Input type="number" step="0.01" min="0" placeholder="Precio unit." value={it.unit_price} onChange={(e) => updateItem(i, { unit_price: Number(e.target.value) })} />
-                  </div>
-                  <div className="col-span-1 pt-2 text-right text-sm text-muted-foreground">{formatMoney(amount)}</div>
-                  <div className="col-span-1 flex justify-end">
-                    <Button size="icon" variant="ghost" onClick={() => removeItem(i)} disabled={items.length === 1}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+                <InvoiceItemRow
+                  key={i}
+                  workspaceId={workspaceId}
+                  item={it}
+                  amount={amount}
+                  disabled={items.length === 1}
+                  onChange={(patch) => updateItem(i, patch)}
+                  onRemove={() => removeItem(i)}
+                />
               );
             })}
           </div>
@@ -217,5 +212,113 @@ export function NewInvoiceDialog({ open, onOpenChange, workspaceId, presetClient
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function InvoiceItemRow({
+  workspaceId,
+  item,
+  amount,
+  disabled,
+  onChange,
+  onRemove,
+}: {
+  workspaceId: string | undefined;
+  item: LineItem;
+  amount: number;
+  disabled: boolean;
+  onChange: (patch: Partial<LineItem>) => void;
+  onRemove: () => void;
+}) {
+  const [mode, setMode] = useState<"catalog" | "custom">(item.description ? "custom" : "catalog");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [priceTypeBadge, setPriceTypeBadge] = useState<string | null>(null);
+
+  return (
+    <div className="grid grid-cols-12 items-start gap-2 rounded-md border border-border p-2">
+      <div className="col-span-6 space-y-1">
+        {mode === "catalog" ? (
+          <>
+            <ServiceCatalogSelect
+              workspaceId={workspaceId}
+              value={selectedId}
+              allowCustom
+              placeholder="Elegir servicio del catálogo"
+              onChange={({ service, custom }) => {
+                if (custom) {
+                  setMode("custom");
+                  setSelectedId(null);
+                  setPriceTypeBadge(null);
+                  onChange({ description: "" });
+                  return;
+                }
+                if (service) {
+                  setSelectedId(service.id);
+                  setPriceTypeBadge(SERVICE_PRICE_TYPE_LABEL[service.price_type]);
+                  onChange({
+                    description: service.name,
+                    unit_price: service.price ?? 0,
+                  });
+                }
+              }}
+            />
+            {item.description && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="truncate">{item.description}</span>
+                {priceTypeBadge && <Badge variant="outline">{priceTypeBadge}</Badge>}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="space-y-1">
+            <Input
+              placeholder="Descripción personalizada"
+              value={item.description}
+              onChange={(e) => onChange({ description: e.target.value })}
+            />
+            <button
+              type="button"
+              className="text-[11px] text-muted-foreground underline hover:text-foreground"
+              onClick={() => {
+                setMode("catalog");
+                setSelectedId(null);
+                setPriceTypeBadge(null);
+                onChange({ description: "" });
+              }}
+            >
+              Elegir del catálogo
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="col-span-2">
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="Cantidad"
+          value={item.quantity}
+          onChange={(e) => onChange({ quantity: Number(e.target.value) })}
+        />
+      </div>
+      <div className="col-span-2">
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          placeholder="Precio unit."
+          value={item.unit_price}
+          onChange={(e) => onChange({ unit_price: Number(e.target.value) })}
+        />
+      </div>
+      <div className="col-span-1 pt-2 text-right text-sm text-muted-foreground">
+        {formatMoney(amount)}
+      </div>
+      <div className="col-span-1 flex justify-end">
+        <Button size="icon" variant="ghost" onClick={onRemove} disabled={disabled}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   );
 }

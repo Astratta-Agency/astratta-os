@@ -33,6 +33,10 @@ import {
   type ProposalRow,
   type ProposalType,
 } from "@/hooks/useProposals";
+import { Badge } from "@/components/ui/badge";
+import { ServiceCatalogSelect } from "@/components/settings/service-catalog-select";
+import { SERVICE_PRICE_TYPE_LABEL, SERVICE_PRICE_TYPE_SUFFIX } from "@/hooks/useWorkspaceSettings";
+import { formatMoney } from "@/lib/money";
 
 type Mode = "create" | "edit";
 type Props = {
@@ -52,7 +56,7 @@ const emptyBlock = (type: ProposalBlock["type"]): ProposalBlock => {
     case "text":
       return { type, id: uid(), title: "Sección", body: "" };
     case "services":
-      return { type, id: uid(), title: "Servicios", items: [{ name: "", description: "" }] };
+      return { type, id: uid(), title: "Servicios", items: [] };
     case "deliverables":
       return { type, id: uid(), title: "Entregables", items: [{ label: "" }] };
     case "timeline":
@@ -276,6 +280,7 @@ export function ProposalEditor({
                 <BlockEditor
                   key={b.id}
                   block={b}
+                  workspaceId={workspaceId}
                   onChange={(p) => updateBlock(idx, p)}
                   onRemove={() => removeBlock(idx)}
                   onUp={() => move(idx, -1)}
@@ -347,6 +352,7 @@ export function ProposalEditor({
 
 function BlockEditor({
   block,
+  workspaceId,
   onChange,
   onRemove,
   onUp,
@@ -355,6 +361,7 @@ function BlockEditor({
   canDown,
 }: {
   block: ProposalBlock;
+  workspaceId: string | undefined;
   onChange: (patch: Partial<ProposalBlock>) => void;
   onRemove: () => void;
   onUp: () => void;
@@ -394,14 +401,10 @@ function BlockEditor({
       )}
 
       {block.type === "services" && (
-        <ItemsList
+        <ServicesFromCatalog
+          workspaceId={workspaceId}
           items={block.items}
           onChange={(items) => onChange({ items } as any)}
-          columns={[
-            { key: "name", label: "Servicio", placeholder: "Nombre del servicio" },
-            { key: "description", label: "Descripción", placeholder: "Descripción breve" },
-          ]}
-          empty={{ name: "", description: "" }}
         />
       )}
 
@@ -490,6 +493,106 @@ function ItemsList({
       <Button type="button" variant="outline" size="sm" onClick={() => onChange([...items, { ...empty }])}>
         <Plus className="mr-1 h-3.5 w-3.5" />
         Agregar ítem
+      </Button>
+    </div>
+  );
+}
+
+// ---------------- Services from catalog ----------------
+
+function ServicesFromCatalog({
+  workspaceId,
+  items,
+  onChange,
+}: {
+  workspaceId: string | undefined;
+  items: Array<{
+    service_id: string | null;
+    name: string;
+    description: string;
+    price: number | null;
+    price_type: import("@/hooks/useWorkspaceSettings").ServicePriceType | null;
+  }>;
+  onChange: (items: any[]) => void;
+}) {
+  const removeAt = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+
+  const setAt = (idx: number, svc: any) => {
+    const next = items.map((it, i) =>
+      i === idx
+        ? svc
+          ? {
+              service_id: svc.id,
+              name: svc.name,
+              description: svc.description,
+              price: svc.price,
+              price_type: svc.price_type,
+            }
+          : it
+        : it,
+    );
+    onChange(next);
+  };
+
+  const addRow = () =>
+    onChange([
+      ...items,
+      { service_id: null, name: "", description: "", price: null, price_type: null },
+    ]);
+
+  return (
+    <div className="space-y-3">
+      {items.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Agregá servicios seleccionándolos del catálogo de la agencia.
+        </p>
+      )}
+      {items.map((it, idx) => (
+        <div key={idx} className="rounded-md border p-3">
+          <div className="flex items-start gap-2">
+            <div className="flex-1 space-y-2">
+              <ServiceCatalogSelect
+                workspaceId={workspaceId}
+                value={it.service_id}
+                onChange={({ service }) => setAt(idx, service)}
+              />
+              {it.name && (
+                <div className="rounded-md bg-muted/40 p-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{it.name}</span>
+                    {it.price != null && (
+                      <Badge variant="secondary">
+                        {formatMoney(it.price)}
+                        {it.price_type ? SERVICE_PRICE_TYPE_SUFFIX[it.price_type] : ""}
+                      </Badge>
+                    )}
+                    {it.price_type && (
+                      <Badge variant="outline" className="text-xs">
+                        {SERVICE_PRICE_TYPE_LABEL[it.price_type]}
+                      </Badge>
+                    )}
+                  </div>
+                  {it.description && (
+                    <p className="mt-1 text-xs text-muted-foreground">{it.description}</p>
+                  )}
+                </div>
+              )}
+            </div>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="text-destructive"
+              onClick={() => removeAt(idx)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={addRow}>
+        <Plus className="mr-1 h-3.5 w-3.5" />
+        Agregar servicio
       </Button>
     </div>
   );

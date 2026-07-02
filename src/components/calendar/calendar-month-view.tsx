@@ -81,6 +81,34 @@ export function CalendarMonthView({
     onReschedule(post.id, next);
   };
 
+  const grid = (
+    <div className="grid grid-cols-7 gap-1">
+      {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
+        <div key={d} className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {d}
+        </div>
+      ))}
+      {days.map((d) => {
+        const key = format(d, "yyyy-MM-dd");
+        return (
+          <DayCell
+            key={key}
+            date={d}
+            monthAnchor={monthAnchor}
+            posts={byDay.get(key) ?? []}
+            pillarMap={pillarMap}
+            onPostClick={onPostClick}
+            onCreate={onCreate}
+            isOver={overId === `day:${key}`}
+            readonly={readonly}
+          />
+        );
+      })}
+    </div>
+  );
+
+  if (readonly) return grid;
+
   return (
     <DndContext
       sensors={sensors}
@@ -88,28 +116,7 @@ export function CalendarMonthView({
       onDragEnd={handleEnd}
       onDragCancel={() => setOverId(null)}
     >
-      <div className="grid grid-cols-7 gap-1">
-        {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
-          <div key={d} className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {d}
-          </div>
-        ))}
-        {days.map((d) => {
-          const key = format(d, "yyyy-MM-dd");
-          return (
-            <DayCell
-              key={key}
-              date={d}
-              monthAnchor={monthAnchor}
-              posts={byDay.get(key) ?? []}
-              pillarMap={pillarMap}
-              onPostClick={onPostClick}
-              onCreate={onCreate}
-              isOver={overId === `day:${key}`}
-            />
-          );
-        })}
-      </div>
+      {grid}
     </DndContext>
   );
 }

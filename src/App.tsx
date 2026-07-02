@@ -11,6 +11,7 @@ import ClientHome from "@/pages/portal/ClientHome";
 import ClientApprovals from "@/pages/portal/ClientApprovals";
 import ClientPayments from "@/pages/portal/ClientPayments";
 import ClientCalendar from "@/pages/portal/ClientCalendar";
+import ClientDocuments from "@/pages/portal/ClientDocuments";
 import PortalComingSoon from "@/pages/portal/PortalComingSoon";
 import { RequireAgencyAuth } from "@/components/auth/RequireAgencyAuth";
 import { RequireClientAuth } from "@/components/auth/RequireClientAuth";
@@ -136,7 +137,7 @@ const App = () => (
             <Route path="aprobaciones" element={<ClientApprovals />} />
             <Route path="pagos" element={<ClientPayments />} />
             <Route path="calendario" element={<ClientCalendar />} />
-            <Route path="documentos" element={<PortalComingSoon section="Documentos" />} />
+            <Route path="documentos" element={<ClientDocuments />} />
             <Route path="reportes" element={<PortalComingSoon section="Reportes" />} />
             <Route path="activos" element={<PortalComingSoon section="Activos" />} />
             <Route path="credenciales" element={<PortalComingSoon section="Credenciales" />} />

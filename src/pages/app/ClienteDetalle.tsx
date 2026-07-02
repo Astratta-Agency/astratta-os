@@ -22,6 +22,7 @@ import { TabComingSoon } from "@/components/clients/tab-coming-soon";
 import { UpcomingDeliveries, StakeholdersList } from "@/components/clients/resumen-cards";
 import { ClientProjectsTab } from "@/components/clients/client-projects-tab";
 import { ClientCredentialsTab } from "@/components/clients/client-credentials-tab";
+import { ClientDocumentsTab } from "@/components/clients/client-documents-tab";
 import { ClientNotesTab } from "@/components/clients/client-notes-tab";
 import { ClientTimelineTab } from "@/components/clients/client-timeline-tab";
 import { NewProjectDialog } from "@/components/clients/new-project-dialog";
@@ -231,10 +232,7 @@ export default function ClienteDetalle() {
 
         {/* Documentos */}
         <TabsContent value="documentos">
-          <TabComingSoon
-            title="Documentos próximamente"
-            description="Contratos, propuestas, recibos, briefs y brand assets se subirán a Supabase Storage en la siguiente iteración."
-          />
+          <ClientDocumentsTab clientId={client.id} workspaceId={client.workspace_id} />
         </TabsContent>
 
         {/* Finanzas */}

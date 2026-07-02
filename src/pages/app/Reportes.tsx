@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgencyAnalyticsTab } from "@/components/analytics/agency-analytics-tab";
-import { TabComingSoon } from "@/components/clients/tab-coming-soon";
+import { ClientReportsTab } from "@/components/analytics/client-reports-tab";
 
 export default function Reportes() {
   return (
@@ -23,10 +23,7 @@ export default function Reportes() {
         </TabsContent>
 
         <TabsContent value="clientes">
-          <TabComingSoon
-            title="Reportes mensuales por cliente"
-            description="Generación de reportes PDF por cliente con métricas de performance del mes. Próximamente."
-          />
+          <ClientReportsTab />
         </TabsContent>
       </Tabs>
     </div>

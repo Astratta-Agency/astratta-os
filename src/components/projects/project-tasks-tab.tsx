@@ -7,7 +7,6 @@ import type { WorkspaceMember } from "@/hooks/useProjects";
 import { TaskViewsSwitcher } from "@/components/tasks/views/task-views-switcher";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { NewTaskDialog } from "@/components/tasks/new-task-dialog";
-import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 interface Props {

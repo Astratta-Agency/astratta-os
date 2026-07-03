@@ -390,6 +390,11 @@ export function PostEditorPanel({
                     setSubmitOpen(true);
                   }}
                 />
+                <VerbalApproveButton
+                  postId={post.id}
+                  clientId={post.client_id}
+                  status={post.status}
+                />
                 <StateChangeDropdown
                   status={post.status}
                   onChange={handleStatusChange}

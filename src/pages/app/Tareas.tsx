@@ -28,13 +28,11 @@ import {
 } from "@/hooks/useTasks";
 
 import { TasksFiltersBar } from "@/components/tasks/tasks-filters-bar";
-import { TasksTable } from "@/components/tasks/tasks-table";
-import { TasksGroupedView } from "@/components/tasks/tasks-grouped-view";
 import { TasksCalendarView } from "@/components/tasks/tasks-calendar-view";
-import { TasksOverdueView } from "@/components/tasks/tasks-overdue-view";
 import { NewTaskDialog } from "@/components/tasks/new-task-dialog";
 import { TaskDetailSheet } from "@/components/tasks/task-detail-sheet";
 import { RecurringRulesTab } from "@/components/tasks/recurring-rules-tab";
+import { TaskViewsSwitcher } from "@/components/tasks/views/task-views-switcher";
 import { Checkbox } from "@/components/ui/checkbox";
 
 type ViewKey = "mias" | "proyecto" | "cliente" | "calendario" | "vencidas" | "recurrentes";
@@ -247,46 +245,23 @@ export default function Tareas() {
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
-      ) : view === "mias" ? (
-        <TasksTable
-          tasks={tasks}
-          members={members}
-          onOpen={openTask}
-          onStatusChange={handleStatusChange}
-        />
-      ) : view === "proyecto" ? (
-        <TasksGroupedView
-          tasks={tasks}
-          groupBy="project"
-          groups={projectOptions}
-          members={members}
-          onOpen={openTask}
-          onStatusChange={handleStatusChange}
-        />
-      ) : view === "cliente" ? (
-        <TasksGroupedView
-          tasks={tasks}
-          groupBy="client"
-          groups={clientOptions}
-          members={members}
-          onOpen={openTask}
-          onStatusChange={handleStatusChange}
-        />
       ) : view === "calendario" ? (
         <TasksCalendarView tasks={tasks} onOpen={openTask} />
-      ) : view === "vencidas" ? (
-        <TasksOverdueView
-          tasks={tasks}
-          members={members}
-          onOpen={openTask}
-          onStatusChange={handleStatusChange}
-        />
-      ) : (
+      ) : view === "recurrentes" ? (
         <RecurringRulesTab
           workspaceId={workspaceId}
           members={members}
           clients={clientOptions}
           projects={projectOptions}
+        />
+      ) : (
+        <TaskViewsSwitcher
+          tasks={tasks}
+          members={members}
+          projects={projectOptions}
+          onOpen={openTask}
+          onStatusChange={handleStatusChange}
+          onCreate={() => setCreateOpen(true)}
         />
       )}
 

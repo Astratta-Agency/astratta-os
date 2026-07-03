@@ -360,6 +360,13 @@ export default function Calendario() {
           pillarMap={pillarMap}
           onPostClick={(p) => openPost(p.id)}
         />
+      ) : view === "kanban" ? (
+        <CalendarKanbanView
+          posts={posts}
+          pillarMap={pillarMap}
+          onPostClick={(p) => openPost(p.id)}
+          onStatusChange={handleStatusChange}
+        />
       ) : (
         <CalendarListView
           posts={posts}

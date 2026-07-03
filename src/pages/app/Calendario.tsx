@@ -33,6 +33,7 @@ import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
 import { CalendarChannelView } from "@/components/calendar/calendar-channel-view";
+import { CalendarKanbanView } from "@/components/calendar/calendar-kanban-view";
 import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
 import { ManagePillarsDialog } from "@/components/calendar/manage-pillars-dialog";
@@ -289,7 +290,7 @@ export default function Calendario() {
             onChange={(d) => update({ anchor: d.toISOString() })}
           />
           <div className="ml-auto inline-flex rounded-md border">
-            {(["mes", "semana", "lista", "canal"] as CalView[]).map((v) => (
+            {(["mes", "semana", "lista", "canal", "kanban"] as CalView[]).map((v) => (
               <Button
                 key={v}
                 variant={view === v ? "secondary" : "ghost"}
@@ -358,6 +359,13 @@ export default function Calendario() {
           posts={posts}
           pillarMap={pillarMap}
           onPostClick={(p) => openPost(p.id)}
+        />
+      ) : view === "kanban" ? (
+        <CalendarKanbanView
+          posts={posts}
+          pillarMap={pillarMap}
+          onPostClick={(p) => openPost(p.id)}
+          onStatusChange={handleStatusChange}
         />
       ) : (
         <CalendarListView

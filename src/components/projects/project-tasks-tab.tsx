@@ -85,8 +85,7 @@ export function ProjectTasksTab({
         clients={[]}
         projects={[{ id: projectId, name: "" }]}
         leads={[]}
-        defaultProjectId={projectId}
-        defaultClientId={clientId}
+        defaults={{ project_id: projectId, client_id: clientId }}
       />
 
       <TaskDetailSheet

@@ -12,6 +12,7 @@ export type Task = {
   client_id: string | null;
   lead_id: string | null;
   related_post_id: string | null;
+  parent_task_id: string | null;
   title: string;
   description: string | null;
   assigned_to: string | null;

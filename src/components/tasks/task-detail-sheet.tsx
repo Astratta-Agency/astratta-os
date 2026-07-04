@@ -27,6 +27,7 @@ import { TaskChecklist } from "./task-checklist";
 import { TaskComments } from "./task-comments";
 import { TaskAttachments } from "./task-attachments";
 import { TaskTimer } from "./task-timer";
+import { TaskSubtasks } from "./task-subtasks";
 
 interface Props {
   taskId: string | null;
@@ -36,6 +37,7 @@ interface Props {
   clients: { id: string; name: string }[];
   projects: { id: string; name: string }[];
   leads?: { id: string; company_name: string | null; contact_name: string | null }[];
+  onOpenTask?: (id: string) => void;
 }
 
 export function TaskDetailSheet({

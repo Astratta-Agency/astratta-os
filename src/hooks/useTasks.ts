@@ -176,8 +176,12 @@ export function useCreateTask() {
       if (error) throw error;
       return data as Task;
     },
-    onSuccess: () => {
+    onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["subtask-counts"] });
+      if (vars.parent_task_id) {
+        qc.invalidateQueries({ queryKey: ["subtasks", vars.parent_task_id] });
+      }
     },
   });
 }
@@ -195,9 +199,13 @@ export function useUpdateTask() {
       if (error) throw error;
       return data as Task;
     },
-    onSuccess: (_d, vars) => {
+    onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["task", vars.id] });
+      qc.invalidateQueries({ queryKey: ["subtask-counts"] });
+      if (data?.parent_task_id) {
+        qc.invalidateQueries({ queryKey: ["subtasks", data.parent_task_id] });
+      }
     },
   });
 }
@@ -210,7 +218,11 @@ export function useDeleteTask() {
       if (error) throw error;
       return id;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tasks"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["subtask-counts"] });
+      qc.invalidateQueries({ queryKey: ["subtasks"] });
+    },
   });
 }
 

@@ -43,10 +43,12 @@ function KanbanCard({
   task,
   members,
   onOpen,
+  subtaskCount,
 }: {
   task: Task;
   members: WorkspaceMember[];
   onOpen: (id: string) => void;
+  subtaskCount?: { total: number; done: number };
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -77,6 +79,15 @@ function KanbanCard({
         {task.due_date && (
           <span className="text-[11px] text-muted-foreground">
             {format(parseISO(task.due_date), "dd MMM", { locale: es })}
+          </span>
+        )}
+        {subtaskCount && subtaskCount.total > 0 && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+            title="Subtareas"
+          >
+            <ListChecks className="h-3 w-3" />
+            {subtaskCount.done}/{subtaskCount.total}
           </span>
         )}
       </div>

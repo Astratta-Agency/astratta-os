@@ -167,6 +167,15 @@ export function TaskTableView({
                               </span>
                             </Link>
                           )}
+                          {subtaskCounts[t.id] && subtaskCounts[t.id].total > 0 && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                              title="Subtareas"
+                            >
+                              <ListChecks className="h-3 w-3" />
+                              {subtaskCounts[t.id].done}/{subtaskCounts[t.id].total}
+                            </span>
+                          )}
                           {t.tags.slice(0, 3).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-[10px]">
                               {tag}

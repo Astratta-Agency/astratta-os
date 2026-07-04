@@ -51,6 +51,7 @@ export function useTasks(workspaceId: string | undefined, filters: TasksFilters 
         .from("tasks")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("parent_task_id", null)
         .order("due_date", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false });
 
@@ -73,6 +74,49 @@ export function useTasks(workspaceId: string | undefined, filters: TasksFilters 
         ...r,
         tags: Array.isArray(r.tags) ? r.tags : [],
       })) as Task[];
+    },
+  });
+}
+
+export function useSubtasks(parentTaskId: string | null | undefined) {
+  return useQuery<Task[]>({
+    queryKey: ["subtasks", parentTaskId],
+    enabled: !!parentTaskId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tasks")
+        .select("*")
+        .eq("parent_task_id", parentTaskId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return ((data ?? []) as any[]).map((r) => ({
+        ...r,
+        tags: Array.isArray(r.tags) ? r.tags : [],
+      })) as Task[];
+    },
+  });
+}
+
+export function useSubtaskCountsMap(workspaceId: string | undefined) {
+  return useQuery<Record<string, { total: number; done: number }>>({
+    queryKey: ["subtask-counts", workspaceId],
+    enabled: !!workspaceId,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("tasks")
+        .select("parent_task_id, status")
+        .eq("workspace_id", workspaceId)
+        .not("parent_task_id", "is", null);
+      if (error) throw error;
+      const map: Record<string, { total: number; done: number }> = {};
+      for (const r of (data ?? []) as { parent_task_id: string; status: TaskStatus }[]) {
+        const k = r.parent_task_id;
+        if (!map[k]) map[k] = { total: 0, done: 0 };
+        map[k].total += 1;
+        if (r.status === "done") map[k].done += 1;
+      }
+      return map;
     },
   });
 }

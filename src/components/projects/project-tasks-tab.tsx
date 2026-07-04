@@ -95,6 +95,7 @@ export function ProjectTasksTab({
         clients={[]}
         projects={[{ id: projectId, name: "" }]}
         leads={[]}
+        onOpenTask={openTask}
       />
     </div>
   );

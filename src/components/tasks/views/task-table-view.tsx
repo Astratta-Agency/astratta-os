@@ -20,6 +20,7 @@ import type { WorkspaceMember } from "@/hooks/useProjects";
 import { PRIORITY_CLASS, PRIORITY_LABEL, STATUS_LABEL } from "@/lib/task-labels";
 import { STATUS_DOT, STATUS_ORDER, STATUS_PILL } from "@/lib/task-view-colors";
 import { usePostsByIds } from "@/hooks/useContentSubtasks";
+import { useSubtaskCountsMap } from "@/hooks/useTasks";
 
 export type GroupBy = "status" | "priority" | "assignee" | "project" | "none";
 

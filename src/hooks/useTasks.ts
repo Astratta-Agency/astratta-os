@@ -153,6 +153,7 @@ export type NewTaskInput = {
   client_id?: string | null;
   lead_id?: string | null;
   related_post_id?: string | null;
+  parent_task_id?: string | null;
 };
 
 export function useCreateTask() {

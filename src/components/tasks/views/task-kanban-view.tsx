@@ -169,6 +169,7 @@ export function TaskKanbanView({
   onCreate,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const { data: subtaskCounts = {} } = useSubtaskCountsMap(tasks[0]?.workspace_id);
   const grouped = useMemo(() => {
     const g: Record<TaskStatus, Task[]> = { todo: [], doing: [], review: [], done: [] };
     for (const t of tasks) g[t.status].push(t);

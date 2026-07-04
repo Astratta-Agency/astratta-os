@@ -110,12 +110,14 @@ function KanbanColumn({
   members,
   onOpen,
   onCreate,
+  subtaskCounts,
 }: {
   status: TaskStatus;
   tasks: Task[];
   members: WorkspaceMember[];
   onOpen: (id: string) => void;
   onCreate?: (defaults: { status?: TaskStatus }) => void;
+  subtaskCounts: Record<string, { total: number; done: number }>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
@@ -137,7 +139,13 @@ function KanbanColumn({
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-2">
         {tasks.map((t) => (
-          <KanbanCard key={t.id} task={t} members={members} onOpen={onOpen} />
+          <KanbanCard
+            key={t.id}
+            task={t}
+            members={members}
+            onOpen={onOpen}
+            subtaskCount={subtaskCounts[t.id]}
+          />
         ))}
       </div>
       {onCreate && (

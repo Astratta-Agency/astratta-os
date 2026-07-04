@@ -48,6 +48,7 @@ export function TaskDetailSheet({
   clients,
   projects,
   leads,
+  onOpenTask,
 }: Props) {
   const { data: task, isLoading } = useTask(taskId);
   const update = useUpdateTask();

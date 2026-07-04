@@ -163,6 +163,8 @@ export function TaskDetailSheet({
             </div>
 
             <Separator />
+            <TaskSubtasks parent={task} members={members} onOpenSubtask={onOpenTask} />
+            <Separator />
             <TaskChecklist taskId={task.id} />
             <Separator />
             <TaskAttachments taskId={task.id} workspaceId={workspaceId} />

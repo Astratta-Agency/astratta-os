@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, FileImage } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, FileImage, ListChecks } from "lucide-react";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -20,6 +20,7 @@ import type { WorkspaceMember } from "@/hooks/useProjects";
 import { PRIORITY_CLASS, PRIORITY_LABEL, STATUS_LABEL } from "@/lib/task-labels";
 import { STATUS_DOT, STATUS_ORDER, STATUS_PILL } from "@/lib/task-view-colors";
 import { usePostsByIds } from "@/hooks/useContentSubtasks";
+import { useSubtaskCountsMap } from "@/hooks/useTasks";
 
 export type GroupBy = "status" | "priority" | "assignee" | "project" | "none";
 
@@ -60,6 +61,7 @@ export function TaskTableView({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const postIds = tasks.map((t) => t.related_post_id).filter((x): x is string => !!x);
   const { data: postMap = {} } = usePostsByIds(postIds);
+  const { data: subtaskCounts = {} } = useSubtaskCountsMap(tasks[0]?.workspace_id);
   const projectMap = useMemo(
     () => Object.fromEntries(projects.map((p) => [p.id, p.name])),
     [projects],
@@ -164,6 +166,15 @@ export function TaskTableView({
                                 {postMap[t.related_post_id].title || "Post"}
                               </span>
                             </Link>
+                          )}
+                          {subtaskCounts[t.id] && subtaskCounts[t.id].total > 0 && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                              title="Subtareas"
+                            >
+                              <ListChecks className="h-3 w-3" />
+                              {subtaskCounts[t.id].done}/{subtaskCounts[t.id].total}
+                            </span>
                           )}
                           {t.tags.slice(0, 3).map((tag) => (
                             <Badge key={tag} variant="outline" className="text-[10px]">

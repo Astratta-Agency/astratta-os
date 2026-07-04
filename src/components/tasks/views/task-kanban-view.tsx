@@ -10,10 +10,11 @@ import {
 } from "@dnd-kit/core";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Plus } from "lucide-react";
+import { Plus, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useSubtaskCountsMap } from "@/hooks/useTasks";
 import type { Task, TaskStatus } from "@/hooks/useTasks";
 import type { WorkspaceMember } from "@/hooks/useProjects";
 import { PRIORITY_CLASS, PRIORITY_LABEL, STATUS_LABEL } from "@/lib/task-labels";
@@ -42,10 +43,12 @@ function KanbanCard({
   task,
   members,
   onOpen,
+  subtaskCount,
 }: {
   task: Task;
   members: WorkspaceMember[];
   onOpen: (id: string) => void;
+  subtaskCount?: { total: number; done: number };
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -78,6 +81,15 @@ function KanbanCard({
             {format(parseISO(task.due_date), "dd MMM", { locale: es })}
           </span>
         )}
+        {subtaskCount && subtaskCount.total > 0 && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+            title="Subtareas"
+          >
+            <ListChecks className="h-3 w-3" />
+            {subtaskCount.done}/{subtaskCount.total}
+          </span>
+        )}
       </div>
       {assigned && (
         <div className="mt-2 flex items-center gap-2">
@@ -98,12 +110,14 @@ function KanbanColumn({
   members,
   onOpen,
   onCreate,
+  subtaskCounts,
 }: {
   status: TaskStatus;
   tasks: Task[];
   members: WorkspaceMember[];
   onOpen: (id: string) => void;
   onCreate?: (defaults: { status?: TaskStatus }) => void;
+  subtaskCounts: Record<string, { total: number; done: number }>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
@@ -125,7 +139,13 @@ function KanbanColumn({
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-2">
         {tasks.map((t) => (
-          <KanbanCard key={t.id} task={t} members={members} onOpen={onOpen} />
+          <KanbanCard
+            key={t.id}
+            task={t}
+            members={members}
+            onOpen={onOpen}
+            subtaskCount={subtaskCounts[t.id]}
+          />
         ))}
       </div>
       {onCreate && (
@@ -149,6 +169,7 @@ export function TaskKanbanView({
   onCreate,
 }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const { data: subtaskCounts = {} } = useSubtaskCountsMap(tasks[0]?.workspace_id);
   const grouped = useMemo(() => {
     const g: Record<TaskStatus, Task[]> = { todo: [], doing: [], review: [], done: [] };
     for (const t of tasks) g[t.status].push(t);
@@ -182,6 +203,7 @@ export function TaskKanbanView({
             members={members}
             onOpen={onOpen}
             onCreate={onCreate}
+            subtaskCounts={subtaskCounts}
           />
         ))}
       </div>

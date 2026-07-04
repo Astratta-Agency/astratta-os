@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, FileImage } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, FileImage, ListChecks } from "lucide-react";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Link } from "react-router-dom";

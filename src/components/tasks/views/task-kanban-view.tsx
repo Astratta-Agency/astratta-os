@@ -203,6 +203,7 @@ export function TaskKanbanView({
             members={members}
             onOpen={onOpen}
             onCreate={onCreate}
+            subtaskCounts={subtaskCounts}
           />
         ))}
       </div>

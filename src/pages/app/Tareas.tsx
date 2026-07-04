@@ -283,6 +283,7 @@ export default function Tareas() {
         clients={clientOptions}
         projects={projectOptions}
         leads={leads}
+        onOpenTask={openTask}
       />
     </div>
   );

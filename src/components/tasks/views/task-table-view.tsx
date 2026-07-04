@@ -61,6 +61,7 @@ export function TaskTableView({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const postIds = tasks.map((t) => t.related_post_id).filter((x): x is string => !!x);
   const { data: postMap = {} } = usePostsByIds(postIds);
+  const { data: subtaskCounts = {} } = useSubtaskCountsMap(tasks[0]?.workspace_id);
   const projectMap = useMemo(
     () => Object.fromEntries(projects.map((p) => [p.id, p.name])),
     [projects],

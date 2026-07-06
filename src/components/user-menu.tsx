@@ -12,16 +12,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { signOut, useAuth } from "@/hooks/useAuth";
 
-export function UserMenu() {
+interface Props {
+  /** Where "Mi perfil" navigates. Defaults to the agency settings page. */
+  profilePath?: string;
+  /** Where to redirect after signing out. Defaults to the agency login. */
+  loginPath?: string;
+}
+
+export function UserMenu({ profilePath = "/app/configuracion", loginPath = "/login" }: Props) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
   const email = user?.email ?? "invitado@astrattaos.com";
-  const initials = (email[0] ?? "A").toUpperCase();
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.first_name as string | undefined) ||
+    null;
+  const initials = (displayName?.[0] ?? email[0] ?? "A").toUpperCase();
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/login", { replace: true });
+    navigate(loginPath, { replace: true });
   };
 
   return (
@@ -38,10 +49,15 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           <p className="text-xs text-muted-foreground">Sesión iniciada como</p>
-          <p className="truncate text-sm font-semibold text-foreground">{email}</p>
+          {displayName && (
+            <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+          )}
+          <p className={`truncate text-sm ${displayName ? "text-muted-foreground" : "font-semibold text-foreground"}`}>
+            {email}
+          </p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate("/app/configuracion")}>
+        <DropdownMenuItem onClick={() => navigate(profilePath)}>
           <UserIcon className="mr-2 h-4 w-4" />
           Mi perfil
         </DropdownMenuItem>

@@ -25,7 +25,7 @@ export function PortalHeader({ client }: Props) {
         </div>
       </Link>
       <div className="flex-1" />
-      <UserMenu />
+      <UserMenu profilePath={`/portal/${client.slug}/perfil`} loginPath="/portal/login" />
     </header>
   );
 }

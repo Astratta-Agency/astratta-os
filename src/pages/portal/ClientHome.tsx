@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useClientPortalKpis } from "@/hooks/portal/useClientPortalKpis";
 import { usePendingApprovals, useApprovalsByStatus } from "@/hooks/portal/usePendingApprovals";
 import { useClientTeam } from "@/hooks/portal/useClientTeam";
+import { useMyProfile } from "@/hooks/useMyProfile";
 import { ChannelIcon } from "@/components/calendar/channel-icon";
 import type { PortalContext } from "@/hooks/portal/useClientPortalContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,8 +29,11 @@ export default function ClientHome() {
   const { data: pending = [] } = usePendingApprovals(client.id);
   const { data: upcoming = [] } = useApprovalsByStatus(client.id, ["approved", "scheduled"]);
   const { data: team = [] } = useClientTeam(client.workspace_id);
+  const { data: profile } = useMyProfile();
 
   const firstName =
+    profile?.first_name ||
+    profile?.full_name?.split(" ")[0] ||
     (user?.user_metadata?.first_name as string | undefined) ||
     (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ||
     user?.email?.split("@")[0] ||

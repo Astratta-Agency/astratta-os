@@ -202,6 +202,7 @@ export function useUpdateTask() {
     onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["task", vars.id] });
+      qc.invalidateQueries({ queryKey: ["task-activity", vars.id] });
       qc.invalidateQueries({ queryKey: ["subtask-counts"] });
       if (data?.parent_task_id) {
         qc.invalidateQueries({ queryKey: ["subtasks", data.parent_task_id] });
@@ -503,6 +504,36 @@ export async function getAttachmentSignedUrl(path: string) {
     .createSignedUrl(path, 3600);
   if (error) throw error;
   return data.signedUrl;
+}
+
+// ---------------- Activity (timeline) ----------------
+
+export type TaskActivityEntry = {
+  id: string;
+  task_id: string;
+  workspace_id: string;
+  actor_id: string | null;
+  action: "created" | "field_changed";
+  field: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+};
+
+export function useTaskActivity(taskId: string | null | undefined) {
+  return useQuery<TaskActivityEntry[]>({
+    queryKey: ["task-activity", taskId],
+    enabled: !!taskId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("task_activity")
+        .select("*")
+        .eq("task_id", taskId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as TaskActivityEntry[];
+    },
+  });
 }
 
 // ---------------- Recurrence rules ----------------

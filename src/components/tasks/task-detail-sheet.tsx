@@ -28,6 +28,7 @@ import { TaskComments } from "./task-comments";
 import { TaskAttachments } from "./task-attachments";
 import { TaskTimer } from "./task-timer";
 import { TaskSubtasks } from "./task-subtasks";
+import { TaskActivity } from "./task-activity";
 
 interface Props {
   taskId: string | null;
@@ -170,6 +171,14 @@ export function TaskDetailSheet({
             <TaskAttachments taskId={task.id} workspaceId={workspaceId} />
             <Separator />
             <TaskComments taskId={task.id} members={members} />
+            <Separator />
+            <TaskActivity
+              taskId={task.id}
+              members={members}
+              clients={clients}
+              projects={projects}
+              leads={leads}
+            />
           </div>
         )}
 

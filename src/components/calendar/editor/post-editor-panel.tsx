@@ -21,6 +21,7 @@ import { StateChangeDropdown } from "./state-change-dropdown";
 import { PostSubmitForApprovalButton } from "./post-submit-for-approval-button";
 import { SubmitForApprovalDialog } from "./submit-for-approval-dialog";
 import { PostSubtasksChecklist } from "./post-subtasks-checklist";
+import { ApprovalHistorySection } from "@/components/shared/approval-history-section";
 import { VerbalApproveButton } from "./verbal-approve-dialog";
 
 import { useSearchParams } from "react-router-dom";
@@ -495,6 +496,8 @@ export function PostEditorPanel({
                   workspaceId={workspaceId}
                   postStatus={post.status}
                 />
+
+                <ApprovalHistorySection postId={post.id} />
 
               </div>
 

@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { ChannelIcon } from "@/components/calendar/channel-icon";
 import { ApprovalActions } from "./approval-actions";
+import { ApprovalHistorySection } from "@/components/shared/approval-history-section";
 import type { ApprovalPost } from "@/hooks/portal/usePendingApprovals";
 import { CHANNEL_LABEL } from "@/lib/post-states";
 import { cn } from "@/lib/utils";
@@ -110,6 +111,16 @@ export function ApprovalCard({ post, clientId, role, readonly }: Props) {
               </blockquote>
             )}
           </div>
+        </div>
+
+        {/* Comments / approval timeline */}
+        <div className="border-t border-border p-4">
+          <ApprovalHistorySection
+            postId={post.id}
+            title="Comentarios"
+            emptyText="Aún no hay comentarios en este post."
+            className="border-0 bg-transparent p-0"
+          />
         </div>
 
         {/* Footer */}

@@ -28,6 +28,7 @@ export function useApprovalActions(clientId: string | undefined) {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["portal-approvals", clientId] });
     qc.invalidateQueries({ queryKey: ["portal-kpis", clientId] });
+    qc.invalidateQueries({ queryKey: ["content_approval_history"] });
   };
 
   const approvePost = useMutation({

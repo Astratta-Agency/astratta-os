@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Download, FileCode, FileSpreadsheet, FileText, FileType, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/react";
 
@@ -16,6 +16,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { exportCSV, exportHTML, exportMarkdown, exportPDF } from "@/lib/document-export";
 
 import { DocumentEditor } from "@/components/documents/document-editor";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
@@ -77,6 +84,21 @@ export default function DocumentoDetalle() {
     [save],
   );
 
+  const handleExport = (format: "pdf" | "html" | "md" | "csv") => {
+    if (!doc) return;
+    const content = (doc.content as JSONContent) ?? null;
+    try {
+      if (format === "pdf") {
+        const ok = exportPDF(title || doc.title, content);
+        if (!ok) toast.error("El navegador bloqueó la ventana de impresión. Permite pop-ups para exportar a PDF.");
+      } else if (format === "html") exportHTML(title || doc.title, content);
+      else if (format === "md") exportMarkdown(title || doc.title, content);
+      else exportCSV(title || doc.title, content);
+    } catch {
+      toast.error("No se pudo exportar el documento");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-6">
@@ -107,18 +129,42 @@ export default function DocumentoDetalle() {
             Documentos
           </Link>
         </Button>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          {saving === "saving" && (
-            <>
-              <Loader2 className="h-3 w-3 animate-spin" /> Guardando…
-            </>
-          )}
-          {saving === "saved" && (
-            <>
-              <Check className="h-3 w-3" /> Guardado
-            </>
-          )}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            {saving === "saving" && (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin" /> Guardando…
+              </>
+            )}
+            {saving === "saved" && (
+              <>
+                <Check className="h-3 w-3" /> Guardado
+              </>
+            )}
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Download className="h-4 w-4" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExport("pdf")}>
+                <FileType className="mr-2 h-4 w-4" /> PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("html")}>
+                <FileCode className="mr-2 h-4 w-4" /> HTML
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("md")}>
+                <FileText className="mr-2 h-4 w-4" /> Markdown
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("csv")}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <Input

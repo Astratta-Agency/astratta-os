@@ -37,6 +37,8 @@ import ContractView from "@/pages/public/ContractView";
 import Contratos from "@/pages/app/Contratos";
 import ContratoDetalle from "@/pages/app/ContratoDetalle";
 import Calendario from "@/pages/app/Calendario";
+import Documentos from "@/pages/app/Documentos";
+import DocumentoDetalle from "@/pages/app/DocumentoDetalle";
 import Equipo from "@/pages/app/Equipo";
 import Tareas from "@/pages/app/Tareas";
 
@@ -105,6 +107,8 @@ const App = () => (
             <Route path="proyectos" element={<Proyectos />} />
             <Route path="proyectos/:id" element={<ProyectoDetalle />} />
             <Route path="calendario" element={<Calendario />} />
+            <Route path="documentos" element={<Documentos />} />
+            <Route path="documentos/:id" element={<DocumentoDetalle />} />
             <Route path="equipo" element={<Equipo />} />
             <Route path="tareas" element={<Tareas />} />
             <Route path="finanzas" element={<Finanzas />} />

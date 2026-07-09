@@ -27,6 +27,7 @@ export type ProjectTemplateTask = {
   estimated_hours: number | null;
   checklist_items: string[];
   position: number;
+  parent_id: string | null;
   created_at: string;
 };
 
@@ -102,6 +103,7 @@ export type TemplateTaskInput = {
   offset_days: number;
   estimated_hours?: number | null;
   checklist_items?: string[];
+  parent_id?: string | null;
 };
 
 export function useCreateTemplateTask() {
@@ -128,6 +130,7 @@ export function useCreateTemplateTask() {
           offset_days: input.offset_days,
           estimated_hours: input.estimated_hours ?? null,
           checklist_items: input.checklist_items ?? [],
+          parent_id: input.parent_id ?? null,
           position: nextPos,
         })
         .select("*")

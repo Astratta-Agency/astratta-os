@@ -37,12 +37,14 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   templateId: string;
   task?: ProjectTemplateTask | null;
+  /** Si se pasa, la tarea nueva se crea como subtarea de esta tarea padre. */
+  parentTask?: ProjectTemplateTask | null;
 }
 
 const TYPES: TaskType[] = ["produccion", "revision", "aprobacion", "reunion", "admin"];
 const PRIORITIES: TaskPriority[] = ["p0", "p1", "p2", "p3"];
 
-export function TemplateTaskDialog({ open, onOpenChange, templateId, task }: Props) {
+export function TemplateTaskDialog({ open, onOpenChange, templateId, task, parentTask }: Props) {
   const create = useCreateTemplateTask();
   const update = useUpdateTemplateTask();
   const editing = !!task;
@@ -95,6 +97,7 @@ export function TemplateTaskDialog({ open, onOpenChange, templateId, task }: Pro
       offset_days: Number.isFinite(parseInt(offsetDays, 10)) ? parseInt(offsetDays, 10) : 0,
       estimated_hours: estimatedHours.trim() === "" ? null : Number(estimatedHours),
       checklist_items: checklist,
+      parent_id: editing && task ? task.parent_id : (parentTask?.id ?? null),
     };
     try {
       if (editing && task) {
@@ -116,7 +119,20 @@ export function TemplateTaskDialog({ open, onOpenChange, templateId, task }: Pro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{editing ? "Editar tarea de plantilla" : "Nueva tarea de plantilla"}</DialogTitle>
+          <DialogTitle>
+            {editing
+              ? task?.parent_id
+                ? "Editar subtarea de plantilla"
+                : "Editar tarea de plantilla"
+              : parentTask
+                ? "Nueva subtarea de plantilla"
+                : "Nueva tarea de plantilla"}
+          </DialogTitle>
+          {!editing && parentTask && (
+            <p className="text-sm text-muted-foreground">
+              Subtarea de: <span className="font-medium text-foreground">{parentTask.title}</span>
+            </p>
+          )}
         </DialogHeader>
 
         <div className="space-y-4">

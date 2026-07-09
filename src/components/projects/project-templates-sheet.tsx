@@ -130,13 +130,33 @@ function TemplateEditor({ template }: { template: ProjectTemplate }) {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<ProjectTemplateTask | null>(null);
+  const [parentTask, setParentTask] = useState<ProjectTemplateTask | null>(null);
+
+  const parents = useMemo(() => tasks.filter((t) => !t.parent_id), [tasks]);
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, ProjectTemplateTask[]>();
+    for (const t of tasks) {
+      if (!t.parent_id) continue;
+      const arr = map.get(t.parent_id) ?? [];
+      arr.push(t);
+      map.set(t.parent_id, arr);
+    }
+    return map;
+  }, [tasks]);
 
   const openCreate = () => {
     setEditingTask(null);
+    setParentTask(null);
+    setDialogOpen(true);
+  };
+  const openCreateSub = (parent: ProjectTemplateTask) => {
+    setEditingTask(null);
+    setParentTask(parent);
     setDialogOpen(true);
   };
   const openEdit = (t: ProjectTemplateTask) => {
     setEditingTask(t);
+    setParentTask(null);
     setDialogOpen(true);
   };
 
@@ -164,9 +184,9 @@ function TemplateEditor({ template }: { template: ProjectTemplate }) {
     }
   };
 
-  const move = async (index: number, dir: -1 | 1) => {
-    const a = tasks[index];
-    const b = tasks[index + dir];
+  const move = async (siblings: ProjectTemplateTask[], index: number, dir: -1 | 1) => {
+    const a = siblings[index];
+    const b = siblings[index + dir];
     if (!a || !b) return;
     try {
       await reorder.mutateAsync({
@@ -266,83 +286,47 @@ function TemplateEditor({ template }: { template: ProjectTemplate }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {tasks.map((t, i) => (
-            <div key={t.id} className="rounded-md border p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium">{t.title}</p>
+          {parents.map((t, i) => {
+            const subs = childrenByParent.get(t.id) ?? [];
+            return (
+              <div key={t.id} className="rounded-md border p-3">
+                <TemplateTaskRow
+                  task={t}
+                  index={i}
+                  siblings={parents}
+                  reorderPending={reorder.isPending}
+                  onMove={(idx, dir) => move(parents, idx, dir)}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                />
+                {subs.length > 0 && (
+                  <div className="mt-2 space-y-2 border-l-2 border-muted pl-3">
+                    {subs.map((s, j) => (
+                      <div key={s.id} className="rounded-md bg-muted/40 p-2.5">
+                        <TemplateTaskRow
+                          task={s}
+                          index={j}
+                          siblings={subs}
+                          reorderPending={reorder.isPending}
+                          onMove={(idx, dir) => move(subs, idx, dir)}
+                          onEdit={openEdit}
+                          onDelete={handleDelete}
+                        />
+                      </div>
+                    ))}
                   </div>
-                  {t.description && (
-                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                      {t.description}
-                    </p>
-                  )}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <Badge variant="secondary" className="text-[10px]">
-                      {TYPE_LABEL[t.type]}
-                    </Badge>
-                    <Badge className={cn("text-[10px]", PRIORITY_CLASS[t.priority])}>
-                      {PRIORITY_LABEL[t.priority]}
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px]">
-                      +{t.offset_days} {t.offset_days === 1 ? "día" : "días"}
-                    </Badge>
-                    {t.estimated_hours != null && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <Timer className="h-3 w-3" /> {t.estimated_hours}h
-                      </span>
-                    )}
-                    {t.checklist_items.length > 0 && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                        <ListChecks className="h-3 w-3" /> {t.checklist_items.length}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex shrink-0 flex-col gap-1">
-                  <div className="flex gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      disabled={i === 0 || reorder.isPending}
-                      onClick={() => move(i, -1)}
-                    >
-                      <ArrowUp className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      disabled={i === tasks.length - 1 || reorder.isPending}
-                      onClick={() => move(i, 1)}
-                    >
-                      <ArrowDown className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() => openEdit(t)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(t)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="mt-2 h-7 px-2 text-xs text-muted-foreground"
+                  onClick={() => openCreateSub(t)}
+                >
+                  <Plus className="mr-1 h-3 w-3" /> Subtarea
+                </Button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -351,7 +335,95 @@ function TemplateEditor({ template }: { template: ProjectTemplate }) {
         onOpenChange={setDialogOpen}
         templateId={template.id}
         task={editingTask}
+        parentTask={parentTask}
       />
+    </div>
+  );
+}
+
+function TemplateTaskRow({
+  task: t,
+  index: i,
+  siblings,
+  reorderPending,
+  onMove,
+  onEdit,
+  onDelete,
+}: {
+  task: ProjectTemplateTask;
+  index: number;
+  siblings: ProjectTemplateTask[];
+  reorderPending: boolean;
+  onMove: (index: number, dir: -1 | 1) => void;
+  onEdit: (t: ProjectTemplateTask) => void;
+  onDelete: (t: ProjectTemplateTask) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-medium">{t.title}</p>
+        </div>
+        {t.description && (
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{t.description}</p>
+        )}
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary" className="text-[10px]">
+            {TYPE_LABEL[t.type]}
+          </Badge>
+          <Badge className={cn("text-[10px]", PRIORITY_CLASS[t.priority])}>
+            {PRIORITY_LABEL[t.priority]}
+          </Badge>
+          <Badge variant="outline" className="text-[10px]">
+            +{t.offset_days} {t.offset_days === 1 ? "día" : "días"}
+          </Badge>
+          {t.estimated_hours != null && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Timer className="h-3 w-3" /> {t.estimated_hours}h
+            </span>
+          )}
+          {t.checklist_items.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <ListChecks className="h-3 w-3" /> {t.checklist_items.length}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex shrink-0 flex-col gap-1">
+        <div className="flex gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            disabled={i === 0 || reorderPending}
+            onClick={() => onMove(i, -1)}
+          >
+            <ArrowUp className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            disabled={i === siblings.length - 1 || reorderPending}
+            onClick={() => onMove(i, 1)}
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <div className="flex gap-1">
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(t)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-destructive hover:text-destructive"
+            onClick={() => onDelete(t)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

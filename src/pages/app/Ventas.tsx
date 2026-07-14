@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Target, Plus, LayoutGrid, List } from "lucide-react";
+import { Target, Plus, LayoutGrid, List, Link as LinkIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
@@ -34,6 +35,17 @@ export default function Ventas() {
   const { data: members = [] } = useTeamMembers(workspaceId);
 
   const loading = wsLoading || !workspace || isLoading;
+
+  const handleCopyFormLink = async () => {
+    if (!workspace?.slug) return;
+    const url = `${window.location.origin}/leads/nuevo/${workspace.slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Link del formulario copiado", { description: url });
+    } catch {
+      toast.error("No se pudo copiar", { description: url });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -70,6 +82,10 @@ export default function Ventas() {
               Lista
             </button>
           </div>
+          <Button variant="outline" onClick={handleCopyFormLink} disabled={!workspace?.slug}>
+            <LinkIcon className="mr-2 h-4 w-4" />
+            Copiar link del formulario
+          </Button>
           <Button onClick={() => setNewOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Nuevo lead

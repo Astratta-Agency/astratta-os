@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -46,10 +47,38 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
+type WorkspaceIdentity = {
+  name: string;
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+};
+
+function useWorkspaceIdentity(slug: string | undefined) {
+  return useQuery<WorkspaceIdentity | null>({
+    queryKey: ["workspace-public-identity", slug],
+    enabled: !!slug,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_workspace_public_identity", {
+        p_slug: slug,
+      });
+      if (error) return null;
+      const row = Array.isArray(data) ? data[0] : data;
+      return (row ?? null) as WorkspaceIdentity | null;
+    },
+  });
+}
+
 export default function LeadCapture() {
   const { workspaceSlug } = useParams<{ workspaceSlug: string }>();
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const { data: identity } = useWorkspaceIdentity(workspaceSlug);
+  const brandName = identity?.name ?? "Astratta Agency";
+  const primaryColor = identity?.primary_color || "#5140f2";
+  const accentColor = identity?.secondary_color || "#ff7503";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
@@ -115,12 +144,20 @@ export default function LeadCapture() {
     >
       <div className="mx-auto w-full max-w-lg">
         <div className="mb-6 text-center">
-          <div
-            className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-white"
-            style={{ background: "#5140f2" }}
-          >
-            Astratta Agency
-          </div>
+          {identity?.logo_url ? (
+            <img
+              src={identity.logo_url}
+              alt={brandName}
+              className="mx-auto mb-3 h-12 w-auto max-w-[220px] object-contain"
+            />
+          ) : (
+            <div
+              className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-white"
+              style={{ background: primaryColor }}
+            >
+              {brandName}
+            </div>
+          )}
           <h1 className="text-2xl font-semibold text-slate-900">Hablemos de tu proyecto</h1>
           <p className="mt-1 text-sm text-slate-500">
             Contanos qué necesitás y te contactamos en menos de 24hs.
@@ -129,7 +166,7 @@ export default function LeadCapture() {
 
         {status === "success" ? (
           <div className="rounded-xl border bg-white p-8 text-center shadow-sm">
-            <CheckCircle2 className="mx-auto h-12 w-12" style={{ color: "#ff7503" }} />
+            <CheckCircle2 className="mx-auto h-12 w-12" style={{ color: accentColor }} />
             <h2 className="mt-3 text-lg font-semibold text-slate-900">¡Gracias!</h2>
             <p className="mt-1 text-sm text-slate-500">
               Recibimos tu solicitud. Alguien del equipo te va a escribir a la brevedad.
@@ -256,7 +293,7 @@ export default function LeadCapture() {
             <Button
               type="submit"
               className="w-full text-white"
-              style={{ background: "#5140f2" }}
+              style={{ background: primaryColor }}
               disabled={status === "loading"}
             >
               {status === "loading" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -264,7 +301,7 @@ export default function LeadCapture() {
             </Button>
 
             <p className="text-center text-[11px] text-slate-400">
-              Al enviar aceptás que Astratta Agency te contacte por email.
+              Al enviar aceptás que {brandName} te contacte por email.
             </p>
           </form>
         )}

@@ -217,6 +217,14 @@ export function PostEditorPanel({
     setMeta({ ...meta, channels: next });
     setActive((a) => (a === c ? next[0] ?? null : a));
     try {
+      // Order matters: deleteVariant's onSuccess invalidates the ["post", postId]
+      // query and triggers an immediate refetch, which re-hydrates `meta` from
+      // whatever `channels` is currently in the DB. Running these two mutations
+      // in parallel is a race — if deleteVariant's write/invalidate finishes
+      // first, the refetch can land before updatePost's channels write commits,
+      // and it restores the channel we just removed. Persisting `channels`
+      // first guarantees the DB is already correct by the time the refetch fires.
+      await updatePost.mutateAsync({ channels: next });
       await deleteVariant.mutateAsync(c);
     } catch (e: any) {
       toast.error("No se pudo eliminar el canal", { description: e?.message });

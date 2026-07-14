@@ -65,6 +65,8 @@ export type LeadRow = {
   expected_close_date: string | null;
   lost_reason: string | null;
   notes: string | null;
+  service_interest: string | null;
+  referral_sources: string[] | null;
   assigned_to: string | null;
   converted_client_id: string | null;
   created_by: string | null;

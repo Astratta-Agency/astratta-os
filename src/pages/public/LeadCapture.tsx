@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { CheckCircle2, Loader2 } from "lucide-react";
@@ -8,14 +8,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 
+const SERVICE_OPTIONS = [
+  "Social Media Management",
+  "Branding / Diseño",
+  "Desarrollo Web",
+  "Publicidad (Ads)",
+] as const;
+
+const REFERRAL_OPTIONS = [
+  "Instagram",
+  "Facebook",
+  "TikTok",
+  "LinkedIn",
+  "Google / Búsqueda web",
+  "Referido",
+  "Otro",
+] as const;
+
 const schema = z.object({
-  company_name: z.string().trim().min(1, "Requerido").max(255),
   contact_name: z.string().trim().min(1, "Requerido").max(255),
   contact_email: z.string().email("Email inválido").max(255),
-  contact_phone: z.string().max(50).optional(),
-  notes: z.string().max(2000).optional(),
+  contact_phone: z.string().trim().min(1, "Requerido").max(50),
+  service_interest: z.string().min(1, "Seleccioná un servicio"),
+  notes: z.string().trim().min(1, "Requerido").max(2000),
+  referral_sources: z.array(z.string()).min(1, "Seleccioná al menos una opción"),
   website_url_confirm: z.string().optional(), // honeypot
 });
 type FormValues = z.infer<typeof schema>;
@@ -28,11 +54,12 @@ export default function LeadCapture() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
     defaultValues: {
-      company_name: "",
       contact_name: "",
       contact_email: "",
       contact_phone: "",
+      service_interest: "",
       notes: "",
+      referral_sources: [],
       website_url_confirm: "",
     },
   });
@@ -59,11 +86,12 @@ export default function LeadCapture() {
       const { data, error } = await supabase.functions.invoke("capture-lead", {
         body: {
           workspace_slug: workspaceSlug,
-          company_name: values.company_name,
           contact_name: values.contact_name,
           contact_email: values.contact_email,
-          contact_phone: values.contact_phone || undefined,
-          notes: values.notes || undefined,
+          contact_phone: values.contact_phone,
+          service_interest: values.service_interest,
+          notes: values.notes,
+          referral_sources: values.referral_sources,
           honeypot: values.website_url_confirm || undefined,
           ...utm,
         },
@@ -113,33 +141,97 @@ export default function LeadCapture() {
             className="space-y-4 rounded-xl border bg-white p-6 shadow-sm"
           >
             <div>
-              <Label>Empresa *</Label>
-              <Input {...form.register("company_name")} />
-              {form.formState.errors.company_name && (
-                <p className="mt-1 text-xs text-red-600">{form.formState.errors.company_name.message}</p>
-              )}
-            </div>
-            <div>
-              <Label>Tu nombre *</Label>
+              <Label>Nombre y apellido *</Label>
               <Input {...form.register("contact_name")} />
               {form.formState.errors.contact_name && (
                 <p className="mt-1 text-xs text-red-600">{form.formState.errors.contact_name.message}</p>
               )}
             </div>
             <div>
-              <Label>Email *</Label>
+              <Label>Correo electrónico *</Label>
               <Input type="email" {...form.register("contact_email")} />
               {form.formState.errors.contact_email && (
                 <p className="mt-1 text-xs text-red-600">{form.formState.errors.contact_email.message}</p>
               )}
             </div>
             <div>
-              <Label>Teléfono</Label>
-              <Input {...form.register("contact_phone")} />
+              <Label>Número de teléfono *</Label>
+              <Input type="tel" {...form.register("contact_phone")} />
+              {form.formState.errors.contact_phone && (
+                <p className="mt-1 text-xs text-red-600">{form.formState.errors.contact_phone.message}</p>
+              )}
             </div>
             <div>
-              <Label>Contanos brevemente</Label>
-              <Textarea rows={4} {...form.register("notes")} placeholder="Qué necesitás, tiempos, etc." />
+              <Label>¿Qué servicio te interesa? *</Label>
+              <Controller
+                control={form.control}
+                name="service_interest"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccioná un servicio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_OPTIONS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {form.formState.errors.service_interest && (
+                <p className="mt-1 text-xs text-red-600">{form.formState.errors.service_interest.message}</p>
+              )}
+            </div>
+            <div>
+              <Label>Describe tu negocio *</Label>
+              <Textarea
+                rows={4}
+                {...form.register("notes")}
+                placeholder="A qué se dedica tu negocio, qué necesitás, tiempos, etc."
+              />
+              {form.formState.errors.notes && (
+                <p className="mt-1 text-xs text-red-600">{form.formState.errors.notes.message}</p>
+              )}
+            </div>
+            <div>
+              <Label>¿Cómo escuchaste de nosotros? *</Label>
+              <Controller
+                control={form.control}
+                name="referral_sources"
+                render={({ field }) => (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {REFERRAL_OPTIONS.map((option) => {
+                      const checked = field.value.includes(option);
+                      return (
+                        <label
+                          key={option}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border p-2 text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) => {
+                              field.onChange(
+                                v === true
+                                  ? [...field.value, option]
+                                  : field.value.filter((x) => x !== option),
+                              );
+                            }}
+                          />
+                          {option}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              />
+              {form.formState.errors.referral_sources && (
+                <p className="mt-1 text-xs text-red-600">
+                  {form.formState.errors.referral_sources.message as string}
+                </p>
+              )}
             </div>
 
             {/* Honeypot: hidden from real users. Bots that fill every field will fill this one and be silently dropped. */}

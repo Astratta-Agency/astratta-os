@@ -99,6 +99,7 @@ export function LeadDetailDialog({
         "expected_close_date",
         "lost_reason",
         "notes",
+        "service_interest",
         "assigned_to",
       ];
       for (const k of keys) {
@@ -255,6 +256,14 @@ export function LeadDetailDialog({
                   />
                 </div>
                 <div>
+                  <Label>Servicio de interés</Label>
+                  <Input
+                    value={form.service_interest ?? ""}
+                    disabled={!canEdit}
+                    onChange={(e) => setField("service_interest", (e.target.value || null) as any)}
+                  />
+                </div>
+                <div>
                   <Label>Asignado a</Label>
                   <Select
                     value={form.assigned_to ?? "none"}
@@ -275,6 +284,15 @@ export function LeadDetailDialog({
                   </Select>
                 </div>
               </div>
+
+              {lead.referral_sources && lead.referral_sources.length > 0 && (
+                <div>
+                  <Label>¿Cómo nos conoció?</Label>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {lead.referral_sources.join(", ")}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <Label>Notas</Label>

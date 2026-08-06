@@ -72,9 +72,9 @@ export default function ClientApprovals() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v); if (deepPostId) { params.delete("post"); setParams(params, { replace: true }); } }}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="flex w-full items-center justify-start gap-1 overflow-x-auto sm:grid sm:grid-cols-4 sm:overflow-visible">
           {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
+            <TabsTrigger key={t.value} value={t.value} className="shrink-0">
               {t.label}
               {lists[t.value]?.length > 0 && (
                 <span className="ml-2 rounded-full bg-muted px-1.5 text-[10px]">

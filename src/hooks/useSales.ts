@@ -126,12 +126,22 @@ export function useLead(leadId: string | undefined) {
 
 // ---------------- Mutations ----------------
 
+// Mirrors the `deriveSource` logic in supabase/functions/capture-lead so
+// manually-created leads and publicly-captured leads end up with the same
+// `source` classification.
+export function deriveLeadSource(referralSources: string[]): LeadSource {
+  const joined = referralSources.map((r) => r.toLowerCase()).join(" ");
+  if (joined.includes("referido")) return "referral";
+  return "organic";
+}
+
 export type NewLeadInput = {
   company_name: string;
   contact_name: string;
   contact_email: string;
-  contact_phone?: string;
-  source: LeadSource;
+  contact_phone: string;
+  service_interest: string;
+  referral_sources: string[];
   estimated_value?: number | null;
   expected_close_date?: string | null;
   notes?: string;
@@ -149,8 +159,10 @@ export function useCreateLead(workspaceId: string | undefined) {
           company_name: input.company_name,
           contact_name: input.contact_name,
           contact_email: input.contact_email,
-          contact_phone: input.contact_phone || null,
-          source: input.source,
+          contact_phone: input.contact_phone,
+          service_interest: input.service_interest,
+          referral_sources: input.referral_sources,
+          source: deriveLeadSource(input.referral_sources),
           estimated_value: input.estimated_value ?? null,
           expected_close_date: input.expected_close_date || null,
           notes: input.notes || null,

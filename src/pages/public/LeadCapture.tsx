@@ -18,23 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-
-const SERVICE_OPTIONS = [
-  "Social Media Management",
-  "Branding / Diseño",
-  "Desarrollo Web",
-  "Publicidad (Ads)",
-] as const;
-
-const REFERRAL_OPTIONS = [
-  "Instagram",
-  "Facebook",
-  "TikTok",
-  "LinkedIn",
-  "Google / Búsqueda web",
-  "Referido",
-  "Otro",
-] as const;
+import { SERVICE_OPTIONS, REFERRAL_OPTIONS } from "@/lib/lead-options";
 
 const schema = z.object({
   contact_name: z.string().trim().min(1, "Requerido").max(255),

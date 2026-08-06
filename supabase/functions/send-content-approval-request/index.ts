@@ -13,6 +13,15 @@ import { z } from "npm:zod@3.23.8";
 import { validateRequest } from "../_shared/auth.ts";
 import { escapeHtml, sendSesEmail } from "../_shared/ses.ts";
 
+// Canonical production origin for the portal. We deliberately do NOT trust
+// the request's Origin header anymore: approval emails sent while a staff
+// browser was on the old Lovable domain (or fired from the DB trigger,
+// which has no Origin header at all) were generating client-facing links
+// that pointed at astratta-os.lovable.app or were flat-out broken.
+// SITE_URL env var can still override, but anything pointing at Lovable is
+// ignored. Mirrors the fix already applied to send-portal-invite.
+const PROD_ORIGIN = "https://app.astrattaagency.com";
+
 const BodySchema = z.object({
   post_id: z.string().uuid(),
   source: z.enum(["manual", "trigger"]).default("manual"),
@@ -275,11 +284,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // --- Build portal URL + email ---
-    const originHeader = req.headers.get("origin");
-    const siteBase =
-      Deno.env.get("SITE_URL") ?? (originHeader ? new URL(originHeader).origin : "");
-    const portalUrl = `${siteBase.replace(/\/$/, "")}/portal/${client.slug}/aprobaciones/${post.id}`;
+    // --- Build portal URL + email (always the canonical production origin) ---
+    let siteBase = (Deno.env.get("SITE_URL") ?? PROD_ORIGIN).replace(/\/$/, "");
+    if (siteBase.includes("lovable")) siteBase = PROD_ORIGIN; // never send clients to the old Lovable domain
+    const portalUrl = `${siteBase}/portal/${client.slug}/aprobaciones/${post.id}`;
     const primaryColor = client.brand_primary_color || "#5140f2";
 
     const { html, text, subject } = renderEmail({

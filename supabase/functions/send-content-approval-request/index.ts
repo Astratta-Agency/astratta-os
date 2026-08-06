@@ -287,7 +287,7 @@ Deno.serve(async (req) => {
     // --- Build portal URL + email (always the canonical production origin) ---
     let siteBase = (Deno.env.get("SITE_URL") ?? PROD_ORIGIN).replace(/\/$/, "");
     if (siteBase.includes("lovable")) siteBase = PROD_ORIGIN; // never send clients to the old Lovable domain
-    const portalUrl = `${siteBase}/portal/${client.slug}/aprobaciones/${post.id}`;
+    const portalUrl = `${siteBase}/portal/${client.slug}/aprobaciones?post=${post.id}`;
     const primaryColor = client.brand_primary_color || "#5140f2";
 
     const { html, text, subject } = renderEmail({

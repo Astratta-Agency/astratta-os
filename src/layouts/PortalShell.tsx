@@ -66,7 +66,7 @@ export default function PortalShell() {
     <div className="flex min-h-screen w-full bg-background">
       <PortalSidebar client={ctx.client} pendingCount={pendingCount} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <PortalHeader client={ctx.client} />
+        <PortalHeader client={ctx.client} pendingCount={pendingCount} />
         <main className="flex-1 px-4 py-8 md:px-8">
           <div className="mx-auto w-full max-w-6xl">
             <Outlet context={ctx} />

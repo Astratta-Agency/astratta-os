@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { useOutletContext, useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import {
   endOfMonth,
   endOfWeek,
@@ -26,6 +26,7 @@ import {
   PortalCalendarFiltersBar,
   PORTAL_VISIBLE_STATUSES,
 } from "@/components/portal/calendar/portal-calendar-filters-bar";
+import { PostDetailDialog } from "@/components/portal/post-detail-dialog";
 
 const parseList = (v: string | null): string[] => (v ? v.split(",").filter(Boolean) : []);
 
@@ -34,9 +35,8 @@ const ALLOWED_VIEWS: PortalView[] = ["mes", "semana", "lista"];
 
 export default function ClientCalendar() {
   const ctx = useOutletContext<PortalContext>();
-  const { slug } = useParams();
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   const viewParam = params.get("view") as PortalView | null;
   const view: PortalView = viewParam && ALLOWED_VIEWS.includes(viewParam) ? viewParam : "mes";
@@ -108,10 +108,6 @@ export default function ClientCalendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const goToApproval = (postId: string) => {
-    navigate(`/portal/${slug}/aprobaciones?post=${postId}`);
-  };
-
   const activeFiltersCount = (channels.length ? 1 : 0) + (statuses.length ? 1 : 0);
   const clearFilters = () => update({ channels: null, status: null });
 
@@ -180,7 +176,7 @@ export default function ClientCalendar() {
           monthAnchor={anchor}
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => goToApproval(p.id)}
+          onPostClick={(p) => setSelectedPostId(p.id)}
           onCreate={noop}
           onReschedule={noop}
           readonly
@@ -190,7 +186,7 @@ export default function ClientCalendar() {
           anchor={anchor}
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => goToApproval(p.id)}
+          onPostClick={(p) => setSelectedPostId(p.id)}
           onCreate={noop}
           onReschedule={noop}
           readonly
@@ -199,12 +195,19 @@ export default function ClientCalendar() {
         <CalendarListView
           posts={posts}
           pillarMap={pillarMap}
-          onPostClick={(p) => goToApproval(p.id)}
+          onPostClick={(p) => setSelectedPostId(p.id)}
           clientName={ctx.client.name}
           rangeFrom={range.from}
           rangeTo={range.to}
         />
       )}
+
+      <PostDetailDialog
+        postId={selectedPostId}
+        clientId={ctx.client.id}
+        role={ctx.role}
+        onOpenChange={(open) => !open && setSelectedPostId(null)}
+      />
     </div>
   );
 }

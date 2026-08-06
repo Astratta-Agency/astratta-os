@@ -87,3 +87,33 @@ export function useApprovalsByStatus(clientId: string | undefined, statuses: Pos
 export function usePendingApprovals(clientId: string | undefined) {
   return useApprovalsByStatus(clientId, ["pending_approval"]);
 }
+
+/**
+ * Fetches a single post (with variants) by id, for read-only / action
+ * detail views opened outside the Aprobaciones tabs — e.g. clicking a
+ * post from the portal Calendar.
+ */
+export function usePortalPostDetail(postId: string | undefined) {
+  return useQuery<ApprovalPost | null>({
+    queryKey: ["portal-post-detail", postId],
+    enabled: !!postId,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("social_posts")
+        .select(
+          "id, workspace_id, client_id, title, type, caption, scheduled_for, status, channels, content_pillar, media_urls, hashtags, rejection_reason, approved_at, rejected_at, created_at, updated_at, post_variants(id, channel, caption, hashtags, first_comment, is_enabled)",
+        )
+        .eq("id", postId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        ...data,
+        channels: Array.isArray(data.channels) ? data.channels : [],
+        media_urls: Array.isArray(data.media_urls) ? data.media_urls : [],
+        post_variants: Array.isArray(data.post_variants) ? data.post_variants : [],
+      } as ApprovalPost;
+    },
+  });
+}

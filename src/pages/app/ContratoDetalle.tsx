@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Send,
   Trash2,
+  Download,
   X,
   MoveUp,
   MoveDown,
@@ -65,10 +66,12 @@ import {
   formatVarPrice,
   type ContractBlock,
   type ContractRow,
+  type ContractSignatureRow,
 } from "@/hooks/useContracts";
 
 import { SignaturePad, type SignaturePadHandle } from "@/components/sales/proposals/signature-pad";
 import { supabase } from "@/integrations/supabase/client";
+import { exportContractPDF } from "@/lib/contract-pdf";
 
 export default function ContratoDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -135,6 +138,9 @@ export default function ContratoDetalle() {
         <ContractActions
           contract={contract}
           hasClientSig={!!clientSig}
+          clientSig={clientSig}
+          agencySig={agencySig}
+          clientName={clientName}
           publicUrl={publicUrl}
           onCountersign={() => setCountersignOpen(true)}
           onCancel={() => setConfirmCancel(true)}
@@ -222,6 +228,9 @@ function CancelContractFooter({ id, onDone }: { id: string; onDone: () => void }
 function ContractActions({
   contract,
   hasClientSig,
+  clientSig,
+  agencySig,
+  clientName,
   publicUrl,
   onCountersign,
   onCancel,
@@ -229,6 +238,9 @@ function ContractActions({
 }: {
   contract: ContractRow;
   hasClientSig: boolean;
+  clientSig: ContractSignatureRow | null;
+  agencySig: ContractSignatureRow | null;
+  clientName: string;
   publicUrl: string;
   onCountersign: () => void;
   onCancel: () => void;
@@ -253,6 +265,17 @@ function ContractActions({
       {(contract.status === "sent" || contract.status === "signed_by_client" || contract.status === "countersigned" || contract.status === "active") && (
         <Button variant="outline" size="sm" onClick={copyLink}>
           <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar link
+        </Button>
+      )}
+      {clientSig && agencySig && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            exportContractPDF({ contract, clientName, clientSig, agencySig })
+          }
+        >
+          <Download className="mr-1.5 h-3.5 w-3.5" /> Descargar PDF
         </Button>
       )}
       {contract.status === "sent" && (

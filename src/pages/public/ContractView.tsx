@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { format } from "date-fns";
-import { CheckCircle2, Clock, Loader2, ShieldCheck, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Download, Loader2, ShieldCheck, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
   type ContractBlock,
 } from "@/hooks/useContracts";
 import { SignaturePad, type SignaturePadHandle } from "@/components/sales/proposals/signature-pad";
+import { exportContractPDF } from "@/lib/contract-pdf";
 
 const BRAND_PRIMARY = "#5140f2";
 const BRAND_SECONDARY = "#ff7503";
@@ -134,6 +135,24 @@ export default function ContractView() {
             {clientSig && <SignatureCard title="Firma del cliente" sig={clientSig} />}
             {agencySig && <SignatureCard title="Firma de la agencia" sig={agencySig} />}
           </section>
+        )}
+
+        {clientSig && agencySig && (
+          <div className="mt-4 flex justify-center">
+            <Button
+              variant="outline"
+              onClick={() =>
+                exportContractPDF({
+                  contract,
+                  clientName: client?.name ?? null,
+                  clientSig,
+                  agencySig,
+                })
+              }
+            >
+              <Download className="mr-1.5 h-4 w-4" /> Descargar PDF
+            </Button>
+          </div>
         )}
 
         {canSign && (

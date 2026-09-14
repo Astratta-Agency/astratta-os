@@ -34,7 +34,7 @@ import {
   PROJECT_TYPE_LABEL,
   PROJECT_TYPES,
 } from "@/components/projects/project-meta";
-import type { ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectType } from "@/integrations/supabase/enums";
 
 const REVENUE_COLOR = "#5140f2";
 const EXPENSE_COLOR = "#ff7503";

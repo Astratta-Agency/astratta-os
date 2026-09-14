@@ -30,7 +30,7 @@ import {
   PROJECT_TYPE_LABEL,
 } from "@/components/projects/project-meta";
 import { PRIORITY_CLASS, PRIORITY_LABEL, TYPE_LABEL } from "@/lib/task-labels";
-import type { ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectType } from "@/integrations/supabase/enums";
 import {
   useDeleteTemplateTask,
   useProjectTemplateTasks,

@@ -30,7 +30,7 @@ import {
   type ProjectTimelineFilter,
 } from "@/hooks/useProjectDetail";
 import { PROJECT_STATUS_LABEL } from "@/components/projects/project-meta";
-import type { ProjectStatus } from "@/integrations/supabase/database.types";
+import type { ProjectStatus } from "@/integrations/supabase/enums";
 
 const iconFor = (t: ProjectTimelineEvent["event_type"]) => {
   switch (t) {

@@ -67,7 +67,7 @@ export function NewClientDialog({ open, onOpenChange, workspaceId }: Props) {
       name: "",
       industry: "",
       website: "",
-      location: "Dallas-Fort Worth, TX",
+      location: "",
       status: "prospect",
       brand_primary_color: "#5140f2",
       brand_secondary_color: "#ff7503",

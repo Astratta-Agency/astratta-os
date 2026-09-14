@@ -255,10 +255,24 @@ function ContractActions({
           <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar link
         </Button>
       )}
+      {contract.status === "sent" && (
+        <Button variant="outline" size="sm" onClick={async () => {
+          try {
+            const result = await send.mutateAsync(contract.id);
+            const count = result.sent ?? 1;
+            toast.success(`Contrato reenviado a ${count} ${count === 1 ? "destinatario" : "destinatarios"}`);
+          } catch (e: any) { toast.error(e?.message ?? "No se pudo reenviar"); }
+        }}>
+          <Send className="mr-1.5 h-3.5 w-3.5" /> Reenviar por correo
+        </Button>
+      )}
       {contract.status === "draft" && (
         <Button size="sm" onClick={async () => {
-          try { await send.mutateAsync(contract.id); toast.success("Contrato enviado"); }
-          catch (e: any) { toast.error(e?.message ?? "No se pudo enviar"); }
+          try {
+            const result = await send.mutateAsync(contract.id);
+            const count = result.sent ?? 1;
+            toast.success(`Contrato enviado por correo a ${count} ${count === 1 ? "destinatario" : "destinatarios"}`);
+          } catch (e: any) { toast.error(e?.message ?? "No se pudo enviar"); }
         }}>
           <Send className="mr-1.5 h-3.5 w-3.5" /> Enviar
         </Button>

@@ -43,7 +43,7 @@ import {
   type ServicePriceType,
 } from "@/hooks/useWorkspaceSettings";
 import { PROJECT_TYPES, PROJECT_TYPE_LABEL } from "@/components/projects/project-meta";
-import type { ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectType } from "@/integrations/supabase/enums";
 import { formatMoney } from "@/lib/money";
 
 interface Props {

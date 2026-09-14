@@ -24,7 +24,7 @@ import {
   PROJECT_TYPES,
   PROJECT_TYPE_LABEL,
 } from "@/components/projects/project-meta";
-import type { ProjectStatus, ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectStatus, ProjectType } from "@/integrations/supabase/enums";
 
 export type View = "lista" | "kanban" | "calendario" | "gantt";
 

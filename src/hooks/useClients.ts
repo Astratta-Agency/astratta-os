@@ -51,7 +51,7 @@ export function useClients(workspaceId: string | undefined, filters: ClientsFilt
       if (filters.search?.trim()) q = q.ilike("name", `%${filters.search.trim()}%`);
       if (filters.status && filters.status !== "all") q = q.eq("status", filters.status);
       if (filters.industry && filters.industry !== "all") q = q.eq("industry", filters.industry);
-      if (filters.location && filters.location !== "all") q = q.eq("location", filters.location);
+      if (filters.location?.trim()) q = q.ilike("location", `%${filters.location.trim()}%`);
 
       const { data, error } = await q;
       if (error) throw error;

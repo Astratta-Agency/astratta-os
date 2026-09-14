@@ -382,16 +382,37 @@ export function useUpdateContract() {
   });
 }
 
+export type SendContractResult = {
+  emailed: boolean;
+  sent?: number;
+  failed?: number;
+  isResend?: boolean;
+  contractUrl?: string;
+  recipientEmails?: string[];
+  error?: string;
+};
+
+const SEND_CONTRACT_ERROR_LABEL: Record<string, string> = {
+  no_recipients: "El cliente no tiene un contacto con acceso al portal para recibir el correo",
+  resend_api_key_missing: "Falta configurar el envío de correos",
+  invalid_status_for_send: "El contrato ya no está en un estado que se pueda enviar",
+  all_sends_failed: "No se pudo entregar el correo",
+};
+
 export function useSendContract() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await (supabase as any)
-        .from("contracts")
-        .update({ status: "sent", sent_at: new Date().toISOString() })
-        .eq("id", id)
-        .eq("status", "draft");
+    mutationFn: async (id: string): Promise<SendContractResult> => {
+      const { data, error } = await supabase.functions.invoke("send-contract", {
+        body: { contract_id: id },
+      });
       if (error) throw error;
+      const result = data as SendContractResult;
+      if (!result?.emailed) {
+        const label = result?.error ? SEND_CONTRACT_ERROR_LABEL[result.error] : undefined;
+        throw new Error(label ?? result?.error ?? "No se pudo enviar el contrato por correo");
+      }
+      return result;
     },
     onSuccess: (_r, id) => {
       qc.invalidateQueries({ queryKey: ["contract", id] });

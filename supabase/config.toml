@@ -1,10 +1,28 @@
 project_id = "601312f6-accf-461c-ab0d-cfc12d476bfe"
 
-[functions.send-portal-invite]
-verify_jwt = false
+# ---------------------------------------------------------------------------
+# Edge function JWT settings.
+#
+# These mirror what is ACTUALLY deployed in production (project
+# vdnblnrwkkychxzbixam), captured 2026-08-08. Every deployed function is
+# listed explicitly — including the ones that use the `true` default — so a
+# redeploy from this repo can never silently flip a function's auth mode.
+#
+# `verify_jwt = false` does NOT mean "unauthenticated". Several of these
+# validate the caller themselves in the function body:
+#   - send-portal-invite / send-team-invite: validateRequest() + workspace
+#     membership check before doing anything.
+#   - send-content-approval-request: JWT or the x-internal-secret used by the
+#     DB trigger.
+#   - stripe-webhook: authenticated by Stripe-Signature, not by Supabase.
+#   - google-calendar-sync-cycle: authenticated by the X-Sync-Secret header.
+#   - google-calendar-oauth-callback: hits Google's redirect, verified via a
+#     signed `state` parameter.
+# The genuinely public ones are capture-lead, get/sign-proposal,
+# get/sign-contract and subscribe-newsletter — all token- or captcha-gated.
+# ---------------------------------------------------------------------------
 
-[functions.send-content-approval-request]
-verify_jwt = false
+# --- Public endpoints (token, captcha or signature gated) ---
 
 [functions.capture-lead]
 verify_jwt = false
@@ -14,3 +32,48 @@ verify_jwt = false
 
 [functions.sign-proposal]
 verify_jwt = false
+
+[functions.get-contract]
+verify_jwt = false
+
+[functions.sign-contract]
+verify_jwt = false
+
+[functions.subscribe-newsletter]
+verify_jwt = false
+
+# --- Self-authenticating (validate the caller in the function body) ---
+
+[functions.send-portal-invite]
+verify_jwt = false
+
+[functions.send-team-invite]
+verify_jwt = false
+
+[functions.send-content-approval-request]
+verify_jwt = false
+
+# --- Authenticated by a third party, not by Supabase ---
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.google-calendar-oauth-callback]
+verify_jwt = false
+
+[functions.google-calendar-sync-cycle]
+verify_jwt = false
+
+# --- Standard Supabase JWT verification ---
+
+[functions.ping]
+verify_jwt = true
+
+[functions.create-stripe-invoice]
+verify_jwt = true
+
+[functions.google-calendar-oauth-start]
+verify_jwt = true
+
+[functions.google-calendar-disconnect]
+verify_jwt = true

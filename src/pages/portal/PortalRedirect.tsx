@@ -23,12 +23,6 @@ export default function PortalRedirect() {
           <p className="mt-2 text-sm text-muted-foreground">
             Pídele a tu agencia que te envíe una invitación.
           </p>
-          <a
-            href="mailto:hola@astrattaagency.com"
-            className="mt-4 inline-block text-sm font-semibold text-primary hover:underline"
-          >
-            Contactar soporte
-          </a>
         </div>
       </div>
     );

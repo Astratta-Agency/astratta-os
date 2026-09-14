@@ -1,7 +1,7 @@
 import { Globe, Instagram, Target, Palette, Sparkles, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PROJECT_TYPES, PROJECT_TYPE_LABEL } from "@/components/projects/project-meta";
-import type { ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectType } from "@/integrations/supabase/enums";
 
 const ICONS: Record<ProjectType, React.ComponentType<{ className?: string }>> = {
   web_dev: Globe,

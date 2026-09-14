@@ -1,5 +1,4 @@
 -- Plantilla de reporte v2 (basada en el reporte 180° Med Spa, jul 2026)
--- Aplicada en producción el 2026-07-06 vía MCP (apply_migration: client_reports_template_v2_sections)
 alter table public.client_reports
   add column if not exists hero_stats jsonb not null default '[]'::jsonb,
   add column if not exists platform_kpis jsonb not null default '[]'::jsonb,

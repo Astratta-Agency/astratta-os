@@ -6,7 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
 import { validateRequest } from "../_shared/auth.ts";
-import { escapeHtml, sendSesEmail } from "../_shared/ses.ts";
+import { escapeHtml, sendResendEmail } from "../_shared/resend.ts";
 
 const BodySchema = z.object({
   workspace_id: z.string().uuid(),
@@ -32,8 +32,8 @@ function renderEmail(args: {
 }): { html: string; text: string; subject: string } {
   const { workspaceName, actionUrl, recipientEmail, isNewAccount } = args;
   const primaryColor = "#5140f2";
-  const subject = `Te invitamos al equipo de Astratta OS`;
-  const ctaLabel = isNewAccount ? "Crear mi contraseña y acceder" : "Acceder a Astratta OS";
+  const subject = `Te invitamos al equipo de ${workspaceName}`;
+  const ctaLabel = isNewAccount ? "Crear mi contraseña y acceder" : "Acceder al workspace";
 
   const html = `<!doctype html>
 <html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /></head>
@@ -43,8 +43,8 @@ function renderEmail(args: {
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
         <tr><td style="height:60px;background:${primaryColor};"></td></tr>
         <tr><td style="padding:32px 40px;">
-          <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;text-align:center;color:#0f172a;">Te invitamos al equipo de Astratta OS</h1>
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">Fuiste invitado a colaborar en <strong>${escapeHtml(workspaceName)}</strong>. Desde Astratta OS vas a poder gestionar clientes, proyectos, contenido y tu tiempo de trabajo.</p>
+          <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;text-align:center;color:#0f172a;">Te invitamos al equipo de ${escapeHtml(workspaceName)}</h1>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">Fuiste invitado a colaborar en <strong>${escapeHtml(workspaceName)}</strong>. Vas a poder gestionar clientes, proyectos, contenido y tu tiempo de trabajo.</p>
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:28px auto;">
             <tr><td style="border-radius:8px;background:${primaryColor};">
               <a href="${escapeHtml(actionUrl)}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:8px;">${ctaLabel}</a>
@@ -53,7 +53,7 @@ function renderEmail(args: {
           <p style="margin:24px 0 0;font-size:13px;color:#64748b;text-align:center;">Inicia sesión con tu correo: <strong>${escapeHtml(recipientEmail)}</strong></p>
         </td></tr>
         <tr><td style="padding:20px 40px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:12px;color:#94a3b8;">
-          Powered by <strong style="color:#475569;">Astratta Agency</strong> · astrattaagency.com
+          Powered by <strong style="color:#475569;">Astratta OS</strong>
         </td></tr>
       </table>
     </td></tr>
@@ -61,14 +61,14 @@ function renderEmail(args: {
 </body></html>`;
 
   const text = [
-    `Te invitamos al equipo de Astratta OS`,
+    `Te invitamos al equipo de ${workspaceName}`,
     ``,
     `Fuiste invitado a colaborar en ${workspaceName}.`,
     ``,
     `${ctaLabel}: ${actionUrl}`,
     `Inicia sesión con tu correo: ${recipientEmail}`,
     ``,
-    `— Astratta Agency · astrattaagency.com`,
+    `— Astratta OS`,
   ].join("\n");
 
   return { html, text, subject };
@@ -90,13 +90,14 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Verify caller is owner
+    // Verify caller is an active owner
     const { data: ownerMembership } = await admin
       .from("workspace_members")
       .select("user_id, role")
       .eq("workspace_id", workspace_id)
       .eq("user_id", userId)
       .eq("role", "owner")
+      .eq("status", "active")
       .maybeSingle();
     if (!ownerMembership) return json({ error: "forbidden" }, 403);
 
@@ -186,20 +187,17 @@ Deno.serve(async (req) => {
       isNewAccount,
     });
 
-    const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID");
-    const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const fromEmail = Deno.env.get("FROM_EMAIL") ?? "invites@astrattaagency.com";
     const replyTo = Deno.env.get("REPLY_TO_EMAIL") ?? "hello@astrattaagency.com";
 
-    if (!accessKeyId || !secretAccessKey) {
-      console.error("[send-team-invite] missing AWS credentials");
-      return json({ emailed: false, error: "aws_credentials_missing", actionUrl }, 200);
+    if (!resendApiKey) {
+      console.error("[send-team-invite] missing Resend API key");
+      return json({ emailed: false, error: "resend_api_key_missing", actionUrl }, 200);
     }
 
-    const sesResult = await sendSesEmail({
-      region: Deno.env.get("AWS_REGION") ?? "us-east-1",
-      accessKeyId,
-      secretAccessKey,
+    const emailResult = await sendResendEmail({
+      apiKey: resendApiKey,
       fromEmail: `Astratta <${fromEmail}>`,
       replyTo,
       toAddresses: [normalizedEmail],
@@ -208,11 +206,11 @@ Deno.serve(async (req) => {
       text,
     });
 
-    if (!sesResult.ok) {
-      console.error("[send-team-invite] SES error", sesResult.status, sesResult.error);
-      return json({ emailed: false, error: `ses_${sesResult.status}`, detail: sesResult.error, actionUrl }, 200);
+    if (!emailResult.ok) {
+      console.error("[send-team-invite] Resend error", emailResult.status, emailResult.error);
+      return json({ emailed: false, error: `resend_${emailResult.status}`, detail: emailResult.error, actionUrl }, 200);
     }
-    return json({ emailed: true, messageId: sesResult.messageId, isNewAccount });
+    return json({ emailed: true, messageId: emailResult.messageId, isNewAccount });
   } catch (e) {
     console.error("[send-team-invite] unexpected", e);
     return json({ emailed: false, error: "unexpected", detail: String(e) }, 200);

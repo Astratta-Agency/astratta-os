@@ -43,7 +43,7 @@ import {
 } from "@/components/projects/project-meta";
 import type { ProjectRow } from "@/hooks/useProjects";
 import type { WorkspaceMember } from "@/hooks/useProjects";
-import type { ProjectStatus } from "@/integrations/supabase/database.types";
+import type { ProjectStatus } from "@/integrations/supabase/enums";
 
 type SortKey = "name" | "client" | "type" | "status" | "start_date" | "end_date";
 

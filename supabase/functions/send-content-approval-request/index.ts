@@ -1,6 +1,6 @@
 // Edge Function: send-content-approval-request
 // Notifies all active client_admin users of a client when a social_posts row
-// enters status='pending_approval'. Sends one branded SES v2 email per
+// enters status='pending_approval'. Sends one branded Resend email per
 // recipient (privacy-preserving) and writes an audit row to
 // content_approval_history. Triggered either manually from the UI (JWT auth)
 // or automatically by a DB trigger (x-internal-secret header).
@@ -11,7 +11,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
 import { validateRequest } from "../_shared/auth.ts";
-import { escapeHtml, sendSesEmail } from "../_shared/ses.ts";
+import { escapeHtml, sendResendEmail } from "../_shared/resend.ts";
 
 // Canonical production origin for the portal. We deliberately do NOT trust
 // the request's Origin header anymore: approval emails sent while a staff
@@ -54,6 +54,8 @@ function formatScheduledEs(iso: string | null): string {
 
 function renderEmail(args: {
   clientName: string;
+  workspaceName: string;
+  workspaceWebsite: string | null;
   primaryColor: string;
   logoUrl: string | null;
   post: {
@@ -65,8 +67,10 @@ function renderEmail(args: {
   };
   portalUrl: string;
 }): { html: string; text: string; subject: string } {
-  const { clientName, primaryColor, logoUrl, post, portalUrl } = args;
+  const { clientName, workspaceName, workspaceWebsite, primaryColor, logoUrl, post, portalUrl } = args;
   const safeClient = escapeHtml(clientName);
+  const safeWorkspaceName = escapeHtml(workspaceName);
+  const footerHost = workspaceWebsite ? workspaceWebsite.replace(/^https?:\/\//, "").replace(/\/$/, "") : null;
   const safeTitle = escapeHtml(post.title);
   const safeType = escapeHtml(post.type.replace(/_/g, " "));
   const captionPreview = post.caption
@@ -97,7 +101,7 @@ function renderEmail(args: {
         <tr><td style="padding:32px 40px;">
           ${logoBlock}
           <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;text-align:center;color:#0f172a;">Nuevo contenido para aprobar</h1>
-          <p style="margin:0 0 24px;font-size:14px;color:#64748b;text-align:center;">Tu equipo en Astratta dejó listo un contenido para ${safeClient}.</p>
+          <p style="margin:0 0 24px;font-size:14px;color:#64748b;text-align:center;">Tu equipo en ${safeWorkspaceName} dejó listo un contenido para ${safeClient}.</p>
           ${previewBlock}
           <div style="border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:0 0 8px;">
             <div style="display:inline-block;padding:2px 10px;border-radius:999px;background:${primaryColor};color:#ffffff;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">${safeType}</div>
@@ -113,7 +117,7 @@ function renderEmail(args: {
           <p style="margin:16px 0 0;font-size:13px;color:#64748b;text-align:center;">También podés solicitar cambios o rechazar el contenido desde el portal.</p>
         </td></tr>
         <tr><td style="padding:20px 40px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:12px;color:#94a3b8;">
-          Powered by <strong style="color:#475569;">Astratta Agency</strong> · astrattaagency.com
+          Powered by <strong style="color:#475569;">${safeWorkspaceName}</strong>${footerHost ? ` · ${escapeHtml(footerHost)}` : ""}
         </td></tr>
       </table>
     </td></tr>
@@ -130,7 +134,7 @@ function renderEmail(args: {
     "",
     `Revisar y aprobar: ${portalUrl}`,
     "",
-    "— Astratta Agency · astrattaagency.com",
+    `— ${workspaceName}${footerHost ? ` · ${footerHost}` : ""}`,
   ].join("\n");
 
   return { html, text, subject };
@@ -186,6 +190,7 @@ Deno.serve(async (req) => {
         .select("user_id")
         .eq("workspace_id", post.workspace_id)
         .eq("user_id", callerUserId)
+        .eq("status", "active")
         .maybeSingle();
       if (!membership) return json({ error: "forbidden" }, 403);
     }
@@ -217,7 +222,9 @@ Deno.serve(async (req) => {
     // --- Load client ---
     const { data: client, error: clientErr } = await admin
       .from("clients")
-      .select("id, name, slug, brand_primary_color, brand_secondary_color, logo_url")
+      .select(
+        "id, name, slug, brand_primary_color, brand_secondary_color, logo_url, workspace:workspaces(name, website)",
+      )
       .eq("id", post.client_id)
       .maybeSingle();
     if (clientErr) return json({ error: "client_lookup_failed", detail: clientErr.message }, 500);
@@ -292,6 +299,8 @@ Deno.serve(async (req) => {
 
     const { html, text, subject } = renderEmail({
       clientName: client.name,
+      workspaceName: (client.workspace as any)?.name ?? "tu agencia",
+      workspaceWebsite: (client.workspace as any)?.website ?? null,
       primaryColor,
       logoUrl: client.logo_url,
       post: {
@@ -304,25 +313,21 @@ Deno.serve(async (req) => {
       portalUrl,
     });
 
-    // --- SES credentials ---
-    const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID");
-    const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
-    const region = Deno.env.get("AWS_REGION") ?? "us-east-1";
+    // --- Resend credentials ---
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const fromEmail = Deno.env.get("FROM_EMAIL") ?? "invites@astrattaagency.com";
     const replyTo = Deno.env.get("REPLY_TO_EMAIL") ?? "hello@astrattaagency.com";
 
-    if (!accessKeyId || !secretAccessKey) {
-      console.error("[send-content-approval-request] missing AWS credentials");
-      return json({ emailed: false, error: "aws_credentials_missing" }, 200);
+    if (!resendApiKey) {
+      console.error("[send-content-approval-request] missing Resend API key");
+      return json({ emailed: false, error: "resend_api_key_missing" }, 200);
     }
 
     // --- Send one email per recipient (privacy) in parallel ---
     const sendResults = await Promise.all(
       recipients.map(async (email) => {
-        const res = await sendSesEmail({
-          region,
-          accessKeyId,
-          secretAccessKey,
+        const res = await sendResendEmail({
+          apiKey: resendApiKey,
           fromEmail: `Astratta <${fromEmail}>`,
           replyTo,
           toAddresses: [email],
@@ -377,7 +382,7 @@ Deno.serve(async (req) => {
       results: sendResults.map((r) => ({
         email: r.email,
         messageId: r.ok ? r.messageId : null,
-        error: r.ok ? undefined : (r.error ?? `ses_${r.status}`),
+        error: r.ok ? undefined : (r.error ?? `resend_${r.status}`),
       })),
     });
   } catch (e) {

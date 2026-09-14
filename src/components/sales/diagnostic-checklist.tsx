@@ -22,6 +22,7 @@ import {
   type DiagnosticSection,
   type LeadRow,
 } from "@/hooks/useSales";
+import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 
 const DEFAULT_SECTIONS: DiagnosticSection[] = [
   { key: "social", title: "Presencia en redes sociales", score: null, notes: "" },
@@ -37,6 +38,13 @@ function mergeSections(saved: DiagnosticSection[]): DiagnosticSection[] {
   return DEFAULT_SECTIONS.map((d) => byKey.get(d.key) ?? d);
 }
 
+function hexToRgb(hex: string | null | undefined): [number, number, number] | null {
+  const match = hex?.trim().match(/^#?([0-9a-f]{6})$/i);
+  if (!match) return null;
+  const n = parseInt(match[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 export function DiagnosticChecklist({
   lead,
   workspaceId,
@@ -48,6 +56,7 @@ export function DiagnosticChecklist({
   const existing = diagnostics[0] as DiagnosticRow | undefined;
   const create = useCreateDiagnostic(workspaceId);
   const update = useUpdateDiagnostic();
+  const { workspace } = useActiveWorkspace();
 
   const [sections, setSections] = useState<DiagnosticSection[]>(DEFAULT_SECTIONS);
   const [overallNotes, setOverallNotes] = useState("");
@@ -100,16 +109,23 @@ export function DiagnosticChecklist({
       const pageH = doc.internal.pageSize.getHeight();
       const marginX = 48;
 
+      // Brand colors come from the workspace running this diagnostic — falls
+      // back to the platform's own default palette (same default every new
+      // workspace gets in Configuración) if this workspace hasn't customized it.
+      const [primaryR, primaryG, primaryB] = hexToRgb(workspace?.primary_color) ?? [81, 64, 242];
+      const [secondaryR, secondaryG, secondaryB] = hexToRgb(workspace?.secondary_color) ?? [255, 117, 3];
+      const agencyName = workspace?.name ?? "Diagnóstico";
+
       // Header band
-      doc.setFillColor(81, 64, 242); // #5140f2
+      doc.setFillColor(primaryR, primaryG, primaryB);
       doc.rect(0, 0, pageW, 80, "F");
-      doc.setFillColor(255, 117, 3); // #ff7503
+      doc.setFillColor(secondaryR, secondaryG, secondaryB);
       doc.rect(0, 80, pageW, 4, "F");
 
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(20);
-      doc.text("Astratta Agency", marginX, 40);
+      doc.text(agencyName, marginX, 40);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(11);
       doc.text("Diagnóstico / Auditoría", marginX, 62);
@@ -133,7 +149,7 @@ export function DiagnosticChecklist({
       doc.text(`Fecha: ${format(new Date(), "d MMM yyyy")}`, marginX, y);
       if (avg != null) {
         y += 14;
-        doc.setTextColor(81, 64, 242);
+        doc.setTextColor(primaryR, primaryG, primaryB);
         doc.setFont("helvetica", "bold");
         doc.text(`Score promedio: ${avg.toFixed(1)} / 5`, marginX, y);
       }
@@ -148,7 +164,7 @@ export function DiagnosticChecklist({
 
       for (const s of sections) {
         ensureSpace(80);
-        doc.setDrawColor(255, 117, 3);
+        doc.setDrawColor(secondaryR, secondaryG, secondaryB);
         doc.setLineWidth(2);
         doc.line(marginX, y - 4, marginX + 24, y - 4);
         doc.setTextColor(20, 20, 20);
@@ -191,12 +207,14 @@ export function DiagnosticChecklist({
         doc.setPage(p);
         doc.setFontSize(9);
         doc.setTextColor(150, 150, 150);
-        doc.text(
-          "astrattaagency.com",
-          pageW - marginX,
-          pageH - 24,
-          { align: "right" },
-        );
+        if (workspace?.website) {
+          doc.text(
+            workspace.website.replace(/^https?:\/\//, "").replace(/\/$/, ""),
+            pageW - marginX,
+            pageH - 24,
+            { align: "right" },
+          );
+        }
         doc.text(`Página ${p} de ${pageCount}`, marginX, pageH - 24);
       }
 

@@ -15,8 +15,12 @@ export function RequireAgencyAuth({ children, allowUnonboarded = false }: Props)
   const workspaceMembers = data?.workspaces;
   const ctxLoading = isLoading || (!!user?.id && (!isFetched || workspaceMembers === undefined));
 
-  // Backend not connected — let the team preview the shell
-  if (!configured) return <>{children}</>;
+  // Backend not connected — let the team preview the shell, but only in local
+  // dev. In a deployed build this means Vercel is missing the Supabase env
+  // vars; falling through to the normal session/redirect logic below fails
+  // closed (redirects to /login) instead of serving the whole workspace with
+  // no auth check.
+  if (!configured && import.meta.env.DEV) return <>{children}</>;
 
   if (loading || ctxLoading) {
     return (

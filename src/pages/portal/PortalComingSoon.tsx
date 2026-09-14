@@ -15,7 +15,7 @@ export default function PortalComingSoon({ section }: Props) {
       </div>
       <h1 className="font-display text-2xl font-bold">{section}</h1>
       <p className="mt-2 max-w-md text-sm text-muted-foreground">
-        Próximamente. Tu equipo en Astratta está trabajando en esta sección.
+        Próximamente. Tu equipo está trabajando en esta sección.
       </p>
     </div>
   );

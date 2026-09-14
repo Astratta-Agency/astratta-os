@@ -17,7 +17,7 @@ import {
   PROJECT_STATUS_ORDER,
 } from "@/components/projects/project-meta";
 import type { ProjectRow, WorkspaceMember } from "@/hooks/useProjects";
-import type { ProjectStatus } from "@/integrations/supabase/database.types";
+import type { ProjectStatus } from "@/integrations/supabase/enums";
 
 interface Props {
   rows: ProjectRow[];

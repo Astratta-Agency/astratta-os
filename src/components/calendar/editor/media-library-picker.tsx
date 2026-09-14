@@ -16,6 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaAssets, type MediaAssetRow } from "@/hooks/useMediaAssets";
 import { cn } from "@/lib/utils";
+import { MediaThumb } from "@/components/shared/media-thumb";
 
 interface Props {
   open: boolean;
@@ -127,10 +128,10 @@ export function MediaLibraryPicker({
                     {isVideo ? (
                       <video src={a.public_url} className="h-full w-full object-cover" muted />
                     ) : (
-                      <img
-                        src={a.public_url}
+                      <MediaThumb
+                        url={a.public_url}
+                        thumbnailUrl={a.thumbnail_url}
                         alt={a.file_name}
-                        loading="lazy"
                         className="h-full w-full object-cover"
                       />
                     )}

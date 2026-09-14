@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { ChannelIcon } from "./channel-icon";
 import { StateBadgePost } from "./state-badge-post";
 import type { SocialPostRow, ContentPillar } from "@/hooks/useSocialPosts";
+import { MediaThumb } from "@/components/shared/media-thumb";
 
 interface Props {
   post: SocialPostRow;
@@ -63,11 +64,9 @@ export function PostCard({ post, pillarMap, onClick, compact = true, draggable =
         </div>
         <div className="flex items-start gap-1.5">
           {post.media_urls[0] && (
-            <img
-              src={post.media_urls[0]}
-              alt=""
+            <MediaThumb
+              url={post.media_urls[0]}
               className="h-8 w-8 shrink-0 rounded object-cover"
-              loading="lazy"
             />
           )}
           <p className="line-clamp-1 flex-1 text-[11px] font-medium leading-tight">

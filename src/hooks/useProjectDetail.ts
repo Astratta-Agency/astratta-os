@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { ProjectStatus, ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectStatus, ProjectType } from "@/integrations/supabase/enums";
 
 export type ProjectDetail = {
   id: string;

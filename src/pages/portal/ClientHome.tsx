@@ -12,6 +12,7 @@ import { useMyProfile } from "@/hooks/useMyProfile";
 import { ChannelIcon } from "@/components/calendar/channel-icon";
 import type { PortalContext } from "@/hooks/portal/useClientPortalContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MediaThumb } from "@/components/shared/media-thumb";
 
 function greeting(d = new Date()) {
   const h = d.getHours();
@@ -153,7 +154,7 @@ export default function ClientHome() {
                   </span>
                 </div>
                 {p.media_urls[0] && (
-                  <img src={p.media_urls[0]} alt="" className="mb-2 aspect-square w-full rounded object-cover" loading="lazy" />
+                  <MediaThumb url={p.media_urls[0]} className="mb-2 aspect-square w-full rounded object-cover" />
                 )}
                 <p className="line-clamp-2 text-xs">{p.caption || p.title}</p>
               </div>

@@ -53,7 +53,7 @@ import { useUpdateProject, type WorkspaceMember } from "@/hooks/useProjects";
 import type {
   ProjectStatus,
   ProjectType,
-} from "@/integrations/supabase/database.types";
+} from "@/integrations/supabase/enums";
 
 const PROJECT_TYPE_VALUES = [
   "web_dev",

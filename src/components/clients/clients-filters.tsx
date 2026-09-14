@@ -22,8 +22,6 @@ export const INDUSTRIES = [
   "Otro",
 ];
 
-export const LOCATIONS = ["Dallas-Fort Worth, TX", "Houston, TX", "Austin, TX", "Otro"];
-
 export type ViewMode = "table" | "cards";
 
 interface Props {
@@ -80,20 +78,15 @@ export function ClientsFilters(p: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={p.location} onValueChange={p.onLocation}>
-          <SelectTrigger className="w-[200px]">
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Ubicación" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            {LOCATIONS.map((l) => (
-              <SelectItem key={l} value={l}>
-                {l}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="relative w-[200px]">
+          <SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Ubicación…"
+            value={p.location}
+            onChange={(e) => p.onLocation(e.target.value)}
+            className="pl-9"
+          />
+        </div>
       </div>
 
       <ToggleGroup

@@ -12,7 +12,8 @@ export function RequireClientAuth({ children }: Props) {
   const params = useParams();
   const location = useLocation();
 
-  if (!configured) return <>{children}</>;
+  // See RequireAgencyAuth for why this only bypasses in local dev.
+  if (!configured && import.meta.env.DEV) return <>{children}</>;
 
   if (loading || isLoading) {
     return (

@@ -14,6 +14,8 @@ export type MediaAssetRow = {
   file_name: string;
   storage_path: string;
   public_url: string;
+  thumbnail_path: string | null;
+  thumbnail_url: string | null;
   mime_type: string;
   size_bytes: number;
   width: number | null;
@@ -122,6 +124,8 @@ export function useUploadAsset() {
         file_name: result.fileName,
         storage_path: result.storagePath,
         public_url: result.publicUrl,
+        thumbnail_path: result.thumbnailPath,
+        thumbnail_url: result.thumbnailUrl,
         mime_type: result.mimeType,
         size_bytes: result.sizeBytes,
         width: result.width ?? null,

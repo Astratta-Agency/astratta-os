@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import type { ProjectStatus, ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectStatus, ProjectType } from "@/integrations/supabase/enums";
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   planning: "Planning",

@@ -37,7 +37,7 @@ export default function Onboarding() {
   const [step, setStep] = useState<Step>(1);
   const [agencyName, setAgencyName] = useState("");
   const [website, setWebsite] = useState("");
-  const [location, setLocation] = useState("Dallas-Fort Worth, TX");
+  const [location, setLocation] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [services, setServices] = useState<Record<string, boolean>>({

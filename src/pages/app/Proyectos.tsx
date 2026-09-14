@@ -28,7 +28,7 @@ import {
   PROJECT_STATUS_ORDER,
   PROJECT_TYPES,
 } from "@/components/projects/project-meta";
-import type { ProjectStatus, ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectStatus, ProjectType } from "@/integrations/supabase/enums";
 
 type KpiKey = "all-active" | "in_progress" | "paused" | "delivered-month" | "overdue";
 

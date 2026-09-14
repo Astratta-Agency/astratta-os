@@ -60,7 +60,7 @@ export default function LeadCapture() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const { data: identity } = useWorkspaceIdentity(workspaceSlug);
-  const brandName = identity?.name ?? "Astratta Agency";
+  const brandName = identity?.name ?? "esta agencia";
   const primaryColor = identity?.primary_color || "#5140f2";
   const accentColor = identity?.secondary_color || "#ff7503";
 
@@ -134,14 +134,14 @@ export default function LeadCapture() {
               alt={brandName}
               className="mx-auto mb-3 h-12 w-auto max-w-[220px] object-contain"
             />
-          ) : (
+          ) : identity ? (
             <div
               className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium text-white"
               style={{ background: primaryColor }}
             >
               {brandName}
             </div>
-          )}
+          ) : null}
           <h1 className="text-2xl font-semibold text-slate-900">Hablemos de tu proyecto</h1>
           <p className="mt-1 text-sm text-slate-500">
             Contanos qué necesitás y te contactamos en menos de 24hs.

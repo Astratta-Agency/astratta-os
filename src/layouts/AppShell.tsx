@@ -2,10 +2,10 @@ import { Outlet } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { TopBar } from "@/components/top-bar";
-import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
+import { ActiveWorkspaceProvider, useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { usePostStatusChanges } from "@/hooks/usePostStatusChanges";
 
-export default function AppShell() {
+function AppShellContent() {
   const { workspace } = useActiveWorkspace();
   usePostStatusChanges(workspace?.id);
 
@@ -23,5 +23,13 @@ export default function AppShell() {
         </div>
       </div>
     </SidebarProvider>
+  );
+}
+
+export default function AppShell() {
+  return (
+    <ActiveWorkspaceProvider>
+      <AppShellContent />
+    </ActiveWorkspaceProvider>
   );
 }

@@ -73,15 +73,7 @@ export default function PortalShell() {
           </div>
         </main>
         <footer className="border-t border-border px-6 py-3 text-center text-[11px] text-muted-foreground">
-          Powered by{" "}
-          <a
-            href="https://astrattaagency.com"
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold hover:underline"
-          >
-            Astratta Agency
-          </a>
+          Powered by <span className="font-semibold">Astratta OS</span>
         </footer>
       </div>
 
@@ -95,8 +87,8 @@ export default function PortalShell() {
               Bienvenida al portal de {ctx.client.name}
             </DialogTitle>
             <DialogDescription className="text-center">
-              Tu equipo en Astratta Agency te invitó a colaborar. Aquí podrás aprobar contenido,
-              ver reportes y acceder a tus documentos.
+              Tu equipo te invitó a colaborar. Aquí podrás aprobar contenido, ver reportes y
+              acceder a tus documentos.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

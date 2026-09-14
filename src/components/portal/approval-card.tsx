@@ -10,6 +10,7 @@ import { ApprovalHistorySection } from "@/components/shared/approval-history-sec
 import type { ApprovalPost } from "@/hooks/portal/usePendingApprovals";
 import { CHANNEL_LABEL } from "@/lib/post-states";
 import { cn } from "@/lib/utils";
+import { MediaThumb } from "@/components/shared/media-thumb";
 
 interface Props {
   post: ApprovalPost;
@@ -73,7 +74,7 @@ export function ApprovalCard({ post, clientId, role, readonly }: Props) {
                           i === mediaIdx ? "ring-2 ring-primary" : "border-border",
                         )}
                       >
-                        <img src={u} alt="" className="h-full w-full object-cover" />
+                        <MediaThumb url={u} className="h-full w-full object-cover" />
                       </button>
                     ))}
                   </div>

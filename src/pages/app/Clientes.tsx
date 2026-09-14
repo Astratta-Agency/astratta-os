@@ -15,7 +15,7 @@ export default function Clientes() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ClientStatus | "all">("all");
   const [industry, setIndustry] = useState<string>("all");
-  const [location, setLocation] = useState<string>("Dallas-Fort Worth, TX");
+  const [location, setLocation] = useState<string>("");
   const [view, setView] = useState<ViewMode>("table");
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -30,7 +30,7 @@ export default function Clientes() {
     search.length > 0 ||
     status !== "all" ||
     industry !== "all" ||
-    location !== "Dallas-Fort Worth, TX";
+    location.length > 0;
 
   const showEmpty = !isLoading && (clients?.length ?? 0) === 0 && !hasFilters;
 

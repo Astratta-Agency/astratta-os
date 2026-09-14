@@ -11,6 +11,10 @@ export type WorkspaceMembership = {
     slug: string;
     logo_url: string | null;
     onboarded_at: string | null;
+    primary_color: string | null;
+    secondary_color: string | null;
+    website: string | null;
+    billing_email: string | null;
   };
 };
 
@@ -45,7 +49,7 @@ export function useUserContext() {
         supabase
           .from("workspace_members")
           .select(
-            "workspace_id, role, workspace:workspaces!inner(id, name, slug, logo_url, onboarded_at)",
+            "workspace_id, role, workspace:workspaces!inner(id, name, slug, logo_url, onboarded_at, primary_color, secondary_color, website, billing_email)",
           )
           .eq("user_id", user.id)
           .eq("status", "active"),

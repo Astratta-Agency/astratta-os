@@ -48,7 +48,7 @@ export function PortalHeader({ client, pendingCount }: Props) {
         <div className="leading-tight">
           <p className="font-display text-sm font-bold text-foreground">{client.name}</p>
           <p className="text-[10px] text-muted-foreground">
-            Portal · Powered by Astratta Agency
+            Portal · Powered by Astratta OS
           </p>
         </div>
       </Link>

@@ -84,17 +84,21 @@ export function PortalNavLinks({ client, pendingCount, onNavigate }: PortalNavLi
   );
 }
 
-/** Contact-my-team footer link, also shared between desktop and mobile nav. */
+/**
+ * Contact-my-team footer, shared between desktop and mobile nav.
+ *
+ * Not a mailto link: there's no per-agency "general contact" address in the
+ * data model yet (only `workspaces.billing_email`, which isn't the right
+ * inbox for a random support question). Fase 1 (marca por agencia) should
+ * add a real contact field and turn this back into a link.
+ */
 export function PortalContactFooter() {
   return (
     <div className="border-t border-border p-3">
-      <a
-        href="mailto:hola@astrattaagency.com"
-        className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-      >
-        <Mail className="h-3.5 w-3.5" />
-        Contactar mi equipo
-      </a>
+      <div className="flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground">
+        <Mail className="h-3.5 w-3.5 shrink-0" />
+        Para dudas, contacta a tu equipo de marketing
+      </div>
     </div>
   );
 }

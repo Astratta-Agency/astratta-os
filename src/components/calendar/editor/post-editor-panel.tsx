@@ -40,6 +40,7 @@ import type { Channel, PostStatus } from "@/lib/post-states";
 import { useContentPillars } from "@/hooks/useSocialPosts";
 import type { ClientRow } from "@/hooks/useClients";
 import { isHealthcareClient } from "@/lib/client-validation";
+import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 
 interface Props {
   postId: string | null;
@@ -70,6 +71,7 @@ export function PostEditorPanel({
   const { data: post, isLoading } = usePost(postId);
   const { data: pillarOptions = [] } = useContentPillars(post?.client_id);
   const updatePost = useUpdatePost(postId);
+  const { workspace } = useActiveWorkspace();
   const upsertVariant = useUpsertVariant(postId);
   const deleteVariant = useDeleteVariant(postId);
   const deletePost = useDeletePost();
@@ -579,6 +581,7 @@ export function PostEditorPanel({
           clientId={post.client_id}
           clientSlug={clientSlug}
           clientName={clientName}
+          workspaceName={workspace?.name}
           isHealthcare={isHealthcare}
           post={{
             channels: meta.channels,

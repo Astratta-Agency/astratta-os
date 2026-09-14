@@ -36,7 +36,7 @@ export function SubmitSuccessState({
         "",
         message ?? "",
         message ? "" : null,
-        `— ${workspaceName ?? "Astratta Agency"}`,
+        `— ${workspaceName ?? "tu equipo"}`,
       ]
         .filter((l) => l !== null)
         .join("\n")

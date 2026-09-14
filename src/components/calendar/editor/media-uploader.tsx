@@ -37,6 +37,7 @@ import {
   uploadAsset as rawUploadAsset,
 } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import { MediaThumb } from "@/components/shared/media-thumb";
 
 interface Props {
   workspaceId: string;
@@ -353,12 +354,7 @@ function ThumbItem({
       {isVideo ? (
         <video src={url} className="h-full w-full rounded-md border object-cover" muted />
       ) : (
-        <img
-          src={url}
-          alt=""
-          className="h-full w-full rounded-md border object-cover"
-          onError={(e) => ((e.target as HTMLImageElement).style.opacity = "0.3")}
-        />
+        <MediaThumb url={url} className="h-full w-full rounded-md border object-cover" />
       )}
       {pending?.status === "uploading" && (
         <div className="absolute inset-x-0 bottom-0">

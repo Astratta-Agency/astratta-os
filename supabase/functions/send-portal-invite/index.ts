@@ -1,5 +1,5 @@
 // Edge Function: send-portal-invite
-// Sends a branded portal invitation email via Amazon SES v2 (SigV4 signed).
+// Sends a branded portal invitation email via Resend.
 // Also provisions (or links) the Supabase Auth account for the invited
 // email so the link in the email actually works. Handles two cases:
 //   1. Brand-new email -> createUser() provisions the account.
@@ -16,7 +16,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3.23.8";
 import { validateRequest } from "../_shared/auth.ts";
-import { escapeHtml, sendSesEmail } from "../_shared/ses.ts";
+import { escapeHtml, sendResendEmail } from "../_shared/resend.ts";
 
 const BodySchema = z.object({
   client_id: z.string().uuid(),
@@ -32,6 +32,8 @@ const json = (body: unknown, status = 200) =>
 
 function renderEmail(args: {
   clientName: string;
+  workspaceName: string;
+  workspaceWebsite: string | null;
   primaryColor: string;
   logoUrl: string | null;
   welcomeMessage: string | null;
@@ -39,11 +41,13 @@ function renderEmail(args: {
   recipientEmail: string;
   isNewAccount: boolean;
 }): { html: string; text: string; subject: string } {
-  const { clientName, primaryColor, logoUrl, welcomeMessage, actionUrl, recipientEmail, isNewAccount } = args;
+  const { clientName, workspaceName, workspaceWebsite, primaryColor, logoUrl, welcomeMessage, actionUrl, recipientEmail, isNewAccount } = args;
   const safeName = escapeHtml(clientName);
+  const safeWorkspaceName = escapeHtml(workspaceName);
   const safeMsg = welcomeMessage ? escapeHtml(welcomeMessage) : null;
-  const subject = `Te invitamos al portal de ${clientName} x Astratta`;
+  const subject = `Te invitamos al portal de ${clientName} — ${workspaceName}`;
   const ctaLabel = isNewAccount ? "Crear mi contraseña y acceder" : "Acceder al portal";
+  const footerHost = workspaceWebsite ? workspaceWebsite.replace(/^https?:\/\//, "").replace(/\/$/, "") : null;
 
   const logoBlock = logoUrl
     ? `<img src="${escapeHtml(logoUrl)}" alt="${safeName} logo" height="48" style="display:block;margin:0 auto 24px;max-height:48px;" />`
@@ -63,7 +67,7 @@ function renderEmail(args: {
         <tr><td style="padding:32px 40px;">
           ${logoBlock}
           <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;text-align:center;color:#0f172a;">Te invitamos al portal de ${safeName}</h1>
-          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">Desde tu portal vas a poder aprobar contenido, revisar reportes y acceder a los documentos que tu equipo en Astratta gestiona para ${safeName}.</p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">Desde tu portal vas a poder aprobar contenido, revisar reportes y acceder a los documentos que tu equipo en ${safeWorkspaceName} gestiona para ${safeName}.</p>
           ${msgBlock}
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:28px auto;">
             <tr><td style="border-radius:8px;background:${primaryColor};">
@@ -73,7 +77,7 @@ function renderEmail(args: {
           <p style="margin:24px 0 0;font-size:13px;color:#64748b;text-align:center;">Inicia sesión con tu correo: <strong>${escapeHtml(recipientEmail)}</strong></p>
         </td></tr>
         <tr><td style="padding:20px 40px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:12px;color:#94a3b8;">
-          Powered by <strong style="color:#475569;">Astratta Agency</strong> · astrattaagency.com
+          Powered by <strong style="color:#475569;">${safeWorkspaceName}</strong>${footerHost ? ` · ${escapeHtml(footerHost)}` : ""}
         </td></tr>
       </table>
     </td></tr>
@@ -83,12 +87,12 @@ function renderEmail(args: {
   const text = [
     `Te invitamos al portal de ${clientName}`,
     "",
-    `Desde tu portal vas a poder aprobar contenido, revisar reportes y acceder a los documentos que tu equipo en Astratta gestiona para ${clientName}.`,
+    `Desde tu portal vas a poder aprobar contenido, revisar reportes y acceder a los documentos que tu equipo en ${workspaceName} gestiona para ${clientName}.`,
     welcomeMessage ? `\n"${welcomeMessage}"\n` : "",
     `${ctaLabel}: ${actionUrl}`,
     `Inicia sesión con tu correo: ${recipientEmail}`,
     "",
-    "— Astratta Agency · astrattaagency.com",
+    `— ${workspaceName}${footerHost ? ` · ${footerHost}` : ""}`,
   ].join("\n");
 
   return { html, text, subject };
@@ -115,7 +119,9 @@ Deno.serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
     const { data: client, error: clientErr } = await admin
       .from("clients")
-      .select("id, name, slug, workspace_id, brand_primary_color, brand_secondary_color, logo_url")
+      .select(
+        "id, name, slug, workspace_id, brand_primary_color, brand_secondary_color, logo_url, workspace:workspaces(name, website)",
+      )
       .eq("id", client_id)
       .maybeSingle();
     if (clientErr) return json({ error: "client_lookup_failed", detail: clientErr.message }, 500);
@@ -126,6 +132,7 @@ Deno.serve(async (req) => {
       .select("user_id")
       .eq("workspace_id", client.workspace_id)
       .eq("user_id", userId)
+      .eq("status", "active")
       .maybeSingle();
     if (!membership) return json({ error: "forbidden" }, 403);
 
@@ -183,6 +190,8 @@ Deno.serve(async (req) => {
     const primaryColor = client.brand_primary_color || "#5140f2";
     const { html, text, subject } = renderEmail({
       clientName: client.name,
+      workspaceName: (client.workspace as any)?.name ?? "tu agencia",
+      workspaceWebsite: (client.workspace as any)?.website ?? null,
       primaryColor,
       logoUrl: client.logo_url,
       welcomeMessage: welcome_message ?? null,
@@ -191,21 +200,18 @@ Deno.serve(async (req) => {
       isNewAccount,
     });
 
-    // --- Send via SES v2 ---
-    const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID");
-    const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY");
+    // --- Send via Resend ---
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const fromEmail = Deno.env.get("FROM_EMAIL") ?? "invites@astrattaagency.com";
     const replyTo = Deno.env.get("REPLY_TO_EMAIL") ?? "hello@astrattaagency.com";
 
-    if (!accessKeyId || !secretAccessKey) {
-      console.error("[send-portal-invite] missing AWS credentials");
-      return json({ emailed: false, error: "aws_credentials_missing", actionUrl }, 200);
+    if (!resendApiKey) {
+      console.error("[send-portal-invite] missing Resend API key");
+      return json({ emailed: false, error: "resend_api_key_missing", actionUrl }, 200);
     }
 
-    const sesResult = await sendSesEmail({
-      region: Deno.env.get("AWS_REGION") ?? "us-east-1",
-      accessKeyId,
-      secretAccessKey,
+    const emailResult = await sendResendEmail({
+      apiKey: resendApiKey,
       fromEmail: `Astratta <${fromEmail}>`,
       replyTo,
       toAddresses: [email],
@@ -214,11 +220,11 @@ Deno.serve(async (req) => {
       text,
     });
 
-    if (!sesResult.ok) {
-      console.error("[send-portal-invite] SES error", sesResult.status, sesResult.error);
-      return json({ emailed: false, error: `ses_${sesResult.status}`, detail: sesResult.error, actionUrl }, 200);
+    if (!emailResult.ok) {
+      console.error("[send-portal-invite] Resend error", emailResult.status, emailResult.error);
+      return json({ emailed: false, error: `resend_${emailResult.status}`, detail: emailResult.error, actionUrl }, 200);
     }
-    return json({ emailed: true, messageId: sesResult.messageId, isNewAccount });
+    return json({ emailed: true, messageId: emailResult.messageId, isNewAccount });
   } catch (e) {
     console.error("[send-portal-invite] unexpected", e);
     return json({ emailed: false, error: "unexpected", detail: String(e) }, 200);

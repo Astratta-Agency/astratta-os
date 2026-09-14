@@ -33,7 +33,7 @@ import { ProjectTypeSelector } from "@/components/projects/project-type-selector
 import { PROJECT_TYPE_LABEL } from "@/components/projects/project-meta";
 import { useWorkspaceMembers } from "@/hooks/useProjects";
 import { supabase } from "@/integrations/supabase/client";
-import type { ProjectType } from "@/integrations/supabase/database.types";
+import type { ProjectType } from "@/integrations/supabase/enums";
 
 interface ClientOption {
   id: string;

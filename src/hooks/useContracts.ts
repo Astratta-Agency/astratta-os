@@ -393,7 +393,7 @@ export type SendContractResult = {
 };
 
 const SEND_CONTRACT_ERROR_LABEL: Record<string, string> = {
-  no_recipients: "El cliente no tiene un contacto con acceso al portal para recibir el correo",
+  no_recipients: "El cliente no tiene ningún contacto con correo guardado en su ficha",
   resend_api_key_missing: "Falta configurar el envío de correos",
   invalid_status_for_send: "El contrato ya no está en un estado que se pueda enviar",
   all_sends_failed: "No se pudo entregar el correo",

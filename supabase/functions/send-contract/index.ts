@@ -1,9 +1,9 @@
 // Edge Function: send-contract
 // Sends the client the public link to view/sign a contract via Resend, and
 // marks the contract as sent (first send: draft -> sent; already-sent
-// contracts can be resent without changing status again). Notifies all
-// active client_admin users for the contract's client, same recipient
-// resolution as send-content-approval-request.
+// contracts can be resent without changing status again). Notifies every
+// saved client_contacts row for the client (not just users invited to the
+// portal) -- a contract needs to reach whoever the agency has on file.
 //
 // Always returns HTTP 200 so the UI can fall back to manual copy-link UX.
 
@@ -143,28 +143,19 @@ Deno.serve(async (req) => {
     if (clientErr) return json({ error: "client_lookup_failed", detail: clientErr.message }, 500);
     if (!client) return json({ error: "client_not_found" }, 404);
 
-    // --- Resolve recipients: active client_admin users (same rule as send-content-approval-request) ---
-    const { data: clientUsers, error: cuErr } = await admin
-      .from("client_users")
-      .select("user_id, invited_email")
-      .eq("client_id", contract.client_id)
-      .eq("role", "client_admin")
-      .eq("status", "active");
-    if (cuErr) return json({ error: "client_users_lookup_failed", detail: cuErr.message }, 500);
-
-    const userIds = (clientUsers ?? []).map((cu) => cu.user_id).filter(Boolean) as string[];
-    const userEmails = new Map<string, string>();
-    if (userIds.length > 0) {
-      const { data: usersPage } = await admin.auth.admin.listUsers({ perPage: 200, page: 1 });
-      for (const u of usersPage?.users ?? []) {
-        if (u.email && userIds.includes(u.id)) userEmails.set(u.id, u.email);
-      }
-    }
+    // --- Resolve recipients: every saved contact for this client (not just
+    // ones invited to the portal) — contracts should reach whoever the
+    // agency has on file for that client, per business request. ---
+    const { data: contacts, error: ccErr } = await admin
+      .from("client_contacts")
+      .select("email")
+      .eq("client_id", contract.client_id);
+    if (ccErr) return json({ error: "client_contacts_lookup_failed", detail: ccErr.message }, 500);
 
     const recipients = Array.from(
       new Set(
-        (clientUsers ?? [])
-          .map((cu) => (cu.user_id ? userEmails.get(cu.user_id) : cu.invited_email))
+        (contacts ?? [])
+          .map((c) => c.email)
           .filter((e): e is string => !!e && e.includes("@"))
           .map((e) => e.toLowerCase().trim()),
       ),

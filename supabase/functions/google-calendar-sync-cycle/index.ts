@@ -12,6 +12,15 @@ const PROD_ORIGIN = "https://app.astrattaagency.com";
 let APP_URL = (Deno.env.get("SITE_URL") ?? PROD_ORIGIN).replace(/\/$/, "");
 if (APP_URL.includes("lovable")) APP_URL = PROD_ORIGIN;
 
+// Edge functions are killed at ~150s. Stop starting new work before that so a
+// run never dies between "create event in Google" and "record it in sync_map".
+const TIME_BUDGET_MS = 110_000;
+let DEADLINE = 0;
+const outOfTime = () => Date.now() > DEADLINE;
+
+// Marker present in every description we write; used to recognise our own events.
+const EVENT_MARKER = "Astratta OS —";
+
 const PRIORITY_COLOR: Record<string, string> = { p0: "11", p1: "6", p2: "5", p3: "8" };
 
 function hashOf(str: string): string {
@@ -60,6 +69,17 @@ async function getValidAccessToken(admin: any, conn: any): Promise<string> {
   return json.access_token;
 }
 
+// Deterministic Google event id (lowercase hex is valid: a-v, 0-9, 5-1024 chars).
+// Creating the same entity twice hits a 409 instead of producing a duplicate,
+// even if a previous run died before writing sync_map or two runs overlap.
+async function eventIdFor(connectionId: string, entityType: string, entityId: string): Promise<string> {
+  const buf = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(`${connectionId}:${entityType}:${entityId}`),
+  );
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // deno-lint-ignore no-explicit-any
 async function createEvent(
   admin: any,
@@ -72,23 +92,77 @@ async function createEvent(
   eventBody: any,
   hash: string,
 ) {
-  const res = await fetch(`${gcalBase}/events`, {
+  const id = await eventIdFor(connectionId, entityType, entityId);
+  const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+
+  let res = await fetch(`${gcalBase}/events`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(eventBody),
+    headers,
+    body: JSON.stringify({ ...eventBody, id }),
   });
+  if (res.status === 409) {
+    // Already exists (orphan from an earlier run, or deleted in Google): adopt/restore it.
+    res = await fetch(`${gcalBase}/events/${id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ ...eventBody, status: "confirmed" }),
+    });
+  }
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`event_create_failed:${res.status}:${t}`);
   }
-  const created = await res.json();
-  await admin.from("google_calendar_sync_map").insert({
-    connection_id: connectionId,
-    entity_type: entityType,
-    entity_id: entityId,
-    google_event_id: created.id,
-    content_hash: hash,
-  });
+
+  const { error } = await admin.from("google_calendar_sync_map").upsert(
+    {
+      connection_id: connectionId,
+      entity_type: entityType,
+      entity_id: entityId,
+      google_event_id: id,
+      content_hash: hash,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "connection_id,entity_type,entity_id" },
+  );
+  if (error) throw new Error(`sync_map_write_failed:${error.message}`);
+}
+
+// Deletes events in the dedicated calendar that carry our marker but are not in
+// sync_map (duplicates left by the old non-idempotent create). Resumable: returns
+// done=false when the time budget runs out, just call again.
+// deno-lint-ignore no-explicit-any
+async function cleanupOrphans(admin: any, gcalBase: string, accessToken: string, connectionId: string) {
+  const { data: maps } = await admin
+    .from("google_calendar_sync_map")
+    .select("google_event_id")
+    .eq("connection_id", connectionId);
+  // deno-lint-ignore no-explicit-any
+  const known = new Set((maps ?? []).map((m: any) => m.google_event_id));
+
+  let deleted = 0;
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({ singleEvents: "true", maxResults: "250" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const res = await fetch(`${gcalBase}/events?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error(`cleanup_list_failed:${res.status}`);
+    const json = await res.json();
+    // deno-lint-ignore no-explicit-any
+    for (const ev of (json.items ?? []) as any[]) {
+      if (known.has(ev.id)) continue;
+      if (!(ev.description ?? "").includes(EVENT_MARKER)) continue;
+      if (outOfTime()) return { deleted, done: false };
+      const del = await fetch(`${gcalBase}/events/${ev.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (del.ok || del.status === 410) deleted++;
+    }
+    pageToken = json.nextPageToken;
+  } while (pageToken);
+  return { deleted, done: true };
 }
 
 async function deleteEvent(gcalBase: string, accessToken: string, eventId: string) {
@@ -99,7 +173,7 @@ async function deleteEvent(gcalBase: string, accessToken: string, eventId: strin
 }
 
 // deno-lint-ignore no-explicit-any
-async function syncConnection(admin: any, conn: any) {
+async function syncConnection(admin: any, conn: any, cleanup: boolean) {
   const accessToken = await getValidAccessToken(admin, conn);
   const calId = conn.google_calendar_id as string;
   const gcalBase = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}`;
@@ -124,15 +198,16 @@ async function syncConnection(admin: any, conn: any) {
 
   // deno-lint-ignore no-explicit-any
   const taskMapByEntity = new Map((taskMaps ?? []).map((m: any) => [m.entity_id, m]));
-  const seenTaskIds = new Set<string>();
+  const seenTaskIds = new Set<string>((tasks ?? []).map((t: { id: string }) => t.id));
 
   for (const task of tasks ?? []) {
-    seenTaskIds.add(task.id);
+    if (outOfTime()) break; // remaining tasks are picked up next cycle
     const hash = hashOf(JSON.stringify({
       title: task.title,
       due_date: task.due_date,
       priority: task.priority,
       description: task.description,
+      app: APP_URL,
     }));
     const existingMap = taskMapByEntity.get(task.id) as any;
     if (existingMap && existingMap.content_hash === hash) continue;
@@ -191,15 +266,16 @@ async function syncConnection(admin: any, conn: any) {
 
   // deno-lint-ignore no-explicit-any
   const postMapByEntity = new Map((postMaps ?? []).map((m: any) => [m.entity_id, m]));
-  const seenPostIds = new Set<string>();
+  const seenPostIds = new Set<string>((posts ?? []).map((p: { id: string }) => p.id));
 
   for (const post of posts ?? []) {
-    seenPostIds.add(post.id);
+    if (outOfTime()) break; // remaining posts are picked up next cycle
     const hash = hashOf(JSON.stringify({
       title: post.title,
       scheduled_for: post.scheduled_for,
       status: post.status,
       channels: post.channels,
+      app: APP_URL,
     }));
     const existingMap = postMapByEntity.get(post.id) as any;
     if (existingMap && existingMap.content_hash === hash) continue;
@@ -334,7 +410,9 @@ async function syncConnection(admin: any, conn: any) {
     })
     .eq("id", conn.id);
 
-  return { outbound: outboundStats, inbound: inboundStats };
+  const cleanupStats = cleanup ? await cleanupOrphans(admin, gcalBase, accessToken, conn.id) : undefined;
+
+  return { outbound: outboundStats, inbound: inboundStats, cleanup: cleanupStats };
 }
 
 Deno.serve(async (req) => {
@@ -344,6 +422,11 @@ Deno.serve(async (req) => {
   if (!SYNC_SECRET || provided !== SYNC_SECRET) {
     return new Response(JSON.stringify({ error: "forbidden" }), { status: 403 });
   }
+
+  DEADLINE = Date.now() + TIME_BUDGET_MS;
+  // deno-lint-ignore no-explicit-any
+  const body: any = await req.json().catch(() => ({}));
+  const cleanup = body?.cleanup === true;
 
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -364,7 +447,7 @@ Deno.serve(async (req) => {
 
   for (const conn of connections ?? []) {
     try {
-      const result = await syncConnection(admin, conn);
+      const result = await syncConnection(admin, conn, cleanup);
       results.push({ connection_id: conn.id, ...result });
     } catch (e) {
       console.error("sync error for connection", conn.id, e);

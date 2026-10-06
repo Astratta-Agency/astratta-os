@@ -6,9 +6,12 @@
  * rendered into 32px and 48px thumbnails. Every image is now shrunk before it
  * reaches Storage, and a small thumbnail is stored next to it for grid views.
  *
- * Every helper here degrades to `null` instead of throwing: if a browser can't
- * encode WebP, or the file turns out not to be decodable, the caller uploads
- * the original untouched.
+ * WebP is preferred, but Safari cannot encode WebP from a canvas, so those
+ * browsers fall back to JPEG. Without that fallback every Safari upload went
+ * to Storage as the raw multi-megabyte PNG.
+ *
+ * Every helper here degrades to `null` instead of throwing: if the file turns
+ * out not to be decodable, the caller uploads the original untouched.
  */
 
 /** Longest edge kept for the stored original. Covers full-bleed previews. */
@@ -33,14 +36,25 @@ export type ResizedImage = {
   blob: Blob;
   width: number;
   height: number;
+  /** "image/webp", or "image/jpeg" where the browser can't encode WebP. */
+  mimeType: string;
 };
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number,
+): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}
 
 /**
  * Decode `source`, scale its longest edge down to `maxDimension` and re-encode
- * as WebP. Images already smaller than `maxDimension` are re-encoded but never
- * upscaled. Returns `null` if any step fails.
+ * as WebP (or JPEG when WebP encoding is unsupported). Images already smaller
+ * than `maxDimension` are re-encoded but never upscaled. Returns `null` if any
+ * step fails.
  */
-export async function resizeToWebp(
+export async function resizeImage(
   source: Blob,
   maxDimension: number,
   quality: number,
@@ -66,14 +80,23 @@ export async function resizeToWebp(
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, width, height);
 
-    const blob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, "image/webp", quality);
-    });
-    // Safari has historically returned a PNG when asked for an unsupported
-    // type rather than failing, so confirm we actually got WebP back.
-    if (!blob || blob.type !== "image/webp") return null;
+    // Safari returns a PNG when asked for an unsupported type rather than
+    // failing, so confirm we actually got WebP back.
+    const webp = await canvasToBlob(canvas, "image/webp", quality);
+    if (webp && webp.type === "image/webp") {
+      return { blob: webp, width, height, mimeType: "image/webp" };
+    }
 
-    return { blob, width, height };
+    // JPEG has no alpha channel and would render transparent areas black, so
+    // flatten onto white first.
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, width, height);
+    const jpeg = await canvasToBlob(canvas, "image/jpeg", quality);
+    if (jpeg && jpeg.type === "image/jpeg") {
+      return { blob: jpeg, width, height, mimeType: "image/jpeg" };
+    }
+    return null;
   } catch {
     return null;
   } finally {
@@ -88,12 +111,12 @@ export async function resizeToWebp(
  */
 export async function compressForUpload(file: File): Promise<ResizedImage | null> {
   if (!isCompressibleImage(file.type)) return null;
-  const resized = await resizeToWebp(file, MAX_IMAGE_DIMENSION, IMAGE_QUALITY);
+  const resized = await resizeImage(file, MAX_IMAGE_DIMENSION, IMAGE_QUALITY);
   if (!resized) return null;
   return resized.blob.size < file.size ? resized : null;
 }
 
 /** Build the small grid thumbnail. Always worth it, even for small sources. */
 export async function buildThumbnail(source: Blob): Promise<ResizedImage | null> {
-  return resizeToWebp(source, THUMBNAIL_DIMENSION, THUMBNAIL_QUALITY);
+  return resizeImage(source, THUMBNAIL_DIMENSION, THUMBNAIL_QUALITY);
 }

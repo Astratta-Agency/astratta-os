@@ -55,11 +55,20 @@ export function sanitizeFilename(name: string): string {
   return ext ? `${base}${ext}` : base;
 }
 
-/** Swap any extension for `.webp`. Used once an image has been re-encoded. */
-function withWebpExtension(name: string): string {
+/** Swap any extension for `ext`. Used once an image has been re-encoded. */
+function withExtension(name: string, ext: string): string {
   const dot = name.lastIndexOf(".");
-  return `${dot > 0 ? name.slice(0, dot) : name}.webp`;
+  return `${dot > 0 ? name.slice(0, dot) : name}.${ext}`;
 }
+
+function withWebpExtension(name: string): string {
+  return withExtension(name, "webp");
+}
+
+const EXTENSION_FOR_MIME: Record<string, string> = {
+  "image/webp": "webp",
+  "image/jpeg": "jpg",
+};
 
 /**
  * Storage path of the thumbnail mirroring `storagePath`, i.e.
@@ -171,11 +180,13 @@ export async function uploadAsset(opts: UploadOptions): Promise<UploadResult> {
   // videos, PDFs, animated GIFs, and images that don't get smaller.
   const compressed = await compressForUpload(file);
   const body: Blob = compressed?.blob ?? file;
-  const mimeType = compressed ? "image/webp" : file.type;
+  const mimeType = compressed ? compressed.mimeType : file.type;
 
   const segments = [workspaceId, clientId];
   if (subfolder) segments.push(subfolder);
-  const objectName = `${uid}-${compressed ? withWebpExtension(safe) : safe}`;
+  const objectName = `${uid}-${
+    compressed ? withExtension(safe, EXTENSION_FOR_MIME[compressed.mimeType]) : safe
+  }`;
   segments.push(objectName);
   const storagePath = segments.join("/");
 
@@ -190,6 +201,8 @@ export async function uploadAsset(opts: UploadOptions): Promise<UploadResult> {
 
   // Grid views render the thumbnail instead of the full image. Best-effort:
   // a missing thumbnail only costs egress, so it must never fail the upload.
+  // The path always ends in .webp so thumbnailUrlFor() can derive it from the
+  // original's URL; on Safari the bytes are JPEG and the Content-Type says so.
   let thumbnailPath: string | null = null;
   const thumbnail = await buildThumbnail(body);
   if (thumbnail) {
@@ -199,7 +212,7 @@ export async function uploadAsset(opts: UploadOptions): Promise<UploadResult> {
       .upload(candidate, thumbnail.blob, {
         cacheControl: "31536000",
         upsert: true,
-        contentType: "image/webp",
+        contentType: thumbnail.mimeType,
       });
     if (thumbError) {
       console.warn("Thumbnail upload failed for", storagePath, thumbError);

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, ShieldCheck, ShieldAlert, Check } from "lucide-react";
+import { Search, Check } from "lucide-react";
 
 import {
   Dialog,
@@ -11,8 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaAssets, type MediaAssetRow } from "@/hooks/useMediaAssets";
 import { cn } from "@/lib/utils";
@@ -22,33 +20,22 @@ interface Props {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   clientId: string;
-  isHealthcare: boolean;
   /** Currently attached URLs — used to mark already-selected items. */
   attachedUrls: string[];
   onAdd: (urls: string[]) => void;
-  /** When true, dialog opens on the "Pendientes de consentimiento" tab. */
-  initialPendingOnly?: boolean;
 }
 
 export function MediaLibraryPicker({
   open,
   onOpenChange,
   clientId,
-  isHealthcare,
   attachedUrls,
   onAdd,
-  initialPendingOnly,
 }: Props) {
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"all" | "pending">(
-    initialPendingOnly ? "pending" : "all",
-  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const { data: assets = [], isLoading } = useMediaAssets(clientId, {
-    search,
-    pendingConsentOnly: tab === "pending",
-  });
+  const { data: assets = [], isLoading } = useMediaAssets(clientId, { search });
 
   const attached = useMemo(() => new Set(attachedUrls), [attachedUrls]);
 
@@ -88,14 +75,6 @@ export function MediaLibraryPicker({
               className="pl-7"
             />
           </div>
-          {isHealthcare && (
-            <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
-              <TabsList>
-                <TabsTrigger value="all">Todos</TabsTrigger>
-                <TabsTrigger value="pending">Pendientes</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          )}
         </div>
 
         <ScrollArea className="h-[420px] rounded-md border">
@@ -103,9 +82,7 @@ export function MediaLibraryPicker({
             <p className="p-6 text-center text-sm text-muted-foreground">Cargando…</p>
           ) : assets.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
-              {tab === "pending"
-                ? "No hay assets pendientes de consentimiento."
-                : "Aún no hay medios. Sube uno desde el editor."}
+              Aún no hay medios. Sube uno desde el editor.
             </p>
           ) : (
             <div className="grid grid-cols-3 gap-2 p-2 sm:grid-cols-4 md:grid-cols-5">
@@ -143,27 +120,6 @@ export function MediaLibraryPicker({
                     {isAttached && (
                       <div className="absolute inset-x-0 bottom-0 bg-background/80 px-1 py-0.5 text-center text-[10px] backdrop-blur">
                         Ya agregado
-                      </div>
-                    )}
-                    {a.consent_required && (
-                      <div className="absolute left-1 top-1">
-                        {a.consent_signed ? (
-                          <Badge
-                            variant="outline"
-                            className="gap-0.5 border-green-500/60 bg-green-500/10 px-1 py-0 text-[9px] text-green-700 dark:text-green-300"
-                          >
-                            <ShieldCheck className="h-2.5 w-2.5" />
-                            OK
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="gap-0.5 border-destructive/60 bg-destructive/10 px-1 py-0 text-[9px] text-destructive"
-                          >
-                            <ShieldAlert className="h-2.5 w-2.5" />
-                            Falta
-                          </Badge>
-                        )}
                       </div>
                     )}
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/60 px-1 py-0.5 text-[10px] text-white opacity-0 group-hover:opacity-100">

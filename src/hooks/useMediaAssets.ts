@@ -35,13 +35,12 @@ export type MediaAssetRow = {
 export type MediaFilters = {
   search?: string;
   tags?: string[];
-  pendingConsentOnly?: boolean;
 };
 
 export function useMediaAssets(clientId: string | undefined, filters: MediaFilters = {}) {
-  const { search = "", tags = [], pendingConsentOnly = false } = filters;
+  const { search = "", tags = [] } = filters;
   return useQuery<MediaAssetRow[]>({
-    queryKey: ["media-assets", clientId, search, tags.sort().join(","), pendingConsentOnly],
+    queryKey: ["media-assets", clientId, search, tags.sort().join(",")],
     enabled: !!clientId,
     staleTime: 10_000,
     queryFn: async () => {
@@ -54,9 +53,6 @@ export function useMediaAssets(clientId: string | undefined, filters: MediaFilte
         .limit(200);
       if (search.trim()) q = q.ilike("file_name", `%${search.trim()}%`);
       if (tags.length) q = q.contains("tags", tags);
-      if (pendingConsentOnly) {
-        q = q.eq("consent_required", true).eq("consent_signed", false);
-      }
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []).map((r: any) => ({
@@ -89,7 +85,6 @@ export type UseUploadInput = {
   file: File;
   workspaceId: string;
   clientId: string;
-  consentRequired?: boolean;
   subfolder?: string;
 };
 
@@ -131,7 +126,6 @@ export function useUploadAsset() {
         width: result.width ?? null,
         height: result.height ?? null,
         duration_seconds: result.durationSeconds ?? null,
-        consent_required: !!input.consentRequired,
       };
 
       const { data, error } = await (supabase as any)

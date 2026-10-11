@@ -5,8 +5,6 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import {
   Accordion,
@@ -30,12 +28,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-import { useUploadAsset, useUpdateAsset, type MediaAssetRow } from "@/hooks/useMediaAssets";
-import {
-  MAX_FILE_BYTES,
-  ALLOWED_MIME,
-  uploadAsset as rawUploadAsset,
-} from "@/lib/storage";
+import { useUploadAsset, type MediaAssetRow } from "@/hooks/useMediaAssets";
+import { MAX_FILE_BYTES, ALLOWED_MIME } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { MediaThumb } from "@/components/shared/media-thumb";
 
@@ -45,7 +39,6 @@ interface Props {
   urls: string[];
   onChange: (urls: string[]) => void;
   postType: string;
-  isHealthcare: boolean;
   onOpenLibrary: () => void;
 }
 
@@ -67,16 +60,12 @@ export function MediaUploader({
   urls,
   onChange,
   postType,
-  isHealthcare,
   onOpenLibrary,
 }: Props) {
   const upload = useUploadAsset();
   const [pending, setPending] = useState<PendingItem[]>([]);
   const [showUrlPaste, setShowUrlPaste] = useState(false);
   const [urlDraft, setUrlDraft] = useState("");
-
-  // Track which uploaded assets in this session need a consent flow
-  const [consentAssets, setConsentAssets] = useState<MediaAssetRow[]>([]);
 
   const isCarousel = postType === "carousel";
 
@@ -108,16 +97,12 @@ export function MediaUploader({
             file,
             workspaceId,
             clientId,
-            consentRequired: isHealthcare,
           });
           setPending((p) =>
             p.map((it) => (it.id === id ? { ...it, status: "done", progress: 100, asset } : it)),
           );
           onChange([...urls, asset.public_url]);
           urls = [...urls, asset.public_url]; // keep local in sync for next loop
-          if (isHealthcare) {
-            setConsentAssets((c) => [...c, asset]);
-          }
           // Cleanup the local blob preview after a beat
           setTimeout(() => URL.revokeObjectURL(previewUrl), 1500);
         } catch (e: any) {
@@ -130,7 +115,7 @@ export function MediaUploader({
         }
       }
     },
-    [upload, workspaceId, clientId, urls, onChange, isHealthcare],
+    [upload, workspaceId, clientId, urls, onChange],
   );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
@@ -162,7 +147,6 @@ export function MediaUploader({
         file: it.file,
         workspaceId,
         clientId,
-        consentRequired: isHealthcare,
       });
       setPending((p) =>
         p.map((x) => (x.id === it.id ? { ...x, status: "done", progress: 100, asset } : x)),
@@ -295,16 +279,6 @@ export function MediaUploader({
               </div>
             ))}
         </div>
-      )}
-
-      {/* Healthcare consent flow */}
-      {isHealthcare && consentAssets.length > 0 && (
-        <ConsentForms
-          assets={consentAssets}
-          onDone={(id) => setConsentAssets((c) => c.filter((a) => a.id !== id))}
-          workspaceId={workspaceId}
-          clientId={clientId}
-        />
       )}
 
       <Accordion type="single" collapsible value={showUrlPaste ? "url" : ""} onValueChange={(v) => setShowUrlPaste(v === "url")}>
@@ -443,154 +417,6 @@ function SortableThumb({
       <span className="absolute left-1 top-1 rounded bg-background/80 px-1 text-[10px] font-semibold backdrop-blur">
         {index + 1}
       </span>
-    </div>
-  );
-}
-
-function ConsentForms({
-  assets,
-  onDone,
-  workspaceId,
-  clientId,
-}: {
-  assets: MediaAssetRow[];
-  onDone: (id: string) => void;
-  workspaceId: string;
-  clientId: string;
-}) {
-  return (
-    <div className="space-y-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
-      <p className="text-xs font-medium">
-        Las imágenes nuevas requieren consentimiento del paciente
-      </p>
-      {assets.map((a) => (
-        <ConsentRow
-          key={a.id}
-          asset={a}
-          onDone={() => onDone(a.id)}
-          workspaceId={workspaceId}
-          clientId={clientId}
-        />
-      ))}
-    </div>
-  );
-}
-
-function ConsentRow({
-  asset,
-  onDone,
-  workspaceId,
-  clientId,
-}: {
-  asset: MediaAssetRow;
-  onDone: () => void;
-  workspaceId: string;
-  clientId: string;
-}) {
-  const updateAsset = useUpdateAsset();
-  const [signed, setSigned] = useState(false);
-  const [patientRef, setPatientRef] = useState("");
-  const [treatment, setTreatment] = useState("");
-  const [consentUrl, setConsentUrl] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const onConsentFile = async (file: File) => {
-    if (file.type !== "application/pdf") {
-      toast.error("El formulario debe ser PDF");
-      return;
-    }
-    setBusy(true);
-    try {
-      const r = await rawUploadAsset({
-        file,
-        workspaceId,
-        clientId,
-        subfolder: "consents",
-      });
-      if (r.ok) {
-        setConsentUrl(r.publicUrl);
-        toast.success("Formulario subido");
-      } else {
-        toast.error("No se pudo subir el formulario");
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const save = async () => {
-    try {
-      await updateAsset.mutateAsync({
-        id: asset.id,
-        clientId: asset.client_id,
-        patch: {
-          consent_signed: signed,
-          consent_form_url: consentUrl,
-          patient_ref: patientRef || null,
-          treatment: treatment || null,
-        },
-      });
-      onDone();
-    } catch (e: any) {
-      toast.error("No se pudo guardar", { description: e?.message });
-    }
-  };
-
-  return (
-    <div className="space-y-2 rounded-md border bg-background p-2">
-      <p className="text-xs font-medium">{asset.file_name}</p>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div>
-          <Label className="text-[11px]">Ref. paciente</Label>
-          <Input
-            value={patientRef}
-            onChange={(e) => setPatientRef(e.target.value)}
-            placeholder="Iniciales o ID interno"
-            className="mt-0.5 h-8"
-          />
-        </div>
-        <div>
-          <Label className="text-[11px]">Tratamiento</Label>
-          <Input
-            value={treatment}
-            onChange={(e) => setTreatment(e.target.value)}
-            placeholder="Botox, láser..."
-            className="mt-0.5 h-8"
-          />
-        </div>
-      </div>
-      <div>
-        <Label className="text-[11px]">Formulario firmado (PDF)</Label>
-        <Input
-          type="file"
-          accept="application/pdf"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void onConsentFile(f);
-          }}
-          className="mt-0.5 h-8 text-xs"
-          disabled={busy}
-        />
-        {consentUrl && (
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            <a href={consentUrl} target="_blank" rel="noreferrer" className="underline">
-              Ver formulario subido
-            </a>
-          </p>
-        )}
-      </div>
-      <label className="flex items-center gap-2 text-xs">
-        <Checkbox checked={signed} onCheckedChange={(v) => setSigned(!!v)} />
-        Confirmo que el consentimiento está firmado
-      </label>
-      <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" size="sm" onClick={onDone}>
-          Saltar por ahora
-        </Button>
-        <Button type="button" size="sm" onClick={save} disabled={updateAsset.isPending}>
-          Guardar
-        </Button>
-      </div>
     </div>
   );
 }

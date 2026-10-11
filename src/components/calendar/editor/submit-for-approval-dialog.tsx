@@ -17,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useAssetsByUrls } from "@/hooks/useMediaAssets";
 import {
   usePostSubmitForApproval,
   PreflightFailedError,
@@ -36,7 +35,6 @@ interface Props {
   clientSlug: string;
   clientName: string;
   workspaceName?: string;
-  isHealthcare: boolean;
   post: {
     channels: Channel[];
     scheduled_for: string | null;
@@ -77,7 +75,6 @@ export function SubmitForApprovalDialog({
   clientSlug,
   clientName,
   workspaceName,
-  isHealthcare,
   post,
   variants,
 }: Props) {
@@ -85,9 +82,6 @@ export function SubmitForApprovalDialog({
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState<ApprovalSendResponse | null>(null);
 
-  const { data: mediaAssets = [], isLoading: assetsLoading } = useAssetsByUrls(
-    isHealthcare && post.media_urls.length > 0 ? post.media_urls : [],
-  );
   const { data: clientAdmins = [], isLoading: adminsLoading } = useClientAdmins(
     clientId,
     open,
@@ -107,15 +101,13 @@ export function SubmitForApprovalDialog({
       runApprovalPreflight({
         post,
         variants,
-        isHealthcare,
-        mediaAssets,
         clientAdmins,
         clientSlug,
       }),
-    [post, variants, isHealthcare, mediaAssets, clientAdmins, clientSlug],
+    [post, variants, clientAdmins, clientSlug],
   );
 
-  const loading = adminsLoading || (isHealthcare && assetsLoading);
+  const loading = adminsLoading;
   const canSubmit = preflight.ok && !loading && !submit.isPending;
 
   const recipientEmails = useMemo(() => {
@@ -137,8 +129,6 @@ export function SubmitForApprovalDialog({
         preflight: {
           post,
           variants,
-          isHealthcare,
-          mediaAssets,
           clientAdmins,
           clientSlug,
         },

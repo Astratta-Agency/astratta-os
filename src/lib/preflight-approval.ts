@@ -1,7 +1,6 @@
 import type { Channel, PostStatus } from "@/lib/post-states";
 import { CHANNEL_LABEL } from "@/lib/post-states";
 import type { PostVariantRow } from "@/hooks/usePostEditor";
-import type { MediaAssetRow } from "@/hooks/useMediaAssets";
 
 export type PreflightError = {
   code:
@@ -9,7 +8,6 @@ export type PreflightError = {
     | "missing_caption"
     | "missing_schedule"
     | "schedule_in_past"
-    | "missing_consent"
     | "no_client_admin";
   message: string;
   action?: { label: string; path: string };
@@ -23,8 +21,6 @@ export type PreflightInput = {
     status: PostStatus;
   };
   variants: PostVariantRow[];
-  isHealthcare: boolean;
-  mediaAssets: MediaAssetRow[];
   clientAdmins: { user_id: string | null; status: string }[];
   clientSlug: string;
 };
@@ -35,7 +31,7 @@ export type PreflightResult =
 
 export function runApprovalPreflight(input: PreflightInput): PreflightResult {
   const errors: PreflightError[] = [];
-  const { post, variants, isHealthcare, mediaAssets, clientAdmins, clientSlug } = input;
+  const { post, variants, clientAdmins, clientSlug } = input;
 
   // 1. Channels
   if (!post.channels || post.channels.length === 0) {
@@ -75,26 +71,7 @@ export function runApprovalPreflight(input: PreflightInput): PreflightResult {
     }
   }
 
-  // 4. Healthcare consent
-  if (isHealthcare && post.media_urls.length > 0) {
-    const byUrl = new Map(mediaAssets.map((a) => [a.public_url, a]));
-    const missing: string[] = [];
-    for (const u of post.media_urls) {
-      const a = byUrl.get(u);
-      if (a && a.consent_required && !a.consent_signed) missing.push(a.file_name);
-    }
-    if (missing.length > 0) {
-      errors.push({
-        code: "missing_consent",
-        message:
-          missing.length === 1
-            ? `Falta consentimiento firmado para "${missing[0]}"`
-            : `Faltan consentimientos firmados (${missing.length} archivos)`,
-      });
-    }
-  }
-
-  // 5. At least one client_admin
+  // 4. At least one client_admin
   const hasAdmin = (clientAdmins ?? []).some(
     (a) => a.status === "active" || a.status === "invited",
   );

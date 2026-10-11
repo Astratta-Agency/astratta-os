@@ -39,7 +39,6 @@ import {
 import type { Channel, PostStatus } from "@/lib/post-states";
 import { useContentPillars } from "@/hooks/useSocialPosts";
 import type { ClientRow } from "@/hooks/useClients";
-import { isHealthcareClient } from "@/lib/client-validation";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 
 interface Props {
@@ -86,7 +85,6 @@ export function PostEditorPanel({
   const clientSlug = (postClient as any)?.slug ?? "cliente";
   const clientLogo = postClient?.logo_url ?? null;
   const brandColor = postClient?.brand_primary_color ?? null;
-  const isHealthcare = isHealthcareClient(postClient);
 
   const [meta, setMeta] = useState<PostMeta | null>(null);
   const [drafts, setDrafts] = useState<Record<string, VariantDraft>>({});
@@ -94,7 +92,6 @@ export function PostEditorPanel({
   const [confirmClose, setConfirmClose] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryPendingOnly, setLibraryPendingOnly] = useState(false);
   const [submitOpen, setSubmitOpen] = useState(false);
 
   // Hydrate local state when post loads / changes
@@ -255,41 +252,6 @@ export function PostEditorPanel({
 
   const handleStatusChange = async (to: PostStatus) => {
     if (!post || !meta) return;
-    // Consent guard: block scheduling/publishing if any attached asset
-    // requires consent but isn't signed.
-    if ((to === "scheduled" || to === "published") && meta.media_urls.length > 0) {
-      try {
-        const { data: assets } = await (await import("@/integrations/supabase/client")).supabase
-          .from("media_assets" as any)
-          .select("file_name, public_url, consent_required, consent_signed")
-          .in("public_url", meta.media_urls);
-        const missing = ((assets ?? []) as any[]).filter(
-          (a) => a.consent_required && !a.consent_signed,
-        );
-        if (missing.length > 0) {
-          toast.error(
-            `El asset ${missing[0].file_name} no tiene consentimiento firmado`,
-            {
-
-              description:
-                missing.length > 1
-                  ? `+${missing.length - 1} más sin consentimiento`
-                  : undefined,
-              action: {
-                label: "Ver biblioteca",
-                onClick: () => {
-                  setLibraryPendingOnly(true);
-                  setLibraryOpen(true);
-                },
-              },
-            },
-          );
-          return;
-        }
-      } catch {
-        /* if the lookup fails, fall through and let the server-side check it */
-      }
-    }
     try {
       await onChangeStatus(post.id, post.status, to, post.client_id);
     } catch (e: any) {
@@ -493,11 +455,7 @@ export function PostEditorPanel({
                     urls={meta.media_urls}
                     onChange={(u) => setMeta({ ...meta, media_urls: u })}
                     postType={meta.type}
-                    isHealthcare={isHealthcare}
-                    onOpenLibrary={() => {
-                      setLibraryPendingOnly(false);
-                      setLibraryOpen(true);
-                    }}
+                    onOpenLibrary={() => setLibraryOpen(true)}
                   />
                 </div>
 
@@ -562,9 +520,7 @@ export function PostEditorPanel({
           open={libraryOpen}
           onOpenChange={setLibraryOpen}
           clientId={post.client_id}
-          isHealthcare={isHealthcare}
           attachedUrls={meta?.media_urls ?? []}
-          initialPendingOnly={libraryPendingOnly}
           onAdd={(toAdd) => {
             if (!meta) return;
             const merged = Array.from(new Set([...meta.media_urls, ...toAdd]));
@@ -582,7 +538,6 @@ export function PostEditorPanel({
           clientSlug={clientSlug}
           clientName={clientName}
           workspaceName={workspace?.name}
-          isHealthcare={isHealthcare}
           post={{
             channels: meta.channels,
             scheduled_for: meta.scheduled_for,

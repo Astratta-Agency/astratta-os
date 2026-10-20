@@ -31,6 +31,30 @@ npx supabase gen types typescript \
 
 Then the typed client at `src/integrations/supabase/client.ts` will use them automatically (it imports `Database` from `./types`).
 
+## Writing a new migration — explicit grants are required
+
+New migrations go in `supabase/migrations/` (see `docs/migrations/README.md`).
+
+Since **October 30, 2026**, Supabase no longer grants Data API access automatically to new tables in `public`. A table created without explicit grants returns `permission denied` to supabase-js, PostgREST and GraphQL, even when its RLS policies are correct. That covers the app (`src/`) and the edge functions, which use `supabase.from(...)` everywhere. Tables that existed before that date keep their grants.
+
+Every migration that runs `create table public.<name>` must, in the same file:
+
+1. Enable RLS and add its policies (as before).
+2. Grant only the privileges each role needs:
+
+```sql
+alter table public.new_table enable row level security;
+
+grant select, insert, update, delete on public.new_table to authenticated;
+grant select, insert, update, delete on public.new_table to service_role;
+-- Only if a logged-out page or the public site reads it:
+-- grant select on public.new_table to anon;
+```
+
+Keep the grants narrow: if users only read a table, grant `select` and nothing more. `client_credentials` is the example to follow, with column-level `grant update (...)` and no `insert`. Don't grant to `anon` unless the table is genuinely public. RLS remains the row-level guard; grants only decide whether a role can reach the table at all.
+
+The same applies to views and to sequences used directly by clients.
+
 ## Verification
 After applying, run the smoke tests in `docs/security-tests.sql` and check:
 - Every table has RLS enabled (Supabase Dashboard → Authentication → Policies).

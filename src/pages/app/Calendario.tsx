@@ -24,6 +24,7 @@ import {
   useUpdatePostSchedule,
   useUpdatePostStatus,
 } from "@/hooks/useSocialPosts";
+import { useDeletePosts } from "@/hooks/usePostEditor";
 import type { Channel, PostStatus } from "@/lib/post-states";
 
 import { ClientSelector } from "@/components/calendar/client-selector";
@@ -143,6 +144,7 @@ export default function Calendario() {
   const updateSchedule = useUpdatePostSchedule();
   const updateStatus = useUpdatePostStatus();
   const createPost = useCreatePost();
+  const deletePosts = useDeletePosts();
 
   const postIdParam = params.get("post");
   const [editorOpen, setEditorOpen] = useState<boolean>(!!postIdParam);
@@ -199,6 +201,22 @@ export default function Calendario() {
       toast.success(`Movido a ${to}`);
     } catch (e: any) {
       toast.error("No se pudo actualizar el estado", { description: e?.message });
+      throw e;
+    }
+  };
+
+  const handleDeletePosts = async (ids: string[]) => {
+    try {
+      const deleted = await deletePosts.mutateAsync(ids);
+      if (deleted < ids.length) {
+        toast.warning(`Se eliminaron ${deleted} de ${ids.length} publicaciones`, {
+          description: "No tienes permiso para eliminar algunas de ellas.",
+        });
+      } else {
+        toast.success(deleted === 1 ? "Publicación eliminada" : `${deleted} publicaciones eliminadas`);
+      }
+    } catch (e: any) {
+      toast.error("No se pudieron eliminar las publicaciones", { description: e?.message });
       throw e;
     }
   };
@@ -377,6 +395,7 @@ export default function Calendario() {
           clientName={activeClients.find((c) => c.id === clientId)?.name}
           rangeFrom={range.from}
           rangeTo={range.to}
+          onDeletePosts={handleDeletePosts}
         />
       )}
 

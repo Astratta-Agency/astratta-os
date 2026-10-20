@@ -146,6 +146,25 @@ export function useDeletePost() {
   });
 }
 
+export function useDeletePosts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postIds: string[]): Promise<number> => {
+      const { data, error } = await (supabase as any)
+        .from("social_posts")
+        .delete()
+        .in("id", postIds)
+        .select("id");
+      if (error) throw error;
+      return (data ?? []).length;
+    },
+    onSuccess: (_d, postIds) => {
+      qc.invalidateQueries({ queryKey: ["social-posts"] });
+      postIds.forEach((id) => qc.removeQueries({ queryKey: ["post", id] }));
+    },
+  });
+}
+
 export function useDuplicatePost() {
   const qc = useQueryClient();
   return useMutation({

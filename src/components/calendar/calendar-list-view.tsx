@@ -10,7 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Download } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowUpDown, Download, Loader2, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
@@ -37,15 +38,29 @@ interface Props {
   clientName?: string;
   rangeFrom?: Date;
   rangeTo?: Date;
+  /** Si se pasa, habilita la selección de filas y la eliminación en lote. */
+  onDeletePosts?: (ids: string[]) => Promise<void>;
 }
 
 const PAGE_SIZES = [25, 50, 100];
 
-export function CalendarListView({ posts, pillarMap, onPostClick, clientName, rangeFrom, rangeTo }: Props) {
+export function CalendarListView({
+  posts,
+  pillarMap,
+  onPostClick,
+  clientName,
+  rangeFrom,
+  rangeTo,
+  onDeletePosts,
+}: Props) {
   const [asc, setAsc] = useState(true);
   const [pageSize, setPageSize] = useState(25);
   const [page, setPage] = useState(0);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const selectable = !!onDeletePosts;
 
   const sorted = useMemo(() => {
     const arr = [...posts];
@@ -59,6 +74,43 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const slice = sorted.slice(page * pageSize, (page + 1) * pageSize);
+
+  // Solo cuentan las seleccionadas que siguen visibles con los filtros actuales.
+  const selected = useMemo(
+    () => posts.filter((p) => selectedIds.has(p.id)).map((p) => p.id),
+    [posts, selectedIds],
+  );
+  const pageAllSelected = slice.length > 0 && slice.every((p) => selectedIds.has(p.id));
+  const pageSomeSelected = slice.some((p) => selectedIds.has(p.id));
+
+  const togglePage = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      slice.forEach((p) => (checked ? next.add(p.id) : next.delete(p.id)));
+      return next;
+    });
+  };
+
+  const toggleOne = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const doDelete = async () => {
+    if (!onDeletePosts || selected.length === 0) return;
+    setDeleting(true);
+    try {
+      await onDeletePosts(selected);
+      setSelectedIds(new Set());
+      setDeleteOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const doExport = () => {
     const fmtDT = (v: string | null) =>
@@ -118,6 +170,16 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
         <Table>
           <TableHeader>
             <TableRow>
+              {selectable && (
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={pageAllSelected ? true : pageSomeSelected ? "indeterminate" : false}
+                    onCheckedChange={(v) => togglePage(v === true)}
+                    disabled={slice.length === 0}
+                    aria-label="Seleccionar todas las publicaciones de la página"
+                  />
+                </TableHead>
+              )}
               <TableHead className="cursor-pointer" onClick={() => setAsc((v) => !v)}>
                 <span className="inline-flex items-center gap-1">
                   Fecha/Hora <ArrowUpDown className="h-3 w-3" />
@@ -133,7 +195,7 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
           <TableBody>
             {slice.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={selectable ? 7 : 6} className="py-12 text-center text-sm text-muted-foreground">
                   Sin publicaciones
                 </TableCell>
               </TableRow>
@@ -141,7 +203,21 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
             {slice.map((p) => {
               const pillar = p.content_pillar ? pillarMap.get(p.content_pillar) : null;
               return (
-                <TableRow key={p.id} className="cursor-pointer" onClick={() => onPostClick(p)}>
+                <TableRow
+                  key={p.id}
+                  className="cursor-pointer"
+                  data-state={selectedIds.has(p.id) ? "selected" : undefined}
+                  onClick={() => onPostClick(p)}
+                >
+                  {selectable && (
+                    <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(p.id)}
+                        onCheckedChange={(v) => toggleOne(p.id, v === true)}
+                        aria-label="Seleccionar publicación"
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="whitespace-nowrap text-xs">
                     {p.scheduled_for
                       ? format(new Date(p.scheduled_for), "dd MMM HH:mm", { locale: es })
@@ -208,6 +284,17 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
           >
             Siguiente
           </Button>
+          {selectable && selected.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Eliminar ({selected.length})
+            </Button>
+          )}
           {exportDisabled ? (
             <TooltipProvider>
               <Tooltip>
@@ -240,6 +327,33 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
               }}
             >
               Exportar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={(o) => !deleting && setDeleteOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Eliminar {selected.length} {selected.length === 1 ? "publicación" : "publicaciones"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Las publicaciones seleccionadas se eliminarán permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                void doDelete();
+              }}
+            >
+              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

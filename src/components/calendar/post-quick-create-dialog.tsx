@@ -34,6 +34,7 @@ interface Props {
   pillarOptions: ContentPillar[];
   submitting?: boolean;
   onSubmit: (input: {
+    title: string;
     caption: string;
     scheduled_for: Date;
     channels: Channel[];
@@ -50,6 +51,7 @@ export function PostQuickCreateDialog({
   submitting,
   onSubmit,
 }: Props) {
+  const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [date, setDate] = useState<Date>(defaultDate ?? setMinutes(setHours(addDays(new Date(), 1), 9), 0));
   const [time, setTime] = useState("09:00");
@@ -63,6 +65,7 @@ export function PostQuickCreateDialog({
       const base = defaultDate ?? setMinutes(setHours(addDays(new Date(), 1), 9), 0);
       setDate(base);
       setTime(format(base, "HH:mm"));
+      setTitle("");
       setCaption("");
       setChannels(["instagram"]);
       setPillar("__none__");
@@ -73,7 +76,7 @@ export function PostQuickCreateDialog({
 
   const handleSubmit = async () => {
     setError(null);
-    if (!caption.trim()) return setError("El caption no puede estar vacío");
+    if (!title.trim()) return setError("El título (hook) no puede estar vacío");
     if (channels.length === 0) return setError("Selecciona al menos un canal");
     const [hh, mm] = time.split(":").map((n) => parseInt(n, 10));
     if (Number.isNaN(hh) || Number.isNaN(mm)) return setError("Hora inválida");
@@ -84,6 +87,7 @@ export function PostQuickCreateDialog({
       return setError("La fecha debe estar entre 30 días atrás y 365 días adelante");
     }
     await onSubmit({
+      title: title.trim(),
       caption: caption.trim(),
       scheduled_for: scheduled,
       channels,
@@ -100,6 +104,17 @@ export function PostQuickCreateDialog({
           <DialogDescription>Crea rápidamente. Podrás detallar más en el editor completo.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="title">Título (hook)</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value.slice(0, 120))}
+              placeholder="Ej. Si tu feed parece un catálogo, estás perdiendo ventas"
+              autoFocus
+            />
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="caption">Caption</Label>
             <Textarea

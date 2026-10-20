@@ -82,6 +82,7 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
         header: "Estado",
         format: (v) => POST_STATE_META[v as keyof typeof POST_STATE_META]?.label ?? v ?? "",
       },
+      { key: "title", header: "Título (hook)", format: (v) => v ?? "" },
       { key: "caption", header: "Caption", format: (v) => v ?? "" },
       { key: "hashtags", header: "Hashtags", format: (v) => v ?? "" },
       { key: "media_urls", header: "Media URLs", format: (v) => (Array.isArray(v) && v.length ? v.join(" | ") : "") },
@@ -124,7 +125,7 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
               </TableHead>
               <TableHead>Canal</TableHead>
               <TableHead className="hidden md:table-cell">Formato</TableHead>
-              <TableHead>Caption</TableHead>
+              <TableHead>Título</TableHead>
               <TableHead className="hidden md:table-cell">Pilar</TableHead>
               <TableHead>Estado</TableHead>
             </TableRow>
@@ -160,7 +161,7 @@ export function CalendarListView({ posts, pillarMap, onPostClick, clientName, ra
                     {p.type}
                   </TableCell>
                   <TableCell className="max-w-[300px] truncate text-sm">
-                    {(p.caption || p.title || "").slice(0, 60)}
+                    {(p.title || p.caption || "").slice(0, 60)}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     {pillar ? <PillarBadge name={pillar.name} color={pillar.color} /> : <span className="text-xs text-muted-foreground">—</span>}

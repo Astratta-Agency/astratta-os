@@ -209,6 +209,7 @@ export default function Calendario() {
   };
 
   const handleCreate = async (input: {
+    title: string;
     caption: string;
     scheduled_for: Date;
     channels: Channel[];
@@ -220,6 +221,7 @@ export default function Calendario() {
       await createPost.mutateAsync({
         workspaceId,
         clientId,
+        title: input.title,
         caption: input.caption,
         scheduled_for: input.scheduled_for.toISOString(),
         channels: input.channels,

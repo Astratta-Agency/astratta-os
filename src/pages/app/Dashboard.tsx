@@ -328,7 +328,7 @@ export default function Dashboard() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-foreground">
-                      {p.caption?.split("\n")[0] || "Sin caption"}
+                      {p.title || p.caption?.split("\n")[0] || "Sin título"}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {p.client_name} · {format(parseISO(p.scheduled_for), "HH:mm")}

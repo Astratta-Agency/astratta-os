@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type DashboardPostToday = {
   id: string;
   scheduled_for: string;
+  title: string | null;
   caption: string | null;
   channels: string[] | null;
   status: string;
@@ -36,7 +37,7 @@ export function useDashboardKpis(workspaceId: string | undefined) {
           .eq("status", "pending_approval"),
         (supabase as any)
           .from("social_posts")
-          .select("id, scheduled_for, caption, channels, status, client_id, client:clients!inner(id, name)")
+          .select("id, scheduled_for, title, caption, channels, status, client_id, client:clients!inner(id, name)")
           .eq("workspace_id", workspaceId)
           .in("status", ["scheduled", "approved"])
           .gte("scheduled_for", startOfDay)
@@ -54,6 +55,7 @@ export function useDashboardKpis(workspaceId: string | undefined) {
       const postsToday: DashboardPostToday[] = ((today.data ?? []) as any[]).map((r) => ({
         id: r.id,
         scheduled_for: r.scheduled_for,
+        title: r.title ?? null,
         caption: r.caption ?? null,
         channels: Array.isArray(r.channels) ? r.channels : null,
         status: r.status,

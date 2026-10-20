@@ -336,8 +336,8 @@ export function PostEditorPanel({
               <Input
                 value={meta.title}
                 onChange={(e) => setMeta({ ...meta, title: e.target.value })}
-                placeholder="Sin título"
-                className="h-8 max-w-xs border-0 px-1 text-base font-semibold focus-visible:ring-1"
+                placeholder="Título (hook)"
+                className="h-8 max-w-md border-0 px-1 text-base font-semibold focus-visible:ring-1"
               />
               <StateBadgePost status={post.status} size="sm" />
               <span

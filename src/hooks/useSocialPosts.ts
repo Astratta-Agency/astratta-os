@@ -68,7 +68,10 @@ export function useSocialPosts(opts: {
 
       if (filters.statuses?.length) q = q.in("status", filters.statuses);
       if (filters.channels?.length) q = q.overlaps("channels", filters.channels);
-      if (filters.search?.trim()) q = q.ilike("caption", `%${filters.search.trim()}%`);
+      if (filters.search?.trim()) {
+        const term = filters.search.trim().replace(/[,()]/g, " ");
+        q = q.or(`title.ilike.%${term}%,caption.ilike.%${term}%`);
+      }
 
       if (filters.pillars?.length) {
         const withoutNone = filters.pillars.filter((p) => p !== "__none__");
@@ -249,6 +252,7 @@ export function useUpdatePostSchedule() {
 export type CreatePostInput = {
   workspaceId: string;
   clientId: string;
+  title: string;
   caption: string;
   scheduled_for: string;
   channels: Channel[];
@@ -261,7 +265,9 @@ export function useCreatePost() {
   return useMutation({
     mutationFn: async (input: CreatePostInput) => {
       const title =
-        (input.caption || "").trim().split("\n")[0]?.slice(0, 80) || "Publicación sin título";
+        input.title.trim() ||
+        (input.caption || "").trim().split("\n")[0]?.slice(0, 80) ||
+        "Publicación sin título";
       const { data, error } = await (supabase as any)
         .from("social_posts")
         .insert({

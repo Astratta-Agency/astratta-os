@@ -84,7 +84,7 @@ export function CalendarMonthView({
   const grid = (
     <div className="grid grid-cols-7 gap-1">
       {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((d) => (
-        <div key={d} className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div key={d} className="px-1 py-1 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:px-2 sm:text-left sm:text-xs">
           {d}
         </div>
       ))}

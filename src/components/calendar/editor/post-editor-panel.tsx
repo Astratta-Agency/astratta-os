@@ -321,7 +321,7 @@ export function PostEditorPanel({
     <Sheet open={open} onOpenChange={(o) => (o ? onOpenChange(true) : handleClose())}>
       <SheetContent
         side="right"
-        className="w-full overflow-y-auto p-0 sm:max-w-[920px]"
+        className="w-full overflow-y-auto overflow-x-hidden p-0 sm:max-w-[920px]"
       >
         {isLoading || !meta || !post ? (
           <div className="space-y-3 p-6">
@@ -332,12 +332,12 @@ export function PostEditorPanel({
         ) : (
           <>
             {/* Header */}
-            <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
+            <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-3 backdrop-blur">
               <Input
                 value={meta.title}
                 onChange={(e) => setMeta({ ...meta, title: e.target.value })}
                 placeholder="Título (hook)"
-                className="h-8 max-w-md border-0 px-1 text-base font-semibold focus-visible:ring-1"
+                className="h-8 min-w-0 basis-full border-0 px-1 text-base font-semibold focus-visible:ring-1 sm:max-w-md sm:flex-1 sm:basis-0"
               />
               <StateBadgePost status={post.status} size="sm" />
               <span
@@ -351,7 +351,7 @@ export function PostEditorPanel({
               >
                 {saveLabel}
               </span>
-              <div className="ml-auto flex items-center gap-1">
+              <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
                 <PostSubmitForApprovalButton
                   status={post.status}
                   onClick={async () => {
@@ -404,9 +404,9 @@ export function PostEditorPanel({
             </div>
 
             {/* Body */}
-            <div className="grid gap-4 p-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
               {/* Left: editor */}
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 <PostEditorMeta
                   clientName={clientName}
                   type={meta.type}

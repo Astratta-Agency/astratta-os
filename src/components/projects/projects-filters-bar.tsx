@@ -283,37 +283,41 @@ export function ProjectsFiltersBar(props: Props) {
             variant={props.view === "lista" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => props.onView("lista")}
+            aria-label="Lista"
             className="rounded-none rounded-l-md"
           >
-            <ListIcon className="mr-1.5 h-3.5 w-3.5" />
-            Lista
+            <ListIcon className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Lista</span>
           </Button>
           <Button
             variant={props.view === "kanban" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => props.onView("kanban")}
+            aria-label="Kanban"
             className="rounded-none"
           >
-            <LayoutGrid className="mr-1.5 h-3.5 w-3.5" />
-            Kanban
+            <LayoutGrid className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Kanban</span>
           </Button>
           <Button
             variant={props.view === "calendario" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => props.onView("calendario")}
+            aria-label="Calendario"
             className="rounded-none"
           >
-            <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-            Calendario
+            <CalendarDays className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Calendario</span>
           </Button>
           <Button
             variant={props.view === "gantt" ? "secondary" : "ghost"}
             size="sm"
             onClick={() => props.onView("gantt")}
+            aria-label="Gantt"
             className="rounded-none rounded-r-md"
           >
-            <GanttChartSquare className="mr-1.5 h-3.5 w-3.5" />
-            Gantt
+            <GanttChartSquare className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Gantt</span>
           </Button>
         </div>
       </div>

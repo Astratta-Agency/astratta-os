@@ -326,14 +326,14 @@ export default function Calendario() {
               {posts.length} {posts.length === 1 ? "publicación" : "publicaciones"}
             </span>
           )}
-          <div className="ml-auto inline-flex rounded-md border">
+          <div className="flex max-w-full overflow-x-auto rounded-md border md:ml-auto md:inline-flex">
             {(["mes", "semana", "lista", "canal", "kanban"] as CalView[]).map((v) => (
               <Button
                 key={v}
                 variant={view === v ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => update({ view: v === "mes" ? null : v })}
-                className="capitalize"
+                className="flex-1 px-2 capitalize sm:px-3 md:flex-none"
               >
                 {v}
               </Button>

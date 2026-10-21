@@ -57,7 +57,7 @@ export default function Ventas() {
             <p className="mt-1 text-base text-muted-foreground">Pipeline de leads y propuestas</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex overflow-hidden rounded-md border">
             <button
               type="button"

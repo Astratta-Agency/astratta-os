@@ -25,15 +25,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { CHANNELS, CHANNEL_LABEL, type Channel, type PostStatus } from "@/lib/post-states";
 import { ChannelIcon } from "./channel-icon";
-import type { ContentPillar } from "@/hooks/useSocialPosts";
+import { ClientSelector, type ClientOption } from "./client-selector";
+import { useContentPillars, type ContentPillar } from "@/hooks/useSocialPosts";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   defaultDate?: Date | null;
   pillarOptions: ContentPillar[];
+  /** Vista "Todos los clientes": el diálogo pide el cliente y usa sus pilares. */
+  clientOptions?: ClientOption[];
   submitting?: boolean;
   onSubmit: (input: {
+    client_id?: string;
     title: string;
     caption: string;
     scheduled_for: Date;
@@ -48,9 +52,18 @@ export function PostQuickCreateDialog({
   onOpenChange,
   defaultDate,
   pillarOptions,
+  clientOptions,
   submitting,
   onSubmit,
 }: Props) {
+  const pickClient = clientOptions !== undefined;
+  const [clientId, setClientId] = useState<string | null>(null);
+  const { data: pickedPillars = [] } = useContentPillars(pickClient ? clientId ?? undefined : undefined);
+  const pillars = !pickClient
+    ? pillarOptions
+    : pickedPillars.length > 0
+      ? pickedPillars
+      : [{ id: null, name: "Sin pilar", color: "hsl(var(--muted-foreground))" }];
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [date, setDate] = useState<Date>(defaultDate ?? setMinutes(setHours(addDays(new Date(), 1), 9), 0));
@@ -70,12 +83,14 @@ export function PostQuickCreateDialog({
       setChannels(["instagram"]);
       setPillar("__none__");
       setStatus("draft");
+      setClientId(null);
       setError(null);
     }
   }, [open, defaultDate]);
 
   const handleSubmit = async () => {
     setError(null);
+    if (pickClient && !clientId) return setError("Selecciona el cliente");
     if (!title.trim()) return setError("El título (hook) no puede estar vacío");
     if (channels.length === 0) return setError("Selecciona al menos un canal");
     const [hh, mm] = time.split(":").map((n) => parseInt(n, 10));
@@ -87,6 +102,7 @@ export function PostQuickCreateDialog({
       return setError("La fecha debe estar entre 30 días atrás y 365 días adelante");
     }
     await onSubmit({
+      ...(pickClient && clientId ? { client_id: clientId } : {}),
       title: title.trim(),
       caption: caption.trim(),
       scheduled_for: scheduled,
@@ -104,6 +120,20 @@ export function PostQuickCreateDialog({
           <DialogDescription>Crea rápidamente. Podrás detallar más en el editor completo.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {pickClient && (
+            <div className="space-y-1.5">
+              <Label>Cliente</Label>
+              <ClientSelector
+                value={clientId}
+                onChange={(id) => {
+                  setClientId(id);
+                  setPillar("__none__");
+                }}
+                options={clientOptions}
+                className="flex w-full"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="title">Título (hook)</Label>
             <Input
@@ -189,7 +219,7 @@ export function PostQuickCreateDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {pillarOptions.map((o) => (
+                  {pillars.map((o) => (
                     <SelectItem key={o.id ?? "__none__"} value={o.id ?? "__none__"}>
                       {o.name}
                     </SelectItem>

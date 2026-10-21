@@ -3,7 +3,7 @@ import { format, startOfDay, isSameDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { CHANNELS } from "@/lib/post-states";
-import { CHANNEL_META } from "@/lib/channels";
+import { CHANNEL_CALENDAR_COLOR, CHANNEL_META } from "@/lib/channels";
 import type { SocialPostRow, ContentPillar } from "@/hooks/useSocialPosts";
 import { ChannelIcon } from "./channel-icon";
 import { PostCard } from "./post-card";
@@ -57,7 +57,7 @@ export function CalendarChannelView({ posts, pillarMap, onPostClick }: Props) {
           <div
             key={c}
             className="flex min-w-[260px] shrink-0 flex-col rounded-lg border bg-card"
-            style={{ borderTopWidth: 3, borderTopColor: meta.color }}
+            style={{ borderTopWidth: 3, borderTopColor: CHANNEL_CALENDAR_COLOR[c] }}
           >
             {/* Header */}
             <div className="flex items-center gap-2 border-b p-3">

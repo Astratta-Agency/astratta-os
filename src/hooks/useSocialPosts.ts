@@ -33,9 +33,14 @@ export type SocialPostFilters = {
 
 export type DateRange = { from: Date; to: Date };
 
+/** Valor de `clientId` para traer los posts de todos los clientes del workspace. */
+export const ALL_CLIENTS = "all";
+
 export function useSocialPosts(opts: {
   workspaceId: string | undefined;
+  /** Un id de cliente, o `ALL_CLIENTS` para la vista general. */
   clientId: string | undefined;
+  /** `null` trae todas las fechas (p. ej. todas las aprobaciones pendientes). */
   range: DateRange | null;
   filters: SocialPostFilters;
 }) {
@@ -49,7 +54,7 @@ export function useSocialPosts(opts: {
       range?.to?.toISOString(),
       filters,
     ],
-    enabled: !!workspaceId && !!clientId && !!range,
+    enabled: !!workspaceId && !!clientId,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     queryFn: async () => {
@@ -59,8 +64,9 @@ export function useSocialPosts(opts: {
           "id, workspace_id, client_id, project_id, title, type, preview_url, caption, scheduled_for, status, channels, content_pillar, media_urls, hashtags, approved_at, rejected_at, rejection_reason, created_at, updated_at",
         )
         .eq("workspace_id", workspaceId)
-        .eq("client_id", clientId)
         .order("scheduled_for", { ascending: true, nullsFirst: false });
+
+      if (clientId !== ALL_CLIENTS) q = q.eq("client_id", clientId);
 
       if (range) {
         q = q.gte("scheduled_for", range.from.toISOString()).lte("scheduled_for", range.to.toISOString());

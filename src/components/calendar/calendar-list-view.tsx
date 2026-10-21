@@ -30,6 +30,9 @@ import { StateBadgePost } from "./state-badge-post";
 import type { SocialPostRow, ContentPillar } from "@/hooks/useSocialPosts";
 import { POST_STATE_META } from "@/lib/post-states";
 import { exportToCsv } from "@/lib/csv-export";
+import { CHANNEL_CALENDAR_COLOR } from "@/lib/channels";
+import { ClientLogo } from "@/components/clients/client-logo";
+import { useCalendarClients } from "./calendar-clients-context";
 
 interface Props {
   posts: SocialPostRow[];
@@ -61,6 +64,10 @@ export function CalendarListView({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const selectable = !!onDeletePosts;
+  // Vista "Todos los clientes": columna y CSV con el cliente de cada post.
+  const clientMap = useCalendarClients();
+  const showClient = clientMap !== null;
+  const colCount = 6 + (selectable ? 1 : 0) + (showClient ? 1 : 0);
 
   const sorted = useMemo(() => {
     const arr = [...posts];
@@ -121,7 +128,11 @@ export function CalendarListView({
 
     exportToCsv(filename, sorted, [
       { key: "scheduled_for", header: "Fecha programada", format: (v) => fmtDT(v) },
-      { key: "client", header: "Cliente", format: () => clientName ?? "" },
+      {
+        key: "client_id",
+        header: "Cliente",
+        format: (v) => (clientMap ? (clientMap.get(v)?.name ?? "") : (clientName ?? "")),
+      },
       { key: "channels", header: "Canales", format: (v) => (Array.isArray(v) && v.length ? v.join(" | ") : "") },
       { key: "type", header: "Formato", format: (v) => v ?? "" },
       {
@@ -185,6 +196,7 @@ export function CalendarListView({
                   Fecha/Hora <ArrowUpDown className="h-3 w-3" />
                 </span>
               </TableHead>
+              {showClient && <TableHead>Cliente</TableHead>}
               <TableHead>Canal</TableHead>
               <TableHead className="hidden md:table-cell">Formato</TableHead>
               <TableHead>Título</TableHead>
@@ -195,13 +207,14 @@ export function CalendarListView({
           <TableBody>
             {slice.length === 0 && (
               <TableRow>
-                <TableCell colSpan={selectable ? 7 : 6} className="py-12 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={colCount} className="py-12 text-center text-sm text-muted-foreground">
                   Sin publicaciones
                 </TableCell>
               </TableRow>
             )}
             {slice.map((p) => {
               const pillar = p.content_pillar ? pillarMap.get(p.content_pillar) : null;
+              const client = clientMap?.get(p.client_id) ?? null;
               return (
                 <TableRow
                   key={p.id}
@@ -223,10 +236,28 @@ export function CalendarListView({
                       ? format(new Date(p.scheduled_for), "dd MMM HH:mm", { locale: es })
                       : "—"}
                   </TableCell>
+                  {showClient && (
+                    <TableCell className="max-w-[180px]">
+                      {client ? (
+                        <span className="flex items-center gap-1.5">
+                          <ClientLogo
+                            name={client.name}
+                            logoUrl={client.logo_url}
+                            brandColor={client.brand_primary_color}
+                            size="sm"
+                            className="h-5 w-5 shrink-0 text-[9px]"
+                          />
+                          <span className="truncate text-sm">{client.name}</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center gap-1">
                       {p.channels.slice(0, 4).map((c) => (
-                        <ChannelIcon key={c} channel={c} size="sm" className="text-muted-foreground" />
+                        <ChannelIcon key={c} channel={c} size="sm" style={{ color: CHANNEL_CALENDAR_COLOR[c] }} />
                       ))}
                       {p.channels.length > 4 && (
                         <span className="text-xs text-muted-foreground">+{p.channels.length - 4}</span>

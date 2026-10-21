@@ -17,6 +17,20 @@ export const CHANNEL_META: Record<Channel, ChannelMeta> = {
   threads: { label: "Threads", limit: 500, hashtagLimit: 10, firstComment: false, color: "#000000" },
 };
 
+/**
+ * Colores del calendario por red. No son los colores de marca: TikTok, X y
+ * Threads comparten el negro, así que cada red tiene un tono propio y
+ * distinguible que se lee en modo claro y oscuro.
+ */
+export const CHANNEL_CALENDAR_COLOR: Record<Channel, string> = {
+  instagram: "#DB2777", // pink-600
+  facebook: "#2563EB",  // blue-600
+  linkedin: "#0891B2",  // cyan-600
+  tiktok: "#64748B",    // slate-500
+  x: "#D97706",         // amber-600
+  threads: "#7C3AED",   // violet-600
+};
+
 export function countHashtags(s: string | null | undefined): number {
   if (!s) return 0;
   return (s.match(/#\w+/g) ?? []).length;

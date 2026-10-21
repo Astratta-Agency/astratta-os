@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useClients } from "@/hooks/useClients";
 import {
+  ALL_CLIENTS,
   useContentPillars,
   useCreatePost,
   useSocialPosts,
@@ -38,11 +39,13 @@ import { CalendarKanbanView } from "@/components/calendar/calendar-kanban-view";
 import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
 import { ManagePillarsDialog } from "@/components/calendar/manage-pillars-dialog";
+import {
+  CalendarClientsProvider,
+  type CalendarClientInfo,
+} from "@/components/calendar/calendar-clients-context";
 
 
 const parseList = (v: string | null): string[] => (v ? v.split(",").filter(Boolean) : []);
-
-const LS_KEY = "calendario:last_client_id";
 
 export default function Calendario() {
   const { workspace } = useActiveWorkspace();
@@ -84,31 +87,35 @@ export default function Calendario() {
   });
   const activeClients = clients.filter((c) => c.status === "active" || c.status === "prospect");
 
-  // Resolve active clientId
-  const [clientId, setClientIdState] = useState<string | null>(clientIdParam);
-  useEffect(() => {
-    if (clientIdParam) {
-      setClientIdState(clientIdParam);
-      return;
-    }
-    if (activeClients.length === 0) return;
-    const stored = typeof window !== "undefined" ? window.localStorage.getItem(LS_KEY) : null;
-    const valid = stored && activeClients.find((c) => c.id === stored) ? stored : activeClients[0].id;
-    setClientIdState(valid);
-    update({ client_id: valid });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientIdParam, activeClients.length]);
+  // Sin client_id en la URL se muestra el calendario general (todos los clientes).
+  const clientId = clientIdParam ?? ALL_CLIENTS;
+  const isAll = clientId === ALL_CLIENTS;
 
-  const setClientId = (id: string) => {
-    setClientIdState(id);
-    try {
-      window.localStorage.setItem(LS_KEY, id);
-    } catch {}
-    update({ client_id: id });
-  };
+  // Los pilares son por cliente, así que el filtro de pilares no sobrevive al cambio.
+  const setClientId = (id: string) =>
+    update({ client_id: id === ALL_CLIENTS ? null : id, pillars: null });
+
+  // Incluye clientes inactivos: sus posts pasados también aparecen en la vista general.
+  const clientMap = useMemo(() => {
+    const m = new Map<string, CalendarClientInfo>();
+    clients.forEach((c) =>
+      m.set(c.id, {
+        id: c.id,
+        name: c.name,
+        logo_url: c.logo_url,
+        brand_primary_color: c.brand_primary_color,
+      }),
+    );
+    return m;
+  }, [clients]);
+
+  // `periodo=todo` quita el límite de fechas en las vistas sin cuadrícula
+  // (lista, canal, kanban), p. ej. para ver todas las aprobaciones pendientes.
+  const allDates = params.get("periodo") === "todo" && view !== "mes" && view !== "semana";
 
   // Date range from view + anchor
   const range = useMemo(() => {
+    if (allDates) return null;
     if (view === "mes") {
       return {
         from: startOfWeek(startOfMonth(anchor), { weekStartsOn: 0 }),
@@ -123,18 +130,18 @@ export default function Calendario() {
     }
     // list — current month wide window
     return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
-  }, [view, anchor]);
+  }, [allDates, view, anchor]);
 
   const [debouncedSearch] = useDebounce(search, 300);
 
   const { data: posts = [], isLoading: postsLoading } = useSocialPosts({
     workspaceId,
-    clientId: clientId ?? undefined,
+    clientId,
     range,
     filters: { channels, statuses, pillars, search: debouncedSearch },
   });
 
-  const { data: pillarOptions = [] } = useContentPillars(clientId ?? undefined);
+  const { data: pillarOptions = [] } = useContentPillars(isAll ? undefined : clientId);
   const pillarMap = useMemo(() => {
     const m = new Map<string, any>();
     pillarOptions.forEach((p) => m.set(p.name, p));
@@ -227,6 +234,7 @@ export default function Calendario() {
   };
 
   const handleCreate = async (input: {
+    client_id?: string;
     title: string;
     caption: string;
     scheduled_for: Date;
@@ -234,11 +242,12 @@ export default function Calendario() {
     content_pillar: string | null;
     status: PostStatus;
   }) => {
-    if (!workspaceId || !clientId) return;
+    const targetClientId = input.client_id ?? (isAll ? null : clientId);
+    if (!workspaceId || !targetClientId) return;
     try {
       await createPost.mutateAsync({
         workspaceId,
-        clientId,
+        clientId: targetClientId,
         title: input.title,
         caption: input.caption,
         scheduled_for: input.scheduled_for.toISOString(),
@@ -287,6 +296,7 @@ export default function Calendario() {
           <ClientSelector
             value={clientId}
             onChange={setClientId}
+            allValue={ALL_CLIENTS}
             options={activeClients.map((c) => ({
               id: c.id,
               name: c.name,
@@ -298,8 +308,8 @@ export default function Calendario() {
             variant="outline"
             size="sm"
             onClick={() => setPillarsOpen(true)}
-            disabled={!clientId}
-            title="Gestionar pilares"
+            disabled={isAll}
+            title={isAll ? "Elige un cliente para gestionar sus pilares" : "Gestionar pilares"}
           >
             <Settings2 className="mr-2 h-4 w-4" />
             Pilares
@@ -307,8 +317,15 @@ export default function Calendario() {
           <CalendarNavigator
             date={anchor}
             view={view}
-            onChange={(d) => update({ anchor: d.toISOString() })}
+            onChange={(d) => update({ anchor: d.toISOString(), periodo: null })}
+            allDates={allDates}
+            onClearAllDates={() => update({ periodo: null })}
           />
+          {!postsLoading && (
+            <span className="whitespace-nowrap rounded-md border px-2 py-1 text-xs text-muted-foreground">
+              {posts.length} {posts.length === 1 ? "publicación" : "publicaciones"}
+            </span>
+          )}
           <div className="ml-auto inline-flex rounded-md border">
             {(["mes", "semana", "lista", "canal", "kanban"] as CalView[]).map((v) => (
               <Button
@@ -339,6 +356,7 @@ export default function Calendario() {
         onClear={clearFilters}
       />
 
+      <CalendarClientsProvider value={isAll ? clientMap : null}>
       {postsLoading ? (
         <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: 35 }).map((_, i) => (
@@ -392,12 +410,13 @@ export default function Calendario() {
           posts={posts}
           pillarMap={pillarMap}
           onPostClick={(p) => openPost(p.id)}
-          clientName={activeClients.find((c) => c.id === clientId)?.name}
-          rangeFrom={range.from}
-          rangeTo={range.to}
+          clientName={isAll ? "todos-los-clientes" : clientMap.get(clientId)?.name}
+          rangeFrom={range?.from}
+          rangeTo={range?.to}
           onDeletePosts={handleDeletePosts}
         />
       )}
+      </CalendarClientsProvider>
 
       <PostEditorPanel
         postId={postIdParam}
@@ -415,12 +434,22 @@ export default function Calendario() {
         onOpenChange={setCreateOpen}
         defaultDate={createDate}
         pillarOptions={pillarOptions}
+        clientOptions={
+          isAll
+            ? activeClients.map((c) => ({
+                id: c.id,
+                name: c.name,
+                logo_url: c.logo_url,
+                brand_primary_color: c.brand_primary_color,
+              }))
+            : undefined
+        }
         submitting={createPost.isPending}
         onSubmit={handleCreate}
       />
 
       <ManagePillarsDialog
-        clientId={clientId}
+        clientId={isAll ? null : clientId}
         open={pillarsOpen}
         onOpenChange={setPillarsOpen}
       />

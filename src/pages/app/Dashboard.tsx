@@ -44,6 +44,9 @@ import { formatMoney } from "@/lib/money";
 import { PRIORITY_CLASS, PRIORITY_LABEL } from "@/lib/task-labels";
 import type { Channel } from "@/lib/post-states";
 
+// Lista de todos los clientes con las publicaciones que esperan al cliente, sin límite de fechas.
+const PENDING_APPROVAL_URL = "/app/calendario?view=lista&status=pending_approval&periodo=todo";
+
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 6) return "Buenas noches";
@@ -220,7 +223,7 @@ export default function Dashboard() {
               className="cursor-pointer transition-colors hover:border-primary/50"
             />
           </Link>
-          <Link to="/app/calendario">
+          <Link to={PENDING_APPROVAL_URL}>
             <KpiCard
               label="Aprobaciones pendientes"
               value={dash?.postsPendingApproval ?? 0}
@@ -386,7 +389,7 @@ export default function Dashboard() {
                   ? "Todas las aprobaciones dentro de las 48h"
                   : `${dash?.stalePostsCount} ${dash?.stalePostsCount === 1 ? "publicación espera" : "publicaciones esperan"} respuesta hace más de 48h`
               }
-              to="/app/calendario"
+              to={PENDING_APPROVAL_URL}
             />
           </div>
         )}

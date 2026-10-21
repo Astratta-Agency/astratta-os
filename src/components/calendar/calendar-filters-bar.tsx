@@ -133,13 +133,16 @@ function FiltersBody(p: Props) {
         onChange={p.onChannels}
         placeholder="Todos los canales"
       />
-      <MultiSelectDropdown
-        options={pillarOpts}
-        selected={p.pillars}
-        onChange={p.onPillars}
-        placeholder="Todos los pilares"
-        className="md:w-48"
-      />
+      {/* Los pilares son por cliente: sin opciones (vista "Todos") no se filtra por pilar. */}
+      {pillarOpts.length > 0 && (
+        <MultiSelectDropdown
+          options={pillarOpts}
+          selected={p.pillars}
+          onChange={p.onPillars}
+          placeholder="Todos los pilares"
+          className="md:w-48"
+        />
+      )}
       <MultiSelectDropdown
         options={statusOpts}
         selected={p.statuses}

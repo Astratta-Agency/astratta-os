@@ -10,7 +10,7 @@ export type PostStatus =
   | "published"
   | "archived";
 
-export type Channel = "instagram" | "facebook" | "linkedin" | "tiktok" | "x" | "threads";
+export type Channel = "instagram" | "facebook" | "linkedin" | "tiktok" | "x" | "threads" | "google_business" | "nextdoor";
 
 export const POST_STATE_META: Record<PostStatus, { label: string; color: string }> = {
   idea: { label: "Idea", color: "hsl(0 0% 60%)" },
@@ -51,7 +51,7 @@ export const POST_STATE_TRANSITIONS: Record<PostStatus, PostStatus[]> = {
   archived: ["draft"],
 };
 
-export const CHANNELS: Channel[] = ["instagram", "facebook", "linkedin", "tiktok", "x", "threads"];
+export const CHANNELS: Channel[] = ["instagram", "facebook", "linkedin", "tiktok", "x", "threads", "google_business", "nextdoor"];
 
 export const CHANNEL_LABEL: Record<Channel, string> = {
   instagram: "Instagram",
@@ -60,4 +60,6 @@ export const CHANNEL_LABEL: Record<Channel, string> = {
   tiktok: "TikTok",
   x: "X",
   threads: "Threads",
+  google_business: "Google Business",
+  nextdoor: "Nextdoor",
 };

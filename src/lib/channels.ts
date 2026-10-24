@@ -15,6 +15,8 @@ export const CHANNEL_META: Record<Channel, ChannelMeta> = {
   tiktok: { label: "TikTok", limit: 2200, hashtagLimit: 30, firstComment: false, color: "#000000" },
   x: { label: "X", limit: 280, hashtagLimit: 5, firstComment: false, color: "#000000" },
   threads: { label: "Threads", limit: 500, hashtagLimit: 10, firstComment: false, color: "#000000" },
+  google_business: { label: "Google Business", limit: 1500, hashtagLimit: 5, firstComment: false, color: "#4285F4" },
+  nextdoor: { label: "Nextdoor", limit: 8000, hashtagLimit: 5, firstComment: false, color: "#8ED500" },
 };
 
 /**
@@ -29,6 +31,8 @@ export const CHANNEL_CALENDAR_COLOR: Record<Channel, string> = {
   tiktok: "#64748B",    // slate-500
   x: "#D97706",         // amber-600
   threads: "#7C3AED",   // violet-600
+  google_business: "#DC2626", // red-600
+  nextdoor: "#16A34A",  // green-600
 };
 
 export function countHashtags(s: string | null | undefined): number {

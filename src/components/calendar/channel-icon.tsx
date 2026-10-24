@@ -1,4 +1,4 @@
-import { Instagram, Facebook, Linkedin } from "lucide-react";
+import { Instagram, Facebook, Linkedin, Store, House } from "lucide-react";
 import type { Channel } from "@/lib/post-states";
 import { cn } from "@/lib/utils";
 
@@ -37,5 +37,9 @@ export function ChannelIcon({ channel, size = "sm", className, style }: Props) {
           <path d="M12 2.5C6.8 2.5 3 6.3 3 11.9c0 5.4 3.5 9.5 9 9.5 3 0 5.4-1.1 6.7-3l-1.8-1.2c-.9 1.3-2.6 2.1-4.8 2.1-4 0-6.5-2.9-6.7-7 .9-1.7 2.7-3 5-3 2.1 0 3.6.9 4.3 2.4-1-.4-2.1-.6-3.3-.6-2.5 0-4.3 1.3-4.3 3.2 0 1.9 1.7 3.2 4 3.2 2.7 0 4.6-1.6 4.9-4.3.6.4 1.2 1 1.6 1.8.5-1 .8-2.1.8-3.4C18.4 6 15.6 2.5 12 2.5zm.7 11.9c-.2 1.3-1.1 2-2.6 2-1.2 0-2-.5-2-1.4 0-.8.8-1.4 2.1-1.4 1 0 1.9.2 2.5.5v.3z" />
         </svg>
       );
+    case "google_business":
+      return <Store className={cls} style={style} aria-label="Google Business" />;
+    case "nextdoor":
+      return <House className={cls} style={style} aria-label="Nextdoor" />;
   }
 }

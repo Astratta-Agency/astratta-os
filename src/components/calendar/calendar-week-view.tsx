@@ -62,7 +62,7 @@ function Slot({
         if (e.target === e.currentTarget) onCreate(slotDate);
       }}
       className={cn(
-        "min-h-[48px] border-b border-r p-0.5",
+        "min-h-[48px] min-w-0 border-b border-r p-0.5",
         isOver && !readonly && "bg-primary/10",
       )}
     >
@@ -122,48 +122,51 @@ export function CalendarWeekView({
     onReschedule(post.id, new Date(iso));
   };
 
+  // minmax(0,1fr): las columnas no crecen con el contenido de las tarjetas, así
+  // encabezado y cuerpo comparten el mismo ancho. El encabezado es sticky dentro
+  // del contenedor con scroll para que la barra de scroll afecte a ambos.
   const body = (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b bg-muted/30">
-        <div className="border-r" />
-        {days.map((d) => (
-          <div
-            key={d.toISOString()}
-            className={cn(
-              "border-r p-2 text-center text-xs font-medium",
-              isToday(d) && "text-primary",
-            )}
-          >
-            <div className="uppercase text-muted-foreground">{format(d, "EEE", { locale: es })}</div>
-            <div className="text-base">{format(d, "d")}</div>
-          </div>
-        ))}
-      </div>
-      <div ref={scrollRef} className="max-h-[600px] overflow-y-auto">
-        <div className="grid grid-cols-[60px_repeat(7,1fr)]">
-          {HOURS.map((h) => (
-            <div key={h} className="contents">
-              <div className="border-b border-r p-1 text-right text-[10px] text-muted-foreground">
-                {h.toString().padStart(2, "0")}:00
-              </div>
-              {days.map((d) => {
-                const key = `${format(d, "yyyy-MM-dd")}_${h}`;
-                return (
-                  <Slot
-                    key={`${d.toISOString()}_${h}`}
-                    date={d}
-                    hour={h}
-                    posts={byDayHour.get(key) ?? []}
-                    pillarMap={pillarMap}
-                    onPostClick={onPostClick}
-                    onCreate={onCreate}
-                    readonly={readonly}
-                  />
-                );
-              })}
+    <div ref={scrollRef} className="max-h-[600px] overflow-y-auto rounded-lg border bg-card">
+      <div className="sticky top-0 z-10 border-b bg-card">
+        <div className="grid grid-cols-[60px_repeat(7,minmax(0,1fr))] bg-muted/30">
+          <div className="border-r" />
+          {days.map((d) => (
+            <div
+              key={d.toISOString()}
+              className={cn(
+                "border-r p-2 text-center text-xs font-medium",
+                isToday(d) && "text-primary",
+              )}
+            >
+              <div className="uppercase text-muted-foreground">{format(d, "EEE", { locale: es })}</div>
+              <div className="text-base">{format(d, "d")}</div>
             </div>
           ))}
         </div>
+      </div>
+      <div className="grid grid-cols-[60px_repeat(7,minmax(0,1fr))]">
+        {HOURS.map((h) => (
+          <div key={h} className="contents">
+            <div className="border-b border-r p-1 text-right text-[10px] text-muted-foreground">
+              {h.toString().padStart(2, "0")}:00
+            </div>
+            {days.map((d) => {
+              const key = `${format(d, "yyyy-MM-dd")}_${h}`;
+              return (
+                <Slot
+                  key={`${d.toISOString()}_${h}`}
+                  date={d}
+                  hour={h}
+                  posts={byDayHour.get(key) ?? []}
+                  pillarMap={pillarMap}
+                  onPostClick={onPostClick}
+                  onCreate={onCreate}
+                  readonly={readonly}
+                />
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );

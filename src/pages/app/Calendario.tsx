@@ -24,9 +24,11 @@ import {
   useSocialPosts,
   useUpdatePostSchedule,
   useUpdatePostStatus,
+  useUpdatePostsStatus,
+  type SocialPostRow,
 } from "@/hooks/useSocialPosts";
 import { useDeletePosts } from "@/hooks/usePostEditor";
-import type { Channel, PostStatus } from "@/lib/post-states";
+import { POST_STATE_META, type Channel, type PostStatus } from "@/lib/post-states";
 
 import { ClientSelector } from "@/components/calendar/client-selector";
 import { CalendarNavigator, type CalView } from "@/components/calendar/calendar-navigator";
@@ -152,6 +154,7 @@ export default function Calendario() {
   const updateStatus = useUpdatePostStatus();
   const createPost = useCreatePost();
   const deletePosts = useDeletePosts();
+  const updateStatuses = useUpdatePostsStatus();
 
   const postIdParam = params.get("post");
   const [editorOpen, setEditorOpen] = useState<boolean>(!!postIdParam);
@@ -205,7 +208,33 @@ export default function Calendario() {
   ) => {
     try {
       await updateStatus.mutateAsync({ id: postId, clientId: clientIdArg, from, to });
-      toast.success(`Movido a ${to}`);
+      toast.success(`Movido a ${POST_STATE_META[to].label}`);
+    } catch (e: any) {
+      toast.error("No se pudo actualizar el estado", { description: e?.message });
+      throw e;
+    }
+  };
+
+  const handleBulkStatusChange = async (
+    eligible: SocialPostRow[],
+    to: PostStatus,
+    skipped: number,
+  ): Promise<string[]> => {
+    const label = POST_STATE_META[to].label;
+    try {
+      const updated = await updateStatuses.mutateAsync({
+        posts: eligible.map((p) => ({ id: p.id, clientId: p.client_id, from: p.status })),
+        to,
+      });
+      const denied = eligible.length - updated.length;
+      const moved = updated.length === 1 ? `1 movida a ${label}` : `${updated.length} movidas a ${label}`;
+      const notes = [
+        skipped > 0 ? `${skipped} omitida${skipped === 1 ? "" : "s"}` : null,
+        denied > 0 ? `${denied} sin permiso para cambiarla${denied === 1 ? "" : "s"}` : null,
+      ].filter(Boolean);
+      if (notes.length > 0) toast.warning(moved, { description: notes.join(" · ") });
+      else toast.success(moved);
+      return updated;
     } catch (e: any) {
       toast.error("No se pudo actualizar el estado", { description: e?.message });
       throw e;
@@ -414,6 +443,7 @@ export default function Calendario() {
           rangeFrom={range?.from}
           rangeTo={range?.to}
           onDeletePosts={handleDeletePosts}
+          onBulkStatusChange={handleBulkStatusChange}
         />
       )}
       </CalendarClientsProvider>

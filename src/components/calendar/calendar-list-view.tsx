@@ -11,7 +11,13 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowUpDown, Download, Loader2, Trash2 } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Download, Loader2, Trash2, X } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
@@ -28,7 +34,12 @@ import { ChannelIcon } from "./channel-icon";
 import { PillarBadge } from "./pillar-badge";
 import { StateBadgePost } from "./state-badge-post";
 import type { SocialPostRow, ContentPillar } from "@/hooks/useSocialPosts";
-import { POST_STATE_META } from "@/lib/post-states";
+import {
+  POST_STATE_META,
+  POST_STATE_ORDER,
+  POST_STATE_TRANSITIONS,
+  type PostStatus,
+} from "@/lib/post-states";
 import { exportToCsv } from "@/lib/csv-export";
 import { CHANNEL_CALENDAR_COLOR } from "@/lib/channels";
 import { ClientLogo } from "@/components/clients/client-logo";
@@ -43,9 +54,18 @@ interface Props {
   rangeTo?: Date;
   /** Si se pasa, habilita la selección de filas y la eliminación en lote. */
   onDeletePosts?: (ids: string[]) => Promise<void>;
+  /**
+   * Si se pasa, habilita el cambio de estado en lote. Recibe solo los posts
+   * cuya transición está permitida y devuelve los ids actualizados.
+   */
+  onBulkStatusChange?: (eligible: SocialPostRow[], to: PostStatus, skipped: number) => Promise<string[]>;
 }
 
 const PAGE_SIZES = [25, 50, 100];
+
+// "Esperando cliente" requiere preflight + email por post: no se ofrece en lote.
+const BULK_TARGETS = POST_STATE_ORDER.filter((s) => s !== "pending_approval");
+const DESTRUCTIVE: PostStatus[] = ["archived", "rejected"];
 
 export function CalendarListView({
   posts,
@@ -55,6 +75,7 @@ export function CalendarListView({
   rangeFrom,
   rangeTo,
   onDeletePosts,
+  onBulkStatusChange,
 }: Props) {
   const [asc, setAsc] = useState(true);
   const [pageSize, setPageSize] = useState(25);
@@ -63,7 +84,9 @@ export function CalendarListView({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const selectable = !!onDeletePosts;
+  const [statusTarget, setStatusTarget] = useState<PostStatus | null>(null);
+  const [applying, setApplying] = useState(false);
+  const selectable = !!onDeletePosts || !!onBulkStatusChange;
   // Vista "Todos los clientes": columna y CSV con el cliente de cada post.
   const clientMap = useCalendarClients();
   const showClient = clientMap !== null;
@@ -83,10 +106,17 @@ export function CalendarListView({
   const slice = sorted.slice(page * pageSize, (page + 1) * pageSize);
 
   // Solo cuentan las seleccionadas que siguen visibles con los filtros actuales.
-  const selected = useMemo(
-    () => posts.filter((p) => selectedIds.has(p.id)).map((p) => p.id),
+  const selectedPosts = useMemo(
+    () => posts.filter((p) => selectedIds.has(p.id)),
     [posts, selectedIds],
   );
+  const selected = useMemo(() => selectedPosts.map((p) => p.id), [selectedPosts]);
+
+  const eligibleFor = (to: PostStatus) =>
+    selectedPosts.filter((p) => (POST_STATE_TRANSITIONS[p.status] ?? []).includes(to));
+  const targetEligible = statusTarget ? eligibleFor(statusTarget) : [];
+  const targetAlready = statusTarget ? selectedPosts.filter((p) => p.status === statusTarget).length : 0;
+  const targetSkipped = selectedPosts.length - targetEligible.length;
   const pageAllSelected = slice.length > 0 && slice.every((p) => selectedIds.has(p.id));
   const pageSomeSelected = slice.some((p) => selectedIds.has(p.id));
 
@@ -116,6 +146,25 @@ export function CalendarListView({
       setDeleteOpen(false);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const doStatusChange = async () => {
+    if (!onBulkStatusChange || !statusTarget || targetEligible.length === 0) return;
+    setApplying(true);
+    try {
+      const updated = await onBulkStatusChange(targetEligible, statusTarget, targetSkipped);
+      // Las omitidas siguen seleccionadas para poder actuar sobre ellas.
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        updated.forEach((id) => next.delete(id));
+        return next;
+      });
+      setStatusTarget(null);
+    } catch {
+      /* toast ya mostrado arriba */
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -177,6 +226,53 @@ export function CalendarListView({
 
   return (
     <div className="space-y-3">
+      {selectable && selected.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2 text-sm">
+          <span className="font-medium">
+            {selected.length} {selected.length === 1 ? "seleccionada" : "seleccionadas"}
+          </span>
+          {onBulkStatusChange && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Cambiar estado
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {BULK_TARGETS.map((t) => {
+                  const n = eligibleFor(t).length;
+                  return (
+                    <DropdownMenuItem key={t} disabled={n === 0} onClick={() => setStatusTarget(t)}>
+                      <span className="mr-2 h-2 w-2 rounded-full" style={{ backgroundColor: POST_STATE_META[t].color }} />
+                      <span className="flex-1">{POST_STATE_META[t].label}</span>
+                      <span className="ml-4 text-xs text-muted-foreground">
+                        {n} de {selected.length}
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {onDeletePosts && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Eliminar
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSelectedIds(new Set())}>
+            <X className="h-4 w-4" />
+            Limpiar selección
+          </Button>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-lg border bg-card">
         <Table>
           <TableHeader>
@@ -315,17 +411,6 @@ export function CalendarListView({
           >
             Siguiente
           </Button>
-          {selectable && selected.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-              Eliminar ({selected.length})
-            </Button>
-          )}
           {exportDisabled ? (
             <TooltipProvider>
               <Tooltip>
@@ -358,6 +443,50 @@ export function CalendarListView({
               }}
             >
               Exportar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!statusTarget} onOpenChange={(o) => !o && !applying && setStatusTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Mover {targetEligible.length} {targetEligible.length === 1 ? "publicación" : "publicaciones"} a "
+              {statusTarget ? POST_STATE_META[statusTarget].label : ""}"
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {targetSkipped > 0 && (
+                  <p>
+                    Se omitirán {targetSkipped} de {selected.length}
+                    {targetAlready > 0 && ` (${targetAlready} ya en ese estado)`}: su estado actual no permite esta
+                    transición.
+                  </p>
+                )}
+                {statusTarget && DESTRUCTIVE.includes(statusTarget) && (
+                  <p>
+                    Esta acción es destructiva. Puedes revertirla más tarde, pero perderás el historial reciente de
+                    revisión.
+                  </p>
+                )}
+                {targetSkipped === 0 && !(statusTarget && DESTRUCTIVE.includes(statusTarget)) && (
+                  <p>Todas las publicaciones seleccionadas cambiarán de estado.</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={applying}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={applying}
+              onClick={(e) => {
+                e.preventDefault();
+                void doStatusChange();
+              }}
+            >
+              {applying && <Loader2 className="h-4 w-4 animate-spin" />}
+              Confirmar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

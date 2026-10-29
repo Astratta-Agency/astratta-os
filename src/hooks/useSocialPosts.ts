@@ -338,6 +338,61 @@ export function useUpdatePostStatus() {
   });
 }
 
+/**
+ * Cambia el estado de varios posts al mismo destino en una sola consulta.
+ * Las transiciones se validan antes de llamar (POST_STATE_TRANSITIONS);
+ * devuelve los ids que realmente se actualizaron (RLS puede omitir algunos).
+ */
+export function useUpdatePostsStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      posts: { id: string; clientId: string; from: PostStatus }[];
+      to: PostStatus;
+    }): Promise<string[]> => {
+      const { data, error } = await (supabase as any)
+        .from("social_posts")
+        .update({ status: input.to })
+        .in(
+          "id",
+          input.posts.map((p) => p.id),
+        )
+        .select("id");
+      if (error) throw error;
+      const updatedIds: string[] = (data ?? []).map((r: { id: string }) => r.id);
+
+      // Misma auditoría que useUpdatePostStatus, en un solo insert
+      const approvalActions: Record<string, string> = {
+        pending_approval: "sent_for_approval",
+        approved: "approved",
+        rejected: "rejected",
+      };
+      const action = approvalActions[input.to];
+      if (action && updatedIds.length > 0) {
+        const updated = new Set(updatedIds);
+        const { data: userRes } = await supabase.auth.getUser();
+        await (supabase as any).from("content_approval_history").insert(
+          input.posts
+            .filter((p) => updated.has(p.id))
+            .map((p) => ({
+              post_id: p.id,
+              client_id: p.clientId,
+              action,
+              actor_user_id: userRes.user?.id ?? null,
+              metadata: { from: p.from, to: input.to, bulk: true },
+            })),
+        );
+      }
+      return updatedIds;
+    },
+    onSuccess: (_d, input) => {
+      qc.invalidateQueries({ queryKey: ["social-posts"] });
+      qc.invalidateQueries({ queryKey: ["post-approval-history"] });
+      input.posts.forEach((p) => qc.invalidateQueries({ queryKey: ["post", p.id] }));
+    },
+  });
+}
+
 export function usePostApprovalHistory(postId: string | null) {
   return useQuery({
     queryKey: ["post-approval-history", postId],

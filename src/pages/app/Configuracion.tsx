@@ -17,6 +17,8 @@ import { IntegrationsGrid } from "@/components/settings/integrations-grid";
 import { GoogleCalendarCard } from "@/components/settings/google-calendar-card";
 import { NotificationPreferencesCard } from "@/components/settings/notification-preferences-card";
 
+const TABS = ["workspace", "integraciones", "notificaciones"];
+
 export default function Configuracion() {
   const { workspace, isLoading: wsLoading } = useActiveWorkspace();
   const { data: ctx } = useUserContext();
@@ -57,7 +59,7 @@ export default function Configuracion() {
           <Skeleton className="h-48 w-full" />
         </div>
       ) : (
-        <Tabs defaultValue="workspace">
+        <Tabs defaultValue={TABS.includes(searchParams.get("tab") ?? "") ? searchParams.get("tab")! : "workspace"}>
           <TabsList>
             <TabsTrigger value="workspace">Workspace</TabsTrigger>
             <TabsTrigger value="integraciones">Integraciones</TabsTrigger>

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateProjectProgress } from "@/hooks/useProjects";
 
 export type TaskStatus = "todo" | "doing" | "review" | "done";
 export type TaskPriority = "p0" | "p1" | "p2" | "p3";
@@ -179,6 +180,7 @@ export function useCreateTask() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["subtask-counts"] });
+      invalidateProjectProgress(qc);
       if (vars.parent_task_id) {
         qc.invalidateQueries({ queryKey: ["subtasks", vars.parent_task_id] });
       }
@@ -204,6 +206,7 @@ export function useUpdateTask() {
       qc.invalidateQueries({ queryKey: ["task", vars.id] });
       qc.invalidateQueries({ queryKey: ["task-activity", vars.id] });
       qc.invalidateQueries({ queryKey: ["subtask-counts"] });
+      invalidateProjectProgress(qc);
       if (data?.parent_task_id) {
         qc.invalidateQueries({ queryKey: ["subtasks", data.parent_task_id] });
       }
@@ -223,6 +226,7 @@ export function useDeleteTask() {
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["subtask-counts"] });
       qc.invalidateQueries({ queryKey: ["subtasks"] });
+      invalidateProjectProgress(qc);
     },
   });
 }

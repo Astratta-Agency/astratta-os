@@ -58,6 +58,10 @@ verify_jwt = false
 [functions.stripe-webhook]
 verify_jwt = false
 
+# Authenticated by Meta's signed_request; GET only returns a status by unguessable code.
+[functions.meta-data-deletion]
+verify_jwt = false
+
 [functions.google-calendar-oauth-callback]
 verify_jwt = false
 

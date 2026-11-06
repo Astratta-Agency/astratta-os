@@ -55,6 +55,7 @@ function useInvoiceItemsAgency(workspaceId: string | undefined) {
         status: string;
         workspace_id: string;
         client_id: string;
+        project_id: string | null;
       } | null;
     }[]
   >({
@@ -65,7 +66,7 @@ function useInvoiceItemsAgency(workspaceId: string | undefined) {
       const { data, error } = await (supabase as any)
         .from("invoice_items")
         .select(
-          "id, project_id, amount, invoice:invoices!inner(id, status, workspace_id, client_id)",
+          "id, project_id, amount, invoice:invoices!inner(id, status, workspace_id, client_id, project_id)",
         )
         .eq("invoice.workspace_id", workspaceId);
       if (error) throw error;
@@ -191,9 +192,11 @@ export function AgencyAnalyticsTab() {
     PROJECT_TYPES.forEach((t) => rows.set(t, { revenue: 0, costo: 0 }));
 
     items.forEach((it) => {
-      if (!it.project_id) return;
       if (!it.invoice || it.invoice.status !== "paid") return;
-      const t = projectType.get(it.project_id);
+      // The project usually lives on the invoice header; line-level project_id is the fallback.
+      const projectId = it.invoice.project_id ?? it.project_id;
+      if (!projectId) return;
+      const t = projectType.get(projectId);
       if (!t) return;
       rows.get(t)!.revenue += Number(it.amount);
     });

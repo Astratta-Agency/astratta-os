@@ -1,6 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProjectType, ProjectStatus } from "@/integrations/supabase/enums";
+
+/**
+ * projects.progress lo recalcula la base de datos cuando cambian las tareas.
+ * Llamar tras crear, borrar o cambiar el estado de una tarea para que las
+ * listas y el detalle de proyectos muestren el valor nuevo.
+ */
+export function invalidateProjectProgress(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ["projects"] });
+  qc.invalidateQueries({ queryKey: ["project"] });
+}
 
 export type ProjectRow = {
   id: string;
@@ -160,7 +170,6 @@ export type UpdateProjectPatch = {
   start_date?: string | null;
   end_date?: string | null;
   budget_amount?: number | null;
-  progress?: number | null;
   assigned_team_ids?: string[];
 };
 

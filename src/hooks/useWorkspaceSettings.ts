@@ -339,62 +339,136 @@ export type NotificationEventType =
   | "post_rejected"
   | "post_changes_requested"
   | "invite_accepted"
-  | "payment_received"
-  | "contract_expiring";
+  | "new_lead"
+  | "proposal_signed"
+  | "contract_signed"
+  | "contract_expiring"
+  | "task_assigned"
+  | "invoice_sent"
+  | "invoice_paid"
+  | "invoice_overdue"
+  | "invoice_payment_failed"
+  | "payment_received";
 
-export const NOTIFICATION_EVENTS: { key: NotificationEventType; label: string }[] = [
-  { key: "post_approved", label: "Cliente aprobó un post" },
-  { key: "post_rejected", label: "Cliente rechazó un post" },
-  { key: "post_changes_requested", label: "Cliente solicitó cambios" },
-  { key: "invite_accepted", label: "Invitación al portal aceptada" },
-  { key: "payment_received", label: "Pago recibido" },
-  { key: "contract_expiring", label: "Contrato por vencer" },
+export type NotificationChannel = "in_app" | "email" | "push";
+
+export type NotificationChannelPrefs = Record<NotificationChannel, boolean>;
+
+export const NOTIFICATION_CHANNEL_DEFAULTS: NotificationChannelPrefs = {
+  in_app: true,
+  email: false,
+  push: false,
+};
+
+export const NOTIFICATION_EVENT_GROUPS: {
+  label: string;
+  events: { key: NotificationEventType; label: string }[];
+}[] = [
+  {
+    label: "Contenido",
+    events: [
+      { key: "post_approved", label: "Cliente aprobó un post" },
+      { key: "post_rejected", label: "Cliente rechazó un post" },
+      { key: "post_changes_requested", label: "Cliente solicitó cambios" },
+    ],
+  },
+  {
+    label: "Clientes y ventas",
+    events: [
+      { key: "invite_accepted", label: "Invitación al portal aceptada" },
+      { key: "new_lead", label: "Nuevo lead" },
+      { key: "proposal_signed", label: "Propuesta firmada" },
+      { key: "contract_signed", label: "Contrato firmado" },
+      { key: "contract_expiring", label: "Contrato por vencer" },
+    ],
+  },
+  {
+    label: "Tareas",
+    events: [{ key: "task_assigned", label: "Me asignaron una tarea" }],
+  },
+  {
+    label: "Finanzas",
+    events: [
+      { key: "invoice_sent", label: "Factura enviada" },
+      { key: "invoice_paid", label: "Factura pagada" },
+      { key: "payment_received", label: "Pago recibido" },
+      { key: "invoice_overdue", label: "Factura vencida" },
+      { key: "invoice_payment_failed", label: "Pago de factura fallido" },
+    ],
+  },
 ];
 
+export const NOTIFICATION_EVENTS = NOTIFICATION_EVENT_GROUPS.flatMap((g) => g.events);
+
+export type NotificationPreferencesMap = Record<NotificationEventType, NotificationChannelPrefs>;
+
 export function useNotificationPreferences(userId: string | undefined) {
-  return useQuery<Record<NotificationEventType, boolean>>({
+  return useQuery<NotificationPreferencesMap>({
     queryKey: ["notification-preferences", userId],
     enabled: !!userId,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("notification_preferences")
-        .select("event_type, in_app_enabled")
+        .select("event_type, in_app_enabled, email_enabled, push_enabled")
         .eq("user_id", userId);
       if (error) throw error;
-      const map: Record<string, boolean> = {};
-      for (const ev of NOTIFICATION_EVENTS) map[ev.key] = true;
+      const map = {} as NotificationPreferencesMap;
+      for (const ev of NOTIFICATION_EVENTS) map[ev.key] = { ...NOTIFICATION_CHANNEL_DEFAULTS };
       for (const row of data ?? []) {
-        map[row.event_type] = row.in_app_enabled;
+        if (!(row.event_type in map)) continue;
+        map[row.event_type as NotificationEventType] = {
+          in_app: row.in_app_enabled ?? true,
+          email: row.email_enabled ?? false,
+          push: row.push_enabled ?? false,
+        };
       }
-      return map as Record<NotificationEventType, boolean>;
+      return map;
     },
   });
 }
 
-export function useUpdateNotificationPreference() {
+/**
+ * Upserts one or more (event, channel prefs) rows. Each row is written with all
+ * three channels so a new row never resets the others to their DB defaults.
+ */
+export function useUpdateNotificationPreferences() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
       userId: string;
       workspaceId: string;
-      eventType: NotificationEventType;
-      in_app_enabled: boolean;
+      changes: { eventType: NotificationEventType; prefs: NotificationChannelPrefs }[];
     }) => {
-      const { error } = await (supabase as any)
-        .from("notification_preferences")
-        .upsert(
-          {
-            user_id: input.userId,
-            workspace_id: input.workspaceId,
-            event_type: input.eventType,
-            in_app_enabled: input.in_app_enabled,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,event_type" },
-        );
+      const now = new Date().toISOString();
+      const { error } = await (supabase as any).from("notification_preferences").upsert(
+        input.changes.map((c) => ({
+          user_id: input.userId,
+          workspace_id: input.workspaceId,
+          event_type: c.eventType,
+          in_app_enabled: c.prefs.in_app,
+          email_enabled: c.prefs.email,
+          push_enabled: c.prefs.push,
+          updated_at: now,
+        })),
+        { onConflict: "user_id,event_type" },
+      );
       if (error) throw error;
     },
-    onSuccess: (_data, vars) => {
+    onMutate: async (vars) => {
+      const key = ["notification-preferences", vars.userId];
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<NotificationPreferencesMap>(key);
+      if (previous) {
+        const next = { ...previous };
+        for (const c of vars.changes) next[c.eventType] = c.prefs;
+        qc.setQueryData(key, next);
+      }
+      return { previous };
+    },
+    onError: (_err, vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["notification-preferences", vars.userId], ctx.previous);
+    },
+    onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ["notification-preferences", vars.userId] });
     },
   });

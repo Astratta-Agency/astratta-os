@@ -64,6 +64,10 @@ verify_jwt = false
 [functions.google-calendar-sync-cycle]
 verify_jwt = false
 
+# Called by pg_cron; authenticated by the X-Sync-Secret header (SYNC_CRON_SECRET).
+[functions.send-notification-emails]
+verify_jwt = false
+
 # --- Standard Supabase JWT verification ---
 
 [functions.ping]

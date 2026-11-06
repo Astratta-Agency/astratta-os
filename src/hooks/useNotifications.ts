@@ -1,7 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotificationPreferences, type NotificationEventType } from "@/hooks/useWorkspaceSettings";
+import {
+  getDesktopPermission,
+  shouldShowDesktopNotification,
+  showDesktopNotification,
+} from "@/lib/desktop-notifications";
 
 export type NotificationType =
   | "post_approved"
@@ -13,7 +20,11 @@ export type NotificationType =
   | "invoice_sent"
   | "invoice_paid"
   | "invoice_overdue"
-  | "invoice_payment_failed";
+  | "invoice_payment_failed"
+  | "new_lead"
+  | "proposal_signed"
+  | "task_assigned"
+  | "contract_signed";
 
 export type NotificationRow = {
   id: string;
@@ -32,6 +43,14 @@ export type NotificationRow = {
 export function useNotifications() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const { data: prefs } = useNotificationPreferences(user?.id);
+
+  // Read inside the realtime callback without resubscribing on every change.
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
 
   const query = useQuery<NotificationRow[]>({
     queryKey: ["notifications", user?.id],
@@ -63,8 +82,26 @@ export function useNotifications() {
           table: "notifications",
           filter: `recipient_user_id=eq.${user.id}`,
         },
-        () => {
+        (payload) => {
           qc.invalidateQueries({ queryKey: ["notifications", user.id] });
+          const row = payload.new as NotificationRow | undefined;
+          if (!row) return;
+          const pushEnabled =
+            prefsRef.current?.[row.type as NotificationEventType]?.push ?? false;
+          if (
+            shouldShowDesktopNotification({
+              pushEnabled,
+              permission: getDesktopPermission(),
+              documentHidden: document.hidden,
+            })
+          ) {
+            showDesktopNotification({
+              id: row.id,
+              title: row.title,
+              body: row.body,
+              onClick: row.link ? () => navigateRef.current(row.link!) : undefined,
+            });
+          }
         },
       )
       .subscribe();

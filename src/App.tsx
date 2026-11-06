@@ -34,6 +34,8 @@ import Ventas from "@/pages/app/Ventas";
 import LeadCapture from "@/pages/public/LeadCapture";
 import ProposalView from "@/pages/public/ProposalView";
 import ContractView from "@/pages/public/ContractView";
+import Privacy from "@/pages/public/Privacy";
+import DataDeletion from "@/pages/public/DataDeletion";
 import Contratos from "@/pages/app/Contratos";
 import ContratoDetalle from "@/pages/app/ContratoDetalle";
 import Calendario from "@/pages/app/Calendario";
@@ -77,6 +79,10 @@ const App = () => (
           {/* Public proposal view (e-signature) */}
           <Route path="/propuestas/:token" element={<ProposalView />} />
           <Route path="/contratos/:token" element={<ContractView />} />
+
+          {/* Public legal pages (required by Meta and TikTok app review) */}
+          <Route path="/privacidad" element={<Privacy />} />
+          <Route path="/eliminacion-datos" element={<DataDeletion />} />
 
           {/* Onboarding (gated, but allowed before onboarded_at is set) */}
           <Route

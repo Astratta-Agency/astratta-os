@@ -40,7 +40,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
-import { Slider } from "@/components/ui/slider";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 import {
@@ -48,6 +48,7 @@ import {
   PROJECT_STATUS_ORDER,
   PROJECT_TYPES,
   PROJECT_TYPE_LABEL,
+  effectiveProgress,
 } from "@/components/projects/project-meta";
 import { useUpdateProject, type WorkspaceMember } from "@/hooks/useProjects";
 import type {
@@ -86,13 +87,6 @@ const schema = z
     budget_amount: z
       .number({ invalid_type_error: "Número inválido" })
       .min(0, "No puede ser negativo")
-      .nullable()
-      .optional(),
-    progress: z
-      .number()
-      .int()
-      .min(0)
-      .max(100)
       .nullable()
       .optional(),
   })
@@ -155,7 +149,6 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
       start_date: toDate(project.start_date),
       end_date: toDate(project.end_date),
       budget_amount: project.budget_amount,
-      progress: project.progress ?? 0,
     }),
     [
       project.name,
@@ -165,7 +158,6 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
       project.start_date,
       project.end_date,
       project.budget_amount,
-      project.progress,
     ],
   );
 
@@ -175,24 +167,9 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
   });
 
   useEffect(() => {
-    form.register("progress");
-  }, [form]);
-
-  useEffect(() => {
     if (!open) return;
-
-    const values = {
-      ...defaultValues,
-      progress: project.progress ?? 0,
-    };
-
-    form.reset(values);
-    form.setValue("progress", values.progress, {
-      shouldDirty: false,
-      shouldTouch: false,
-      shouldValidate: true,
-    });
-  }, [open, defaultValues, form, project.progress]);
+    form.reset(defaultValues);
+  }, [open, defaultValues, form]);
 
   const onSubmit = async (values: FormValues) => {
     const patch = {
@@ -203,7 +180,6 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
       start_date: toIso(values.start_date ?? null),
       end_date: toIso(values.end_date ?? null),
       budget_amount: values.budget_amount ?? null,
-      progress: values.progress ?? null,
       assigned_team_ids: teamIds,
     };
     const statusChanged = values.status !== project.status;
@@ -211,8 +187,6 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
     const fmtDate = (s: string | null) => (s ? s : "—");
     const fmtMoney = (n: number | null) =>
       n == null ? "—" : `$${n.toLocaleString("es-MX")}`;
-    const fmtProgress = (n: number | null | undefined) =>
-      n == null ? "—" : `${n}%`;
     const clientName = (id: string) =>
       clients.find((c) => c.id === id)?.name ?? id;
     const memberName = (id: string) => {
@@ -255,12 +229,6 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
         from: fmtMoney(project.budget_amount),
         to: fmtMoney(patch.budget_amount),
       });
-    if ((patch.progress ?? null) !== (project.progress ?? null))
-      changes.push({
-        field: "Progreso",
-        from: fmtProgress(project.progress),
-        to: fmtProgress(patch.progress),
-      });
     const prevTeam = [...(project.assigned_team_ids ?? [])].sort();
     const nextTeam = [...teamIds].sort();
     const teamChanged =
@@ -302,6 +270,13 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
       toast.error("No se pudo actualizar", { description: e?.message });
     }
   };
+
+  const autoProgress = effectiveProgress(
+    form.watch("status"),
+    project.start_date,
+    project.end_date,
+    project.progress,
+  );
 
   const selectedClient = clients.find((c) => c.id === form.watch("client_id"));
 
@@ -539,33 +514,20 @@ export function EditProjectDialog({ open, onOpenChange, project, clients, member
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="progress"
-              render={({ field }) => {
-                const val = field.value ?? 0;
-                return (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Progreso</FormLabel>
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {val}%
-                      </span>
-                    </div>
-                    <FormControl>
-                      <Slider
-                        value={[val]}
-                        min={0}
-                        max={100}
-                        step={1}
-                        onValueChange={(v) => field.onChange(v[0])}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                );
-              }}
-            />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Progreso</span>
+                <span className="text-sm font-medium text-muted-foreground">
+                  {autoProgress == null ? "—" : `${autoProgress}%`}
+                </span>
+              </div>
+              <Progress value={autoProgress ?? 0} className="h-1.5" />
+              <p className="text-xs text-muted-foreground">
+                Automático: se calcula con las tareas completadas del proyecto
+                (100% al marcarlo como Entregado o Cerrado). Sin tareas, se
+                estima según las fechas de inicio y deadline.
+              </p>
+            </div>
 
             <div className="space-y-1.5">
               <FormLabel>Equipo asignado</FormLabel>

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateProjectProgress } from "@/hooks/useProjects";
 import type { ProjectStatus, ProjectType } from "@/integrations/supabase/enums";
 
 export type ProjectDetail = {
@@ -248,6 +249,7 @@ export function useCreateProjectTask(
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["project-tasks", projectId] });
+      invalidateProjectProgress(qc);
     },
   });
 }
@@ -264,6 +266,7 @@ export function useUpdateProjectTaskStatus(projectId: string | undefined) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["project-tasks", projectId] });
+      invalidateProjectProgress(qc);
     },
   });
 }

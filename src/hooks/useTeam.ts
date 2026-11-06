@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invalidateProjectProgress } from "@/hooks/useProjects";
 
 // ---------------- Types ----------------
 
@@ -440,6 +441,7 @@ export function useCreateTask(workspaceId: string | undefined) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["workspace-tasks", workspaceId] });
+      invalidateProjectProgress(qc);
     },
   });
 }

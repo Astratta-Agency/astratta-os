@@ -146,9 +146,11 @@ export function FinanceReportsTab() {
     PROJECT_TYPES.forEach((t) => rows.set(t, { revenue: 0, costo: 0 }));
 
     itemsForServices.forEach((it) => {
-      if (!it.project_id) return;
       if (!it.invoice || it.invoice.status !== "paid") return;
-      const t = projectType.get(it.project_id);
+      // The project usually lives on the invoice header; line-level project_id is the fallback.
+      const projectId = it.invoice.project_id ?? it.project_id;
+      if (!projectId) return;
+      const t = projectType.get(projectId);
       if (!t) return;
       const row = rows.get(t)!;
       row.revenue += Number(it.amount);
@@ -392,7 +394,12 @@ function useInvoiceItemsForServices(workspaceId: string | undefined) {
       invoice_id: string;
       project_id: string | null;
       amount: number;
-      invoice: { id: string; status: string; workspace_id: string } | null;
+      invoice: {
+        id: string;
+        status: string;
+        workspace_id: string;
+        project_id: string | null;
+      } | null;
     }[]
   >({
     queryKey: ["invoice-items-for-services", workspaceId],
@@ -402,7 +409,7 @@ function useInvoiceItemsForServices(workspaceId: string | undefined) {
       const { data, error } = await (supabase as any)
         .from("invoice_items")
         .select(
-          "id, invoice_id, project_id, amount, invoice:invoices!inner(id, status, workspace_id)",
+          "id, invoice_id, project_id, amount, invoice:invoices!inner(id, status, workspace_id, project_id)",
         )
         .eq("invoice.workspace_id", workspaceId);
       if (error) throw error;

@@ -83,13 +83,21 @@ export function computeProgress(
   return Math.max(0, Math.min(100, Math.round(((t - s) / (e - s)) * 100)));
 }
 
+/**
+ * Progreso que se muestra en la app. Es automático, nunca manual:
+ *  - Entregado / Cerrado → 100.
+ *  - `taskProgress` es `projects.progress`, que mantiene la base de datos
+ *    (% de tareas completadas; ver migración automatic_project_progress).
+ *  - Sin tareas (`taskProgress` null) → estimación por fechas.
+ */
 export function effectiveProgress(
   status: ProjectStatus,
   start: string | null,
   end: string | null,
-  manualProgress?: number | null,
+  taskProgress?: number | null,
 ): number | null {
-  if (manualProgress != null) return manualProgress;
+  if (status === "delivered" || status === "closed") return 100;
+  if (taskProgress != null) return taskProgress;
   return computeProgress(status, start, end);
 }
 

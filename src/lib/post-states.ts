@@ -38,18 +38,40 @@ export const POST_STATE_ORDER: PostStatus[] = [
   "archived",
 ];
 
+/**
+ * La aprobación del cliente es el camino recomendado, no un candado: el equipo
+ * puede marcar Programado/Publicado desde cualquier estado activo (ver
+ * `skipsClientApproval`), y corregir hacia atrás desde Publicado.
+ */
 export const POST_STATE_TRANSITIONS: Record<PostStatus, PostStatus[]> = {
-  idea: ["draft", "archived"],
-  draft: ["pending_internal_review", "pending_approval", "archived"],
-  pending_internal_review: ["draft", "pending_approval", "rejected"],
-  pending_approval: ["approved", "changes_requested", "rejected", "draft"],
-  changes_requested: ["draft", "pending_approval", "archived"],
-  approved: ["scheduled", "draft"],
-  scheduled: ["approved", "published", "archived"],
-  published: ["archived"],
+  idea: ["draft", "scheduled", "published", "archived"],
+  draft: ["pending_internal_review", "pending_approval", "scheduled", "published", "archived"],
+  pending_internal_review: ["draft", "pending_approval", "scheduled", "published", "rejected"],
+  pending_approval: ["approved", "changes_requested", "rejected", "draft", "scheduled", "published"],
+  changes_requested: ["draft", "pending_approval", "scheduled", "published", "archived"],
+  approved: ["scheduled", "published", "draft"],
+  scheduled: ["published", "approved", "draft", "archived"],
+  published: ["scheduled", "draft", "archived"],
   rejected: ["draft", "archived"],
   archived: ["draft"],
 };
+
+const PRE_APPROVAL: PostStatus[] = [
+  "idea",
+  "draft",
+  "pending_internal_review",
+  "pending_approval",
+  "changes_requested",
+];
+
+/**
+ * true cuando el cambio lleva la publicación a Programado/Publicado sin haber
+ * pasado por la aprobación del cliente. La interfaz pide confirmación y el
+ * salto queda registrado en el historial como `approval_skipped`.
+ */
+export function skipsClientApproval(from: PostStatus, to: PostStatus): boolean {
+  return (to === "scheduled" || to === "published") && PRE_APPROVAL.includes(from);
+}
 
 export const CHANNELS: Channel[] = ["instagram", "facebook", "linkedin", "tiktok", "x", "threads", "google_business", "nextdoor"];
 

@@ -38,6 +38,7 @@ import {
   POST_STATE_META,
   POST_STATE_ORDER,
   POST_STATE_TRANSITIONS,
+  skipsClientApproval,
   type PostStatus,
 } from "@/lib/post-states";
 import { exportToCsv } from "@/lib/csv-export";
@@ -117,6 +118,9 @@ export function CalendarListView({
   const targetEligible = statusTarget ? eligibleFor(statusTarget) : [];
   const targetAlready = statusTarget ? selectedPosts.filter((p) => p.status === statusTarget).length : 0;
   const targetSkipped = selectedPosts.length - targetEligible.length;
+  const targetUnapproved = statusTarget
+    ? targetEligible.filter((p) => skipsClientApproval(p.status, statusTarget)).length
+    : 0;
   const pageAllSelected = slice.length > 0 && slice.every((p) => selectedIds.has(p.id));
   const pageSomeSelected = slice.some((p) => selectedIds.has(p.id));
 
@@ -470,7 +474,15 @@ export function CalendarListView({
                     revisión.
                   </p>
                 )}
-                {targetSkipped === 0 && !(statusTarget && DESTRUCTIVE.includes(statusTarget)) && (
+                {targetUnapproved > 0 && (
+                  <p>
+                    {targetUnapproved === 1
+                      ? "1 no tiene aprobación del cliente."
+                      : `${targetUnapproved} no tienen aprobación del cliente.`}{" "}
+                    Se marcarán igualmente y quedará anotado en su historial; al cliente no se le envía nada.
+                  </p>
+                )}
+                {targetSkipped === 0 && targetUnapproved === 0 && !(statusTarget && DESTRUCTIVE.includes(statusTarget)) && (
                   <p>Todas las publicaciones seleccionadas cambiarán de estado.</p>
                 )}
               </div>

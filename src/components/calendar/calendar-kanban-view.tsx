@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -8,6 +8,16 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
@@ -15,6 +25,7 @@ import {
   POST_STATE_META,
   POST_STATE_ORDER,
   POST_STATE_TRANSITIONS,
+  skipsClientApproval,
   type PostStatus,
 } from "@/lib/post-states";
 import { POST_STATUS_DOT, POST_STATUS_HEX } from "@/lib/post-view-colors";
@@ -97,6 +108,8 @@ export function CalendarKanbanView({
   onPostClick,
   onStatusChange,
 }: Props) {
+  // Soltar en Programado/Publicado sin aprobación del cliente pide confirmación.
+  const [pendingSkip, setPendingSkip] = useState<{ post: SocialPostRow; to: PostStatus } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const grouped = useMemo(() => {
@@ -131,6 +144,14 @@ export function CalendarKanbanView({
       });
       return;
     }
+    if (skipsClientApproval(post.status, to)) {
+      setPendingSkip({ post, to });
+      return;
+    }
+    await applyChange(post, to);
+  };
+
+  const applyChange = async (post: SocialPostRow, to: PostStatus) => {
     try {
       await onStatusChange(post.id, post.status, to, post.client_id);
     } catch {
@@ -160,6 +181,31 @@ export function CalendarKanbanView({
           />
         ))}
       </div>
+      <AlertDialog open={!!pendingSkip} onOpenChange={(o) => !o && setPendingSkip(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ¿Mover a "{pendingSkip ? POST_STATE_META[pendingSkip.to].label : ""}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta publicación no tiene aprobación del cliente. Se marcará igualmente y quedará anotado en el
+              historial; al cliente no se le envía nada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const p = pendingSkip;
+                setPendingSkip(null);
+                if (p) void applyChange(p.post, p.to);
+              }}
+            >
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DndContext>
   );
 }

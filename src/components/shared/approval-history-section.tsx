@@ -26,6 +26,7 @@ const ACTION_META: Record<
   rejected: { label: "Rechazado", icon: XCircle, tone: "text-destructive" },
   changes_requested: { label: "Cambios solicitados", icon: MessageSquare, tone: "text-amber-600" },
   auto_expired: { label: "Solicitud expirada", icon: Clock, tone: "text-muted-foreground" },
+  approval_skipped: { label: "Marcado sin aprobación del cliente", icon: Clock, tone: "text-amber-600" },
 };
 
 /** Fallback when RLS hides the actor profile from the viewer. */

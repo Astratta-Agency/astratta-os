@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { POST_STATE_META, POST_STATE_TRANSITIONS, type PostStatus } from "@/lib/post-states";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { POST_STATE_META, POST_STATE_TRANSITIONS, skipsClientApproval, type PostStatus } from "@/lib/post-states";
 
 interface Props {
   status: PostStatus;
@@ -29,7 +29,7 @@ export function StateChangeDropdown({ status, onChange, onRequestApproval, trigg
   );
 
   const handleSelect = (to: PostStatus) => {
-    if (DESTRUCTIVE.includes(to)) {
+    if (DESTRUCTIVE.includes(to) || skipsClientApproval(status, to)) {
       setPending(to);
       return;
     }
@@ -39,6 +39,11 @@ export function StateChangeDropdown({ status, onChange, onRequestApproval, trigg
   const apply = (to: PostStatus) => {
     onChange(to);
   };
+
+  // Atajos que saltan la aprobación del cliente: van al final, separados.
+  const regular = transitions.filter((t) => !skipsClientApproval(status, t));
+  const shortcuts = transitions.filter((t) => skipsClientApproval(status, t));
+  const pendingSkips = !!pending && skipsClientApproval(status, pending);
 
   const canRequestApproval =
     !!onRequestApproval && (POST_STATE_TRANSITIONS[status] ?? []).includes("pending_approval");
@@ -53,7 +58,7 @@ export function StateChangeDropdown({ status, onChange, onRequestApproval, trigg
           {transitions.length === 0 && !canRequestApproval && (
             <DropdownMenuItem disabled>Sin transiciones disponibles</DropdownMenuItem>
           )}
-          {transitions.map((t) => (
+          {regular.map((t) => (
             <DropdownMenuItem key={t} onClick={() => handleSelect(t)}>
               <span className="mr-2 h-2 w-2 rounded-full" style={{ backgroundColor: POST_STATE_META[t].color }} />
               {POST_STATE_META[t].label}
@@ -68,6 +73,18 @@ export function StateChangeDropdown({ status, onChange, onRequestApproval, trigg
               {POST_STATE_META.pending_approval.label}…
             </DropdownMenuItem>
           )}
+          {shortcuts.length > 0 && (
+            <>
+              <DropdownMenuSeparator />
+              <p className="px-2 py-1 text-[11px] text-muted-foreground">Sin aprobación del cliente</p>
+              {shortcuts.map((t) => (
+                <DropdownMenuItem key={t} onClick={() => handleSelect(t)}>
+                  <span className="mr-2 h-2 w-2 rounded-full" style={{ backgroundColor: POST_STATE_META[t].color }} />
+                  {POST_STATE_META[t].label}
+                </DropdownMenuItem>
+              ))}
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -78,7 +95,9 @@ export function StateChangeDropdown({ status, onChange, onRequestApproval, trigg
               ¿Mover a "{pending ? POST_STATE_META[pending].label : ""}"?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción es destructiva. Puedes revertirla más tarde, pero perderás el historial reciente de revisión.
+              {pendingSkips
+                ? "Esta publicación no tiene aprobación del cliente. Se marcará igualmente y quedará anotado en el historial; al cliente no se le envía nada."
+                : "Esta acción es destructiva. Puedes revertirla más tarde, pero perderás el historial reciente de revisión."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

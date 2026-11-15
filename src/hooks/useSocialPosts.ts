@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Channel, PostStatus } from "@/lib/post-states";
+import { skipsClientApproval, type Channel, type PostStatus } from "@/lib/post-states";
 
 export type SocialPostRow = {
   id: string;
@@ -319,7 +319,9 @@ export function useUpdatePostStatus() {
         approved: "approved",
         rejected: "rejected",
       };
-      const action = approvalActions[input.to];
+      const action = skipsClientApproval(input.from, input.to)
+        ? "approval_skipped"
+        : approvalActions[input.to];
       if (action) {
         const { data: userRes } = await supabase.auth.getUser();
         await (supabase as any).from("content_approval_history").insert({
@@ -331,9 +333,13 @@ export function useUpdatePostStatus() {
         });
       }
     },
-    onSuccess: () => {
+    onSuccess: (_d, input) => {
       qc.invalidateQueries({ queryKey: ["social-posts"] });
       qc.invalidateQueries({ queryKey: ["post-approval-history"] });
+      // El editor lee ["post", id]: sin esto se queda con el estado anterior y
+      // el siguiente cambio se evalúa contra un origen equivocado.
+      qc.invalidateQueries({ queryKey: ["post", input.id] });
+      qc.invalidateQueries({ queryKey: ["content_approval_history", input.id] });
     },
   });
 }
@@ -367,17 +373,19 @@ export function useUpdatePostsStatus() {
         approved: "approved",
         rejected: "rejected",
       };
-      const action = approvalActions[input.to];
-      if (action && updatedIds.length > 0) {
+      const actionFor = (from: PostStatus) =>
+        skipsClientApproval(from, input.to) ? "approval_skipped" : approvalActions[input.to];
+      const audited = input.posts.filter((p) => !!actionFor(p.from));
+      if (audited.length > 0 && updatedIds.length > 0) {
         const updated = new Set(updatedIds);
         const { data: userRes } = await supabase.auth.getUser();
         await (supabase as any).from("content_approval_history").insert(
-          input.posts
+          audited
             .filter((p) => updated.has(p.id))
             .map((p) => ({
               post_id: p.id,
               client_id: p.clientId,
-              action,
+              action: actionFor(p.from),
               actor_user_id: userRes.user?.id ?? null,
               metadata: { from: p.from, to: input.to, bulk: true },
             })),

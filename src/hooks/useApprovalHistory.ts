@@ -7,7 +7,8 @@ export type ApprovalHistoryAction =
   | "rejected"
   | "changes_requested"
   | "resent"
-  | "auto_expired";
+  | "auto_expired"
+  | "approval_skipped";
 
 export type ApprovalHistoryEntry = {
   id: string;

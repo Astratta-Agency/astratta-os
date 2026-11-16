@@ -38,6 +38,7 @@ export function PostDetailDialog({ postId, clientId, role, onOpenChange }: Props
             clientId={clientId}
             role={role}
             readonly={post.status !== "pending_approval"}
+            autoPlayFirst
           />
         )}
       </DialogContent>

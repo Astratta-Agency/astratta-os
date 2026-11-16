@@ -19,10 +19,19 @@ interface Props {
   clientId: string;
   role: "client_admin" | "client_viewer";
   readonly?: boolean;
+  /**
+   * Play a video in the first slide as soon as the card shows. Only for a
+   * card opened on its own (the post detail dialog); in the Aprobaciones list
+   * several cards are visible, so videos there start when their slide is
+   * picked or when the client presses play.
+   */
+  autoPlayFirst?: boolean;
 }
 
-export function ApprovalCard({ post, clientId, role, readonly }: Props) {
+export function ApprovalCard({ post, clientId, role, readonly, autoPlayFirst = false }: Props) {
   const [mediaIdx, setMediaIdx] = useState(0);
+  // Becomes true once the client picks a slide, so that slide's video plays.
+  const [pickedSlide, setPickedSlide] = useState(false);
   const enabledVariants = post.post_variants.filter((v) => v.is_enabled && post.channels.includes(v.channel));
   const tabsList = enabledVariants.length > 0 ? enabledVariants : null;
   const [activeChannel, setActiveChannel] = useState(tabsList?.[0]?.channel ?? post.channels[0]);
@@ -64,6 +73,7 @@ export function ApprovalCard({ post, clientId, role, readonly }: Props) {
                     key={post.media_urls[mediaIdx]}
                     src={post.media_urls[mediaIdx]}
                     className="max-h-[400px] w-full bg-black object-contain"
+                    autoPlay={pickedSlide || autoPlayFirst}
                   />
                 ) : (
                   <img
@@ -78,7 +88,10 @@ export function ApprovalCard({ post, clientId, role, readonly }: Props) {
                       <button
                         key={u + i}
                         type="button"
-                        onClick={() => setMediaIdx(i)}
+                        onClick={() => {
+                          setMediaIdx(i);
+                          setPickedSlide(true);
+                        }}
                         className={cn(
                           "h-12 w-12 shrink-0 overflow-hidden rounded border",
                           i === mediaIdx ? "ring-2 ring-primary" : "border-border",

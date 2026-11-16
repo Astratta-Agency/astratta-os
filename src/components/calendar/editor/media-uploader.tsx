@@ -255,7 +255,11 @@ export function MediaUploader({
                   p.status === "error" && "border-destructive",
                 )}
               >
-                <img src={p.previewUrl} alt="" className="h-full w-full object-cover opacity-60" />
+                {p.file.type.startsWith("video/") ? (
+                  <video src={p.previewUrl} className="h-full w-full object-cover opacity-60" muted playsInline />
+                ) : (
+                  <img src={p.previewUrl} alt="" className="h-full w-full object-cover opacity-60" />
+                )}
                 {p.status === "uploading" && (
                   <>
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -322,14 +326,9 @@ function ThumbItem({
   pending?: PendingItem;
   onRemove: () => void;
 }) {
-  const isVideo = /\.(mp4|mov|webm)(\?|$)/i.test(url);
   return (
     <div className="relative h-20 w-20 shrink-0">
-      {isVideo ? (
-        <video src={url} className="h-full w-full rounded-md border object-cover" muted />
-      ) : (
-        <MediaThumb url={url} className="h-full w-full rounded-md border object-cover" />
-      )}
+      <MediaThumb url={url} className="h-full w-full rounded-md border object-cover" />
       {pending?.status === "uploading" && (
         <div className="absolute inset-x-0 bottom-0">
           <Progress value={pending.progress} className="h-1 rounded-none" />

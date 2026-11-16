@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ImageOff } from "lucide-react";
 
-import { thumbnailUrlFor } from "@/lib/storage";
+import { isVideoUrl, thumbnailUrlFor } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -27,9 +27,26 @@ interface Props {
  * scripts/backfill-media-thumbnails.mjs.
  */
 export function MediaThumb({ url, thumbnailUrl, alt = "", className }: Props) {
-  const preferred = thumbnailUrl ?? thumbnailUrlFor(url);
+  const isVideo = isVideoUrl(url);
+  const preferred = isVideo ? null : thumbnailUrl ?? thumbnailUrlFor(url);
   // Keyed by `url` so switching assets re-arms the placeholder.
   const [failed, setFailed] = useState<string | null>(null);
+
+  if (isVideo) {
+    // Videos have no thumbnail. preload="metadata" fetches only enough bytes
+    // to paint the first frame (#t=0.1 makes Safari show it), not the file.
+    return (
+      <video
+        key={url}
+        src={`${url}#t=0.1`}
+        aria-label={alt || undefined}
+        className={className}
+        muted
+        playsInline
+        preload="metadata"
+      />
+    );
+  }
 
   if (preferred && failed === url) {
     return (

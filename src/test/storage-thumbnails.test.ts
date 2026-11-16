@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { thumbnailPathFor, thumbnailUrlFor } from "@/lib/storage";
+import { isVideoUrl, thumbnailPathFor, thumbnailUrlFor } from "@/lib/storage";
 
 const BASE = "https://vdnblnrwkkychxzbixam.supabase.co/storage/v1/object/public/client-media/";
 
@@ -51,5 +51,19 @@ describe("thumbnailUrlFor", () => {
     const other =
       "https://vdnblnrwkkychxzbixam.supabase.co/storage/v1/object/public/workspace-logos/a/b.png";
     expect(thumbnailUrlFor(other)).toBeNull();
+  });
+});
+
+describe("isVideoUrl", () => {
+  it("recognises uploaded videos, with or without a query string", () => {
+    expect(isVideoUrl(`${BASE}ws/client/uid-12-2.mp4`)).toBe(true);
+    expect(isVideoUrl(`${BASE}ws/client/uid-clip.MOV?t=1`)).toBe(true);
+    expect(isVideoUrl("https://example.com/a.webm#t=0.1")).toBe(true);
+  });
+
+  it("treats images and extensionless links as non-video", () => {
+    expect(isVideoUrl(`${BASE}ws/client/uid-12-1.webp`)).toBe(false);
+    expect(isVideoUrl("https://drive.google.com/file/d/abc/view")).toBe(false);
+    expect(isVideoUrl("https://example.com/mp4-guide.png")).toBe(false);
   });
 });

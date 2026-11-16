@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Heart, MessageCircle, Send, Bookmark, Repeat2, ChevronLeft, ChevronRight } from "lucide-react";
 import { ChannelIcon } from "../channel-icon";
 import { CHANNEL_META } from "@/lib/channels";
+import { isVideoUrl } from "@/lib/storage";
 import type { Channel } from "@/lib/post-states";
 import type { VariantDraft } from "./variant-editor";
 import type { PostFormat } from "./post-editor-meta";
@@ -121,7 +122,17 @@ export function PostPreview({
 
       {/* Media */}
       <div className={`group relative w-full overflow-hidden bg-muted ${aspectClass}`}>
-        {currentUrl ? (
+        {currentUrl && isVideoUrl(currentUrl) ? (
+          <video
+            key={currentUrl}
+            src={currentUrl}
+            className="h-full w-full object-cover"
+            controls
+            muted
+            playsInline
+            preload="metadata"
+          />
+        ) : currentUrl ? (
           <img src={currentUrl} alt="" className="h-full w-full object-cover" />
         ) : (
           <div

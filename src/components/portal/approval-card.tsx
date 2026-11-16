@@ -11,6 +11,7 @@ import type { ApprovalPost } from "@/hooks/portal/usePendingApprovals";
 import { CHANNEL_LABEL } from "@/lib/post-states";
 import { cn } from "@/lib/utils";
 import { MediaThumb } from "@/components/shared/media-thumb";
+import { isVideoUrl } from "@/lib/storage";
 
 interface Props {
   post: ApprovalPost;
@@ -57,11 +58,22 @@ export function ApprovalCard({ post, clientId, role, readonly }: Props) {
               </div>
             ) : (
               <div className="flex flex-col">
-                <img
-                  src={post.media_urls[mediaIdx]}
-                  alt=""
-                  className="max-h-[400px] w-full object-contain"
-                />
+                {isVideoUrl(post.media_urls[mediaIdx] ?? "") ? (
+                  <video
+                    key={post.media_urls[mediaIdx]}
+                    src={post.media_urls[mediaIdx]}
+                    className="max-h-[400px] w-full bg-black object-contain"
+                    controls
+                    playsInline
+                    preload="metadata"
+                  />
+                ) : (
+                  <img
+                    src={post.media_urls[mediaIdx]}
+                    alt=""
+                    className="max-h-[400px] w-full object-contain"
+                  />
+                )}
                 {post.media_urls.length > 1 && (
                   <div className="flex gap-1 overflow-x-auto p-2">
                     {post.media_urls.map((u, i) => (

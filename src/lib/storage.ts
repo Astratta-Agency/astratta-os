@@ -103,6 +103,17 @@ export function thumbnailUrlFor(publicUrl: string): string | null {
   return `${base}${thumbnailPathFor(path)}${query}`;
 }
 
+const VIDEO_URL_PATTERN = /\.(mp4|mov|m4v|webm)(\?|#|$)/i;
+
+/**
+ * Whether a media URL points at a video, judged by its extension. Covers our
+ * own uploads (MP4/MOV keep their extension) and pasted external links.
+ * Videos get no thumbnail, so callers must render them with `<video>`.
+ */
+export function isVideoUrl(url: string): boolean {
+  return VIDEO_URL_PATTERN.test(url);
+}
+
 async function readImageDimensions(
   file: File,
 ): Promise<{ width?: number; height?: number }> {

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { HealthBreakdown } from "@/lib/health";
 import type { ClientStatus, ProjectType } from "@/hooks/useClients";
 
 export type ClientContact = {
@@ -56,6 +57,26 @@ export function useClient(workspaceId: string | undefined, slug: string | undefi
         .maybeSingle();
       if (error) throw error;
       return data as ClientDetail | null;
+    },
+  });
+}
+
+// ---------------- Health score ----------------
+export type ClientHealth = { score: number | null; breakdown: HealthBreakdown; computed_at: string };
+
+/** Breakdown behind clients.health_score. Workspace members only (RLS). */
+export function useClientHealth(clientId: string | undefined) {
+  return useQuery<ClientHealth | null>({
+    queryKey: ["client-health", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("client_health")
+        .select("score, breakdown, computed_at")
+        .eq("client_id", clientId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as ClientHealth | null;
     },
   });
 }

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveWorkspace } from "@/hooks/useActiveWorkspace";
 import { useClients, type ClientStatus } from "@/hooks/useClients";
+import type { HealthFilter } from "@/lib/health";
 import { ClientsFilters, type ViewMode } from "@/components/clients/clients-filters";
 import { ClientsTable } from "@/components/clients/clients-table";
 import { ClientsGrid } from "@/components/clients/clients-grid";
@@ -14,6 +15,7 @@ export default function Clientes() {
   const { workspace } = useActiveWorkspace();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ClientStatus | "all">("all");
+  const [health, setHealth] = useState<HealthFilter>("all");
   const [industry, setIndustry] = useState<string>("all");
   const [location, setLocation] = useState<string>("");
   const [view, setView] = useState<ViewMode>("table");
@@ -22,6 +24,7 @@ export default function Clientes() {
   const { data: clients, isLoading } = useClients(workspace?.id, {
     search,
     status,
+    health,
     industry,
     location,
   });
@@ -29,6 +32,7 @@ export default function Clientes() {
   const hasFilters =
     search.length > 0 ||
     status !== "all" ||
+    health !== "all" ||
     industry !== "all" ||
     location.length > 0;
 
@@ -54,6 +58,8 @@ export default function Clientes() {
           onSearch={setSearch}
           status={status}
           onStatus={setStatus}
+          health={health}
+          onHealth={setHealth}
           industry={industry}
           onIndustry={setIndustry}
           location={location}

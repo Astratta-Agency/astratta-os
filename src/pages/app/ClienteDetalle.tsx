@@ -16,7 +16,7 @@ import { useClient, useClientPendingTasksCount } from "@/hooks/useClientDetail";
 
 import { ClientLogo } from "@/components/clients/client-logo";
 import { StatusBadge } from "@/components/clients/status-badge";
-import { HealthScoreDial } from "@/components/clients/health-score-dial";
+import { HealthScoreBreakdown } from "@/components/clients/health-score-breakdown";
 import { KpiCard } from "@/components/clients/kpi-card";
 import { TabComingSoon } from "@/components/clients/tab-coming-soon";
 import { UpcomingDeliveries, StakeholdersList } from "@/components/clients/resumen-cards";
@@ -135,7 +135,7 @@ export default function ClienteDetalle() {
                 </a>
               )}
             </div>
-            <HealthScoreDial score={health} label="Health score" />
+            <HealthScoreBreakdown clientId={client.id} score={health} />
           </div>
         </div>
 

@@ -249,6 +249,35 @@ export type Database = {
           },
         ]
       }
+      client_health: {
+        Row: {
+          breakdown: Json
+          client_id: string
+          computed_at: string
+          score: number | null
+        }
+        Insert: {
+          breakdown?: Json
+          client_id: string
+          computed_at?: string
+          score?: number | null
+        }
+        Update: {
+          breakdown?: Json
+          client_id?: string
+          computed_at?: string
+          score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_health_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_notes: {
         Row: {
           body_md: string
@@ -1825,30 +1854,133 @@ export type Database = {
           },
         ]
       }
+      newsletter_sends: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          post_slug: string
+          recipients: number
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          post_slug: string
+          recipients?: number
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          post_slug?: string
+          recipients?: number
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "newsletter_sends_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_email_outbox: {
+        Row: {
+          attempts: number
+          body: string | null
+          claimed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          link: string | null
+          recipient_user_id: string
+          sent_at: string | null
+          status: string
+          title: string
+          type: string
+          workspace_id: string
+        }
+        Insert: {
+          attempts?: number
+          body?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          link?: string | null
+          recipient_user_id: string
+          sent_at?: string | null
+          status?: string
+          title: string
+          type: string
+          workspace_id: string
+        }
+        Update: {
+          attempts?: number
+          body?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          link?: string | null
+          recipient_user_id?: string
+          sent_at?: string | null
+          status?: string
+          title?: string
+          type?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_email_outbox_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           created_at: string
+          email_enabled: boolean
           event_type: string
           id: string
           in_app_enabled: boolean
+          push_enabled: boolean
           updated_at: string
           user_id: string
           workspace_id: string
         }
         Insert: {
           created_at?: string
+          email_enabled?: boolean
           event_type: string
           id?: string
           in_app_enabled?: boolean
+          push_enabled?: boolean
           updated_at?: string
           user_id: string
           workspace_id: string
         }
         Update: {
           created_at?: string
+          email_enabled?: boolean
           event_type?: string
           id?: string
           in_app_enabled?: boolean
+          push_enabled?: boolean
           updated_at?: string
           user_id?: string
           workspace_id?: string
@@ -2646,6 +2778,7 @@ export type Database = {
           email: string
           id: string
           interest_tag: string | null
+          language: string
           source_page: string | null
           status: string
           unsubscribe_token: string
@@ -2657,6 +2790,7 @@ export type Database = {
           email: string
           id?: string
           interest_tag?: string | null
+          language?: string
           source_page?: string | null
           status?: string
           unsubscribe_token?: string
@@ -2668,6 +2802,7 @@ export type Database = {
           email?: string
           id?: string
           interest_tag?: string | null
+          language?: string
           source_page?: string | null
           status?: string
           unsubscribe_token?: string
@@ -3324,9 +3459,38 @@ export type Database = {
     }
     Functions: {
       can_write_workspace: { Args: { _workspace_id: string }; Returns: boolean }
+      claim_notification_emails: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          body: string | null
+          claimed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          link: string | null
+          recipient_user_id: string
+          sent_at: string | null
+          status: string
+          title: string
+          type: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notification_email_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       client_in_member_workspace: {
         Args: { _client_id: string }
         Returns: boolean
+      }
+      compute_client_health: { Args: { p_client_id: string }; Returns: Json }
+      compute_project_progress: {
+        Args: { p_project_id: string }
+        Returns: number
       }
       countersign_contract: {
         Args: {
@@ -3471,6 +3635,12 @@ export type Database = {
         Args: { _profile_id: string }
         Returns: boolean
       }
+      project_task_progress: { Args: { p_project_id: string }; Returns: number }
+      refresh_all_client_health: { Args: never; Returns: undefined }
+      refresh_client_health: {
+        Args: { p_client_id: string }
+        Returns: undefined
+      }
       reveal_client_credential: {
         Args: { _credential_id: string }
         Returns: string
@@ -3596,12 +3766,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3625,11 +3795,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3650,11 +3820,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3675,11 +3845,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3692,11 +3862,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

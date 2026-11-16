@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { HEALTHY_MIN, WATCH_MIN, type HealthFilter } from "@/lib/health";
 
 export type ClientStatus = "prospect" | "active" | "paused" | "churned";
 export type ProjectType =
@@ -30,6 +31,7 @@ export type ClientRow = {
 export type ClientsFilters = {
   search?: string;
   status?: ClientStatus | "all";
+  health?: HealthFilter;
   industry?: string | "all";
   location?: string | "all";
 };
@@ -50,6 +52,10 @@ export function useClients(workspaceId: string | undefined, filters: ClientsFilt
 
       if (filters.search?.trim()) q = q.ilike("name", `%${filters.search.trim()}%`);
       if (filters.status && filters.status !== "all") q = q.eq("status", filters.status);
+      if (filters.health === "healthy") q = q.gte("health_score", HEALTHY_MIN);
+      else if (filters.health === "watch") q = q.gte("health_score", WATCH_MIN).lt("health_score", HEALTHY_MIN);
+      else if (filters.health === "risk") q = q.lt("health_score", WATCH_MIN);
+      else if (filters.health === "none") q = q.is("health_score", null);
       if (filters.industry && filters.industry !== "all") q = q.eq("industry", filters.industry);
       if (filters.location?.trim()) q = q.ilike("location", `%${filters.location.trim()}%`);
 

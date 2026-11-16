@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ClientStatus } from "@/hooks/useClients";
+import { HEALTH_LEVEL, type HealthFilter } from "@/lib/health";
 
 export const INDUSTRIES = [
   "Med Spa",
@@ -29,6 +30,8 @@ interface Props {
   onSearch: (v: string) => void;
   status: ClientStatus | "all";
   onStatus: (v: ClientStatus | "all") => void;
+  health: HealthFilter;
+  onHealth: (v: HealthFilter) => void;
   industry: string;
   onIndustry: (v: string) => void;
   location: string;
@@ -75,6 +78,19 @@ export function ClientsFilters(p: Props) {
             <SelectItem value="active">Activos</SelectItem>
             <SelectItem value="paused">Pausados</SelectItem>
             <SelectItem value="churned">Churned</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={p.health} onValueChange={(v) => p.onHealth(v as HealthFilter)}>
+          <SelectTrigger className="w-[170px]" aria-label="Salud">
+            <SelectValue placeholder="Salud" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Toda salud</SelectItem>
+            <SelectItem value="healthy">{HEALTH_LEVEL.healthy.label}</SelectItem>
+            <SelectItem value="watch">{HEALTH_LEVEL.watch.label}</SelectItem>
+            <SelectItem value="risk">{HEALTH_LEVEL.risk.label}</SelectItem>
+            <SelectItem value="none">Sin datos</SelectItem>
           </SelectContent>
         </Select>
 

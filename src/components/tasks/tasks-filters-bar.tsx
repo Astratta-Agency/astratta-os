@@ -23,6 +23,8 @@ interface Props {
   tags: string[];
   onTags: (v: string[]) => void;
   availableTags: string[];
+  /** Clears every filter in one update (separate setters would overwrite each other). */
+  onClear: () => void;
 }
 
 const toggle = <T,>(arr: T[], v: T) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
@@ -37,6 +39,7 @@ export function TasksFiltersBar({
   tags,
   onTags,
   availableTags,
+  onClear,
 }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -119,16 +122,7 @@ export function TasksFiltersBar({
       )}
 
       {(types.length > 0 || priorities.length > 0 || tags.length > 0 || search) && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            onSearch("");
-            onTypes([]);
-            onPriorities([]);
-            onTags([]);
-          }}
-        >
+        <Button variant="ghost" size="sm" onClick={onClear}>
           Limpiar
         </Button>
       )}

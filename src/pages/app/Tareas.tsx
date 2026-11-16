@@ -188,6 +188,7 @@ export default function Tareas() {
             tags={tags}
             onTags={(v) => update({ tags: v })}
             availableTags={availableTags}
+            onClear={() => update({ q: null, types: null, priorities: null, tags: null })}
           />
 
           {(view === "proyecto" || view === "cliente") && (

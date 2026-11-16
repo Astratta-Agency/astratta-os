@@ -12,6 +12,7 @@ import { CHANNEL_LABEL } from "@/lib/post-states";
 import { cn } from "@/lib/utils";
 import { MediaThumb } from "@/components/shared/media-thumb";
 import { isVideoUrl } from "@/lib/storage";
+import { SlideVideo } from "@/components/shared/slide-video";
 
 interface Props {
   post: ApprovalPost;
@@ -59,13 +60,10 @@ export function ApprovalCard({ post, clientId, role, readonly }: Props) {
             ) : (
               <div className="flex flex-col">
                 {isVideoUrl(post.media_urls[mediaIdx] ?? "") ? (
-                  <video
+                  <SlideVideo
                     key={post.media_urls[mediaIdx]}
                     src={post.media_urls[mediaIdx]}
                     className="max-h-[400px] w-full bg-black object-contain"
-                    controls
-                    playsInline
-                    preload="metadata"
                   />
                 ) : (
                   <img

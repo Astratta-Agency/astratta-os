@@ -57,7 +57,7 @@ interface Props {
   onClearFilters?: () => void;
 }
 
-const fmt = (d: string | null) => (d ? format(new Date(d), "dd MMM yyyy") : "—");
+const fmt = (d: string | null) => (d ? format(new Date(d), "d MMM yy") : "—");
 
 export function ProjectsTable({
   rows,
@@ -99,7 +99,7 @@ export function ProjectsTable({
   };
 
   const Th = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
-    <TableHead>
+    <TableHead className="h-8 px-2 text-[11px] font-medium uppercase tracking-wide">
       <button
         type="button"
         onClick={() => toggleSort(k)}
@@ -126,7 +126,7 @@ export function ProjectsTable({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="overflow-hidden rounded-lg border [&_td]:px-2 [&_td]:py-1 [&_td]:text-sm [&_tr]:border-border/60">
         <Table>
           <TableHeader>
             <TableRow>
@@ -136,8 +136,8 @@ export function ProjectsTable({
               <Th k="status">Status</Th>
               <Th k="start_date">Inicio</Th>
               <Th k="end_date">Deadline</Th>
-              <TableHead>Equipo</TableHead>
-              <TableHead>Progreso</TableHead>
+              <TableHead className="h-8 px-2 text-[11px] font-medium uppercase tracking-wide">Equipo</TableHead>
+              <TableHead className="h-8 px-2 text-[11px] font-medium uppercase tracking-wide">Progreso</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -159,7 +159,7 @@ export function ProjectsTable({
               return (
                 <TableRow
                   key={p.id}
-                  className="group cursor-pointer"
+                  className="group h-10 cursor-pointer hover:bg-muted/50"
                   onClick={(e) => {
                     const target = e.target as HTMLElement;
                     if (target.closest("a,button,[role='menuitem'],[role='checkbox'],input")) return;
@@ -170,7 +170,7 @@ export function ProjectsTable({
                     <button
                       type="button"
                       onClick={() => onOpenProject(p)}
-                      className="font-medium hover:text-primary"
+                      className="max-w-[320px] truncate text-left font-medium hover:text-primary"
                     >
                       {p.name}
                     </button>
@@ -216,7 +216,7 @@ export function ProjectsTable({
                       <span className="text-xs text-muted-foreground">—</span>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Progress value={progress} className="h-1.5 flex-1" />
+                        <Progress value={progress} className="h-1 flex-1" />
                         <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">
                           {progress}%
                         </span>
@@ -226,7 +226,7 @@ export function ProjectsTable({
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

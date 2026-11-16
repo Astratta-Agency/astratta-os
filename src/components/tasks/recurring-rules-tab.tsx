@@ -20,6 +20,7 @@ import {
   type RecurrenceRule,
 } from "@/hooks/useTasks";
 import type { WorkspaceMember } from "@/hooks/useProjects";
+import { AssigneeAvatars } from "./assignee-avatars";
 import { RecurringRuleDialog } from "./recurring-rule-dialog";
 
 const FREQ_LABEL = {
@@ -42,11 +43,6 @@ export function RecurringRulesTab({ workspaceId, members, clients, projects }: P
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RecurrenceRule | null>(null);
 
-  const memberName = (id: string | null) => {
-    if (!id) return "—";
-    const m = members.find((x) => x.user_id === id);
-    return m?.full_name || m?.email || id.slice(0, 6);
-  };
 
   return (
     <div className="space-y-4">
@@ -102,7 +98,9 @@ export function RecurringRulesTab({ workspaceId, members, clients, projects }: P
                   <TableCell className="text-sm">
                     {format(parseISO(r.next_run_date), "dd MMM yyyy", { locale: es })}
                   </TableCell>
-                  <TableCell className="text-sm">{memberName(r.assigned_to)}</TableCell>
+                  <TableCell className="text-sm">
+                    <AssigneeAvatars ids={r.assignee_ids} members={members} showName />
+                  </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <Switch
                       checked={r.is_active}

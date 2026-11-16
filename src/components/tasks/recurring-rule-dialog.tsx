@@ -1,3 +1,4 @@
+import { AssigneeMultiSelect } from "./assignee-multi-select";
 import { useEffect, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -59,7 +60,7 @@ export function RecurringRuleDialog({
   const [description, setDescription] = useState("");
   const [type, setType] = useState<TaskType>("produccion");
   const [priority, setPriority] = useState<TaskPriority>("p2");
-  const [assignedTo, setAssignedTo] = useState<string>("none");
+  const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [clientId, setClientId] = useState<string>("none");
   const [projectId, setProjectId] = useState<string>("none");
   const [estHours, setEstHours] = useState("");
@@ -72,7 +73,7 @@ export function RecurringRuleDialog({
       setDescription(editing.description ?? "");
       setType(editing.type);
       setPriority(editing.priority);
-      setAssignedTo(editing.assigned_to ?? "none");
+      setAssignedTo(editing.assignee_ids);
       setClientId(editing.client_id ?? "none");
       setProjectId(editing.project_id ?? "none");
       setEstHours(editing.estimated_hours != null ? String(editing.estimated_hours) : "");
@@ -83,7 +84,7 @@ export function RecurringRuleDialog({
       setDescription("");
       setType("produccion");
       setPriority("p2");
-      setAssignedTo("none");
+      setAssignedTo([]);
       setClientId("none");
       setProjectId("none");
       setEstHours("");
@@ -100,7 +101,8 @@ export function RecurringRuleDialog({
       description: description.trim() || null,
       type,
       priority,
-      assigned_to: assignedTo === "none" ? null : assignedTo,
+      assigned_to: assignedTo[0] ?? null,
+      assignee_ids: assignedTo,
       client_id: clientId === "none" ? null : clientId,
       project_id: projectId === "none" ? null : projectId,
       estimated_hours: estHours.trim() ? Number(estHours) : null,
@@ -204,20 +206,8 @@ export function RecurringRuleDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Asignado</Label>
-              <Select value={assignedTo} onValueChange={setAssignedTo}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
-                  {members.map((m) => (
-                    <SelectItem key={m.user_id} value={m.user_id}>
-                      {m.full_name || m.email || m.user_id.slice(0, 6)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Asignados</Label>
+              <AssigneeMultiSelect value={assignedTo} onChange={setAssignedTo} members={members} />
             </div>
             <div className="space-y-1.5">
               <Label>Horas estimadas</Label>

@@ -30,7 +30,7 @@ export function MemberAssignmentsCard({ members, projects, tasks, currentUserId,
               (p.status === "planning" || p.status === "in_progress") &&
               (p.assigned_team_ids ?? []).includes(m.user_id),
           );
-          const memberTasks = tasks.filter((t) => t.assigned_to === m.user_id && t.status !== "done");
+          const memberTasks = tasks.filter((t) => t.assignee_ids.includes(m.user_id) && t.status !== "done");
           const empty = memberProjects.length === 0 && memberTasks.length === 0;
 
           return (

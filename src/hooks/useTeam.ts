@@ -67,6 +67,7 @@ export type WorkspaceTask = {
   title: string;
   description: string | null;
   assigned_to: string | null;
+  assignee_ids: string[];
   status: "todo" | "doing" | "review" | "done";
   priority: "p0" | "p1" | "p2" | "p3" | null;
   due_date: string | null;
@@ -407,11 +408,14 @@ export function useWorkspaceTasks(workspaceId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("tasks")
-        .select("*")
+        .select("*, task_assignees(user_id)")
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as WorkspaceTask[];
+      return ((data ?? []) as any[]).map(({ task_assignees, ...r }) => ({
+        ...r,
+        assignee_ids: (task_assignees ?? []).map((a: { user_id: string }) => a.user_id),
+      })) as WorkspaceTask[];
     },
   });
 }

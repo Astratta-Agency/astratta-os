@@ -17,7 +17,8 @@
 -- de Edge Functions, porque google-calendar-sync-cycle lo compara contra la
 -- cabecera X-Sync-Secret entrante.
 --
--- El secreto que se usó en producción sigue activo y debería rotarse.
+-- El secreto original (el que estaba incrustado aquí) se rotó en producción el
+-- 2026-11-06; ver "Rotar el secreto interno de los cron" en docs/database.md.
 
 do $$
 begin

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Task, TaskType } from "@/hooks/useTasks";
+import { normalizeTask, TASK_SELECT, type Task, type TaskType } from "@/hooks/useTasks";
 
 // ---------------- Types ----------------
 
@@ -198,16 +198,13 @@ export function usePostSubtasks(postId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("tasks")
-        .select("*")
+        .select(TASK_SELECT)
         .eq("related_post_id", postId)
         .not("content_subtask_key", "is", null)
         .order("due_date", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return ((data ?? []) as any[]).map((r) => ({
-        ...r,
-        tags: Array.isArray(r.tags) ? r.tags : [],
-      })) as ContentSubtask[];
+      return ((data ?? []) as any[]).map(normalizeTask) as ContentSubtask[];
     },
   });
 }

@@ -1120,6 +1120,11 @@ export type Database = {
           updated_by: string | null
           visible_in_portal: boolean
           workspace_id: string
+          archived_at: string | null
+          cover_color: string | null
+          icon: string | null
+          parent_id: string | null
+          position: number
         }
         Insert: {
           client_id?: string | null
@@ -1136,6 +1141,11 @@ export type Database = {
           updated_by?: string | null
           visible_in_portal?: boolean
           workspace_id: string
+          archived_at?: string | null
+          cover_color?: string | null
+          icon?: string | null
+          parent_id?: string | null
+          position?: number
         }
         Update: {
           client_id?: string | null
@@ -1152,6 +1162,11 @@ export type Database = {
           updated_by?: string | null
           visible_in_portal?: boolean
           workspace_id?: string
+          archived_at?: string | null
+          cover_color?: string | null
+          icon?: string | null
+          parent_id?: string | null
+          position?: number
         }
         Relationships: [
           {
@@ -2863,6 +2878,35 @@ export type Database = {
           },
         ]
       }
+      task_assignees: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignees_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_attachments: {
         Row: {
           created_at: string
@@ -2974,6 +3018,7 @@ export type Database = {
       task_recurrence_rules: {
         Row: {
           assigned_to: string | null
+          assignee_ids: string[]
           client_id: string | null
           created_at: string
           created_by: string | null
@@ -2995,6 +3040,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          assignee_ids?: string[]
           client_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -3016,6 +3062,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          assignee_ids?: string[]
           client_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -3069,6 +3116,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           due_date: string | null
+          due_time: string | null
           estimated_hours: number | null
           id: string
           lead_id: string | null
@@ -3076,6 +3124,8 @@ export type Database = {
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string | null
           related_post_id: string | null
+          start_date: string | null
+          start_time: string | null
           status: Database["public"]["Enums"]["task_status"]
           tags: string[]
           timer_started_at: string | null
@@ -3094,6 +3144,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           estimated_hours?: number | null
           id?: string
           lead_id?: string | null
@@ -3101,6 +3152,8 @@ export type Database = {
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
           related_post_id?: string | null
+          start_date?: string | null
+          start_time?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           tags?: string[]
           timer_started_at?: string | null
@@ -3119,6 +3172,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           due_date?: string | null
+          due_time?: string | null
           estimated_hours?: number | null
           id?: string
           lead_id?: string | null
@@ -3126,6 +3180,8 @@ export type Database = {
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string | null
           related_post_id?: string | null
+          start_date?: string | null
+          start_time?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           tags?: string[]
           timer_started_at?: string | null
@@ -3612,6 +3668,7 @@ export type Database = {
       }
       is_client_admin: { Args: { _client_id: string }; Returns: boolean }
       is_client_user: { Args: { _client_id: string }; Returns: boolean }
+      is_task_assignee: { Args: { p_task_id: string }; Returns: boolean }
       is_workspace_member: { Args: { _workspace_id: string }; Returns: boolean }
       is_workspace_owner: { Args: { _workspace_id: string }; Returns: boolean }
       mark_overdue_invoices: { Args: never; Returns: undefined }
@@ -3644,6 +3701,10 @@ export type Database = {
       reveal_client_credential: {
         Args: { _credential_id: string }
         Returns: string
+      }
+      set_task_assignees: {
+        Args: { p_task_id: string; p_user_ids: string[] }
+        Returns: undefined
       }
       shares_workspace_with: { Args: { _other_user: string }; Returns: boolean }
       stop_task_timer: {

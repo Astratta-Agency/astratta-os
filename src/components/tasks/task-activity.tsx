@@ -46,7 +46,7 @@ export function describeActivity(
       const from = memberName(ctx.members, e.old_value);
       const to = memberName(ctx.members, e.new_value);
       if (!from && to) return `asignó la tarea a ${to}`;
-      if (from && !to) return `quitó la asignación (antes ${from})`;
+      if (from && !to) return `quitó a ${from} de la tarea`;
       return `reasignó la tarea de ${from ?? "?"} a ${to ?? "?"}`;
     }
     case "title":

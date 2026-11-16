@@ -1,10 +1,8 @@
 import { generateHTML, type JSONContent } from "@tiptap/core";
-import StarterKit from "@tiptap/starter-kit";
-import TaskList from "@tiptap/extension-task-list";
-import TaskItem from "@tiptap/extension-task-item";
+import { DOC_EXTENSIONS } from "@/lib/doc-extensions";
 import TurndownService from "turndown";
 
-const EXTENSIONS = [StarterKit, TaskList, TaskItem.configure({ nested: true })];
+const EXTENSIONS = DOC_EXTENSIONS;
 
 const slugify = (s: string) =>
   s
@@ -38,6 +36,13 @@ function fullHTMLDocument(title: string, bodyHTML: string): string {
   pre code { background: none; padding: 0; }
   ul[data-type="taskList"] { list-style: none; padding-left: 4px; }
   ul[data-type="taskList"] li { display: flex; gap: 8px; align-items: baseline; }
+  div[data-callout] { position: relative; background: #fef9c3; border-radius: 8px; padding: 10px 14px 10px 40px; margin: 12px 0; }
+  div[data-callout]::before { content: attr(data-emoji); position: absolute; left: 14px; top: 10px; }
+  div[data-callout][data-variant="info"] { background: #e0f2fe; }
+  div[data-callout][data-variant="warning"] { background: #ffedd5; }
+  div[data-callout][data-variant="success"] { background: #dcfce7; }
+  div[data-callout] > :first-child { margin-top: 0; }
+  div[data-callout] > :last-child { margin-bottom: 0; }
   hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
   .doc-title { margin-bottom: 4px; }
   .doc-meta { color: #6b7280; font-size: 13px; margin-bottom: 28px; }

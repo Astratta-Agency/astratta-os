@@ -1,3 +1,4 @@
+import { AssigneeAvatars } from "@/components/tasks/assignee-avatars";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -14,7 +15,6 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
@@ -92,16 +92,6 @@ export function PostSubtasksChecklist({ postId, workspaceId, postStatus }: Props
               const done = t.status === "done";
               const overdue =
                 !done && t.due_date && isBefore(parseISO(t.due_date), today);
-              const member = members.find((m) => m.user_id === t.assigned_to);
-              const assignedName = member?.full_name || member?.email || null;
-              const initials = (assignedName || "")
-                .split(/\s+/)
-                .map((w) => w[0])
-                .filter(Boolean)
-                .slice(0, 2)
-                .join("")
-                .toUpperCase();
-
               const handleToggle = async (checked: boolean) => {
                 try {
                   await updateTask.mutateAsync({
@@ -136,16 +126,8 @@ export function PostSubtasksChecklist({ postId, workspaceId, postStatus }: Props
                       </Badge>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      {assignedName ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Avatar className="h-4 w-4">
-                            {member?.avatar_url && (
-                              <AvatarImage src={member.avatar_url} alt={assignedName} />
-                            )}
-                            <AvatarFallback className="text-[8px]">{initials}</AvatarFallback>
-                          </Avatar>
-                          {assignedName}
-                        </span>
+                      {t.assignee_ids.length > 0 ? (
+                        <AssigneeAvatars ids={t.assignee_ids} members={members} max={3} showName />
                       ) : (
                         <span>Sin asignar</span>
                       )}

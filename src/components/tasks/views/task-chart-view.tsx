@@ -45,8 +45,8 @@ export function TaskChartView({ tasks, members, projects = [], showProject = tru
     if (groupBy === "assignee") {
       const counts = new Map<string, number>();
       for (const t of tasks) {
-        const key = t.assigned_to ?? "unassigned";
-        counts.set(key, (counts.get(key) ?? 0) + 1);
+        const keys = t.assignee_ids.length ? t.assignee_ids : ["unassigned"];
+        for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
       }
       return Array.from(counts.entries())
         .map(([id, value]) => {

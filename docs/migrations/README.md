@@ -44,4 +44,4 @@ Texas, y cada agencia necesitará su propia jurisdicción.
 `20260702164057_google_calendar_sync_secret_vault.sql` contenía el valor literal del
 secreto compartido entre `pg_cron` y la edge function de sincronización. Se redactó
 al versionarlo para no dejarlo en el historial de git; el archivo explica cómo
-regenerarlo. El secreto usado en producción sigue activo y conviene rotarlo.
+regenerarlo. El secreto original se rotó en producción el 2026-11-06.

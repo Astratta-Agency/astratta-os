@@ -55,6 +55,27 @@ Keep the grants narrow: if users only read a table, grant `select` and nothing m
 
 The same applies to views and to sequences used directly by clients.
 
+## Rotating the internal cron secret
+
+`pg_cron` authenticates against two edge functions (`google-calendar-sync-cycle`, `send-notification-emails`) with an `X-Sync-Secret` header. The same value lives in two places and **both must change together**:
+
+| Where | Name | Who reads it |
+|---|---|---|
+| Edge function secrets | `SYNC_CRON_SECRET` | the two functions (compare against the header) |
+| Vault | `google_calendar_sync_secret` | the two cron jobs (send it as the header) |
+
+Last rotated: 2026-11-06. Steps (one shell block, value never printed):
+
+1. Generate: `NEW=$(openssl rand -hex 32)`.
+2. `supabase secrets set --remote=<ref> --yes SYNC_CRON_SECRET="$NEW"`.
+3. `supabase db query --remote=<ref> --yes "select vault.update_secret((select id from vault.secrets where name='google_calendar_sync_secret'), '$NEW')"`.
+4. Verify: `curl -X POST .../functions/v1/send-notification-emails -H "X-Sync-Secret: $NEW"` → 200, a wrong value → 401. Then confirm the next 5-minute cron tick returns 200 in `net._http_response`.
+
+Gotchas learned the hard way:
+- In agent mode the CLI refuses hosted writes without `--yes`, and **`secrets set` needs it too**. Apply both steps in one block that aborts if step 2 fails, otherwise the cron jobs return 403 until the two sides match again.
+- The CLI role cannot decrypt the vault (`permission denied for function _crypto_aead_det_decrypt`), so a value written to the vault cannot be read back. Never write the vault first: keep the generated value in the shell until both writes succeed.
+- A mismatch is harmless but noisy: cron calls fail with 403/401 and retry on the next tick (every minute / every 5 minutes).
+
 ## Verification
 After applying, run the smoke tests in `docs/security-tests.sql` and check:
 - Every table has RLS enabled (Supabase Dashboard → Authentication → Policies).

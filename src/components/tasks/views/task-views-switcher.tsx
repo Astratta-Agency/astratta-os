@@ -30,6 +30,28 @@ interface Props {
   defaultView?: TaskViewType;
 }
 
+const VIEW_KEY = "astratta:tasks:view";
+const GROUP_KEY = "astratta:tasks:group-by";
+const VIEW_VALUES: TaskViewType[] = ["table", "kanban", "gantt", "chart"];
+const GROUP_VALUES: GroupBy[] = ["status", "priority", "assignee", "project", "none"];
+
+/** Last choice of the user, kept in this browser. Storage can be blocked. */
+function readPref<T extends string>(key: string, allowed: T[]): T | null {
+  try {
+    const v = localStorage.getItem(key);
+    return v && (allowed as string[]).includes(v) ? (v as T) : null;
+  } catch {
+    return null;
+  }
+}
+function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable: the choice just won't persist */
+  }
+}
+
 const VIEWS: { key: TaskViewType; label: string; icon: React.ComponentType<any> }[] = [
   { key: "table", label: "Tabla", icon: Table2 },
   { key: "kanban", label: "Kanban", icon: KanbanSquare },
@@ -47,8 +69,22 @@ export function TaskViewsSwitcher({
   hideProjectGrouping = false,
   defaultView = "table",
 }: Props) {
-  const [view, setView] = useState<TaskViewType>(defaultView);
-  const [groupBy, setGroupBy] = useState<GroupBy>("status");
+  const [view, setViewState] = useState<TaskViewType>(() => readPref(VIEW_KEY, VIEW_VALUES) ?? defaultView);
+  const [groupBy, setGroupByState] = useState<GroupBy>(() => {
+    const stored = readPref(GROUP_KEY, GROUP_VALUES);
+    // Inside a project, grouping by project makes no sense.
+    return stored === "project" && hideProjectGrouping ? "status" : (stored ?? "status");
+  });
+
+  // Persist only explicit choices, never a fallback default.
+  const setView = (v: TaskViewType) => {
+    setViewState(v);
+    writePref(VIEW_KEY, v);
+  };
+  const setGroupBy = (g: GroupBy) => {
+    setGroupByState(g);
+    writePref(GROUP_KEY, g);
+  };
 
   return (
     <div className="space-y-3">

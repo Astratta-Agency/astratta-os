@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { invalidateProjectProgress } from "@/hooks/useProjects";
+import { saveTaskAssignees } from "@/hooks/useTasks";
 import type { ProjectStatus, ProjectType } from "@/integrations/supabase/enums";
 
 export type ProjectDetail = {
@@ -197,6 +198,7 @@ export type ProjectTask = {
   title: string;
   description: string | null;
   assigned_to: string | null;
+  assignee_ids: string[];
   status: "todo" | "doing" | "review" | "done";
   priority: "p0" | "p1" | "p2" | "p3";
   due_date: string | null;
@@ -210,12 +212,15 @@ export function useProjectTasks(projectId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("tasks")
-        .select("id, title, description, assigned_to, status, priority, due_date, created_at")
+        .select("id, title, description, assigned_to, status, priority, due_date, created_at, task_assignees(user_id)")
         .eq("project_id", projectId)
         .order("due_date", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as ProjectTask[];
+      return ((data ?? []) as any[]).map(({ task_assignees, ...r }) => ({
+        ...r,
+        assignee_ids: (task_assignees ?? []).map((a: { user_id: string }) => a.user_id),
+      })) as ProjectTask[];
     },
   });
 }
@@ -229,23 +234,27 @@ export function useCreateProjectTask(
   return useMutation({
     mutationFn: async (input: {
       title: string;
-      assigned_to?: string | null;
+      assignee_ids?: string[];
       priority: ProjectTask["priority"];
       due_date?: string | null;
     }) => {
       if (!workspaceId || !projectId) throw new Error("Faltan ids");
       const { data: userRes } = await supabase.auth.getUser();
-      const { error } = await (supabase as any).from("tasks").insert({
-        workspace_id: workspaceId,
-        project_id: projectId,
-        client_id: clientId ?? null,
-        title: input.title,
-        assigned_to: input.assigned_to || null,
-        priority: input.priority,
-        due_date: input.due_date || null,
-        created_by: userRes.user?.id ?? null,
-      });
+      const { data, error } = await (supabase as any)
+        .from("tasks")
+        .insert({
+          workspace_id: workspaceId,
+          project_id: projectId,
+          client_id: clientId ?? null,
+          title: input.title,
+          priority: input.priority,
+          due_date: input.due_date || null,
+          created_by: userRes.user?.id ?? null,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      if (input.assignee_ids?.length) await saveTaskAssignees(data.id, input.assignee_ids);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["project-tasks", projectId] });

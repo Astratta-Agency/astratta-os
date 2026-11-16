@@ -16,19 +16,51 @@ export type Task = {
   parent_task_id: string | null;
   title: string;
   description: string | null;
+  /** Deprecated: primary (first) assignee. Use `assignee_ids`. */
   assigned_to: string | null;
+  /** All assignees of the task (primary first). */
+  assignee_ids: string[];
   status: TaskStatus;
   priority: TaskPriority;
   type: TaskType;
   estimated_hours: number | null;
   tags: string[];
+  start_date: string | null;
+  /** Optional time of day for start_date, "HH:MM:SS". */
+  start_time: string | null;
   due_date: string | null;
+  /** Optional time of day for due_date, "HH:MM:SS". */
+  due_time: string | null;
   timer_started_at: string | null;
   timer_started_by: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
 };
+
+/** Select list that also loads the task's assignees. */
+export const TASK_SELECT = "*, task_assignees(user_id)";
+
+/** Maps a raw `tasks` row (with the `task_assignees` embed) to a Task. */
+export function normalizeTask(r: any): Task {
+  const { task_assignees, mine: _mine, ...rest } = r;
+  const embedded: string[] = Array.isArray(task_assignees)
+    ? task_assignees.map((a: { user_id: string }) => a.user_id)
+    : [];
+  const ids = rest.assigned_to && embedded.includes(rest.assigned_to)
+    ? [rest.assigned_to, ...embedded.filter((x) => x !== rest.assigned_to)]
+    : embedded;
+  return { ...rest, tags: Array.isArray(rest.tags) ? rest.tags : [], assignee_ids: ids } as Task;
+}
+
+/** Replaces all assignees of a task (single RPC, RLS applies). */
+export async function saveTaskAssignees(taskId: string, userIds: string[]) {
+  const { error } = await (supabase as any).rpc("set_task_assignees", {
+    p_task_id: taskId,
+    p_user_ids: Array.from(new Set(userIds)),
+  });
+  if (error) throw error;
+}
 
 export type TasksFilters = {
   search?: string;
@@ -48,9 +80,17 @@ export function useTasks(workspaceId: string | undefined, filters: TasksFilters 
     enabled: !!workspaceId,
     staleTime: 15_000,
     queryFn: async () => {
+      const byAssignee =
+        filters.assignedTo === "me"
+          ? filters.currentUserId
+          : filters.assignedTo && filters.assignedTo !== "all"
+            ? filters.assignedTo
+            : undefined;
+      // A second, inner-joined embed filters by assignee without trimming the
+      // `task_assignees` list that tells us everyone assigned to each task.
       let q = (supabase as any)
         .from("tasks")
-        .select("*")
+        .select(byAssignee ? `${TASK_SELECT}, mine:task_assignees!inner(user_id)` : TASK_SELECT)
         .eq("workspace_id", workspaceId)
         .is("parent_task_id", null)
         .order("due_date", { ascending: true, nullsFirst: false })
@@ -63,18 +103,11 @@ export function useTasks(workspaceId: string | undefined, filters: TasksFilters 
       if (filters.tags?.length) q = q.overlaps("tags", filters.tags);
       if (filters.clientId) q = q.eq("client_id", filters.clientId);
       if (filters.projectId) q = q.eq("project_id", filters.projectId);
-      if (filters.assignedTo === "me" && filters.currentUserId) {
-        q = q.eq("assigned_to", filters.currentUserId);
-      } else if (filters.assignedTo && filters.assignedTo !== "all" && filters.assignedTo !== "me") {
-        q = q.eq("assigned_to", filters.assignedTo);
-      }
+      if (byAssignee) q = q.eq("mine.user_id", byAssignee);
 
       const { data, error } = await q;
       if (error) throw error;
-      return ((data ?? []) as any[]).map((r) => ({
-        ...r,
-        tags: Array.isArray(r.tags) ? r.tags : [],
-      })) as Task[];
+      return ((data ?? []) as any[]).map(normalizeTask);
     },
   });
 }
@@ -86,14 +119,11 @@ export function useSubtasks(parentTaskId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("tasks")
-        .select("*")
+        .select(TASK_SELECT)
         .eq("parent_task_id", parentTaskId)
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return ((data ?? []) as any[]).map((r) => ({
-        ...r,
-        tags: Array.isArray(r.tags) ? r.tags : [],
-      })) as Task[];
+      return ((data ?? []) as any[]).map(normalizeTask);
     },
   });
 }
@@ -129,12 +159,12 @@ export function useTask(taskId: string | null | undefined) {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("tasks")
-        .select("*")
+        .select(TASK_SELECT)
         .eq("id", taskId)
         .maybeSingle();
       if (error) throw error;
       if (!data) return null;
-      return { ...data, tags: Array.isArray(data.tags) ? data.tags : [] } as Task;
+      return normalizeTask(data);
     },
   });
 }
@@ -146,8 +176,11 @@ export type NewTaskInput = {
   type?: TaskType;
   priority?: TaskPriority;
   status?: TaskStatus;
-  assigned_to?: string | null;
+  assignee_ids?: string[];
+  start_date?: string | null;
+  start_time?: string | null;
   due_date?: string | null;
+  due_time?: string | null;
   estimated_hours?: number | null;
   tags?: string[];
   project_id?: string | null;
@@ -162,10 +195,11 @@ export function useCreateTask() {
   return useMutation({
     mutationFn: async (input: NewTaskInput) => {
       const { data: userRes } = await supabase.auth.getUser();
+      const { assignee_ids, ...fields } = input;
       const { data, error } = await (supabase as any)
         .from("tasks")
         .insert({
-          ...input,
+          ...fields,
           type: input.type ?? "produccion",
           priority: input.priority ?? "p2",
           status: input.status ?? "todo",
@@ -175,7 +209,8 @@ export function useCreateTask() {
         .select("*")
         .single();
       if (error) throw error;
-      return data as Task;
+      if (assignee_ids?.length) await saveTaskAssignees(data.id, assignee_ids);
+      return { ...data, assignee_ids: assignee_ids ?? [] } as Task;
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
@@ -192,14 +227,16 @@ export function useUpdateTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<Task> }) => {
+      const { assignee_ids, assigned_to: _legacy, ...fields } = patch;
       const { data, error } = await (supabase as any)
         .from("tasks")
-        .update({ ...patch, updated_at: new Date().toISOString() })
+        .update({ ...fields, updated_at: new Date().toISOString() })
         .eq("id", id)
         .select("*")
         .single();
       if (error) throw error;
-      return data as Task;
+      if (assignee_ids) await saveTaskAssignees(id, assignee_ids);
+      return { ...data, assignee_ids: assignee_ids ?? [] } as Task;
     },
     onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
@@ -550,6 +587,7 @@ export type RecurrenceRule = {
   type: TaskType;
   priority: TaskPriority;
   assigned_to: string | null;
+  assignee_ids: string[];
   client_id: string | null;
   project_id: string | null;
   tags: string[];
@@ -578,6 +616,9 @@ export function useRecurrenceRules(workspaceId: string | undefined) {
       return ((data ?? []) as any[]).map((r) => ({
         ...r,
         tags: Array.isArray(r.tags) ? r.tags : [],
+        assignee_ids: Array.isArray(r.assignee_ids) && r.assignee_ids.length
+          ? r.assignee_ids
+          : r.assigned_to ? [r.assigned_to] : [],
       })) as RecurrenceRule[];
     },
   });

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { FileImage } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AssigneeAvatars } from "./assignee-avatars";
 import {
   Select,
   SelectContent,
@@ -32,21 +32,6 @@ interface Props {
   onStatusChange: (id: string, status: TaskStatus) => void;
 }
 
-function memberLabel(members: WorkspaceMember[], id: string | null) {
-  if (!id) return null;
-  const m = members.find((x) => x.user_id === id);
-  if (!m) return null;
-  const name = m.full_name || m.email || "Miembro";
-  const initials = name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  return { name, initials, avatar: m.avatar_url };
-}
-
 export function TasksTable({ tasks, members, onOpen, onStatusChange }: Props) {
   const postIds = tasks.map((t) => t.related_post_id).filter((x): x is string => !!x);
   const { data: postMap = {} } = usePostsByIds(postIds);
@@ -67,14 +52,13 @@ export function TasksTable({ tasks, members, onOpen, onStatusChange }: Props) {
             <TableHead>Título</TableHead>
             <TableHead className="w-[110px]">Tipo</TableHead>
             <TableHead className="w-[90px]">Prioridad</TableHead>
-            <TableHead className="w-[200px]">Asignado</TableHead>
+            <TableHead className="w-[200px]">Asignados</TableHead>
             <TableHead className="w-[140px]">Fecha límite</TableHead>
             <TableHead className="w-[150px]">Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {tasks.map((t) => {
-            const assigned = memberLabel(members, t.assigned_to);
             const overdue =
               t.due_date && t.status !== "done"
                 ? isBefore(parseISO(t.due_date), today)
@@ -119,17 +103,7 @@ export function TasksTable({ tasks, members, onOpen, onStatusChange }: Props) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {assigned ? (
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        {assigned.avatar && <AvatarImage src={assigned.avatar} alt={assigned.name} />}
-                        <AvatarFallback className="text-[10px]">{assigned.initials}</AvatarFallback>
-                      </Avatar>
-                      <span className="truncate text-sm">{assigned.name}</span>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
+                  <AssigneeAvatars ids={t.assignee_ids} members={members} showName />
                 </TableCell>
                 <TableCell className="text-sm">
                   {t.due_date ? (

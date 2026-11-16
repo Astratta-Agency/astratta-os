@@ -35,7 +35,7 @@ type Props = {
 };
 
 function computeOnTime(userId: string, tasks: WorkspaceTask[]): number | null {
-  const done = tasks.filter((t) => t.assigned_to === userId && t.status === "done" && t.due_date);
+  const done = tasks.filter((t) => t.assignee_ids.includes(userId) && t.status === "done" && t.due_date);
   if (done.length === 0) return null;
   const onTime = done.filter((t) => {
     const doneAt = new Date(t.updated_at);

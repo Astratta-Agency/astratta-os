@@ -9,6 +9,7 @@ import {
   FileText,
   UsersRound,
   CheckSquare,
+  CalendarClock,
   DollarSign,
   BarChart3,
   Settings,
@@ -39,6 +40,7 @@ const mainItems = [
   { title: "Documentos", url: "/app/documentos", icon: FileText },
   { title: "Equipo", url: "/app/equipo", icon: UsersRound },
   { title: "Tareas", url: "/app/tareas", icon: CheckSquare },
+  { title: "Planner", url: "/app/planner", icon: CalendarClock },
   { title: "Finanzas", url: "/app/finanzas", icon: DollarSign },
   { title: "Reportes", url: "/app/reportes", icon: BarChart3 },
 ];

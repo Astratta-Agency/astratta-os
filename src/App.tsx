@@ -43,6 +43,7 @@ import Documentos from "@/pages/app/Documentos";
 import DocumentoDetalle from "@/pages/app/DocumentoDetalle";
 import Equipo from "@/pages/app/Equipo";
 import Tareas from "@/pages/app/Tareas";
+import Planner from "@/pages/app/Planner";
 
 import Finanzas from "@/pages/app/Finanzas";
 import Reportes from "@/pages/app/Reportes";
@@ -117,6 +118,7 @@ const App = () => (
             <Route path="documentos/:id" element={<DocumentoDetalle />} />
             <Route path="equipo" element={<Equipo />} />
             <Route path="tareas" element={<Tareas />} />
+            <Route path="planner" element={<Planner />} />
             <Route path="finanzas" element={<Finanzas />} />
             <Route path="reportes" element={<Reportes />} />
             <Route path="configuracion" element={<Configuracion />} />

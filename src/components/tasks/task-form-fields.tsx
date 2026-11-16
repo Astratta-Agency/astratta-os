@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkspaceMember } from "@/hooks/useProjects";
 import type { TaskPriority, TaskStatus, TaskType } from "@/hooks/useTasks";
+import { AssigneeMultiSelect } from "./assignee-multi-select";
 import { PRIORITY_LABEL, TYPE_LABEL, STATUS_LABEL } from "@/lib/task-labels";
 
 export type TaskFormValue = {
@@ -21,8 +22,13 @@ export type TaskFormValue = {
   type: TaskType;
   priority: TaskPriority;
   status: TaskStatus;
-  assigned_to: string; // "none" | uuid
+  assignee_ids: string[];
+  start_date: Date | undefined;
+  /** "HH:mm" or "" when the start has no time. */
+  start_time: string;
   due_date: Date | undefined;
+  /** "HH:mm" or "" when the due date has no time. */
+  due_time: string;
   estimated_hours: string;
   tags: string[];
   project_id: string; // "none" | uuid
@@ -36,8 +42,11 @@ export const emptyTaskForm = (): TaskFormValue => ({
   type: "produccion",
   priority: "p2",
   status: "todo",
-  assigned_to: "none",
+  assignee_ids: [],
+  start_date: undefined,
+  start_time: "",
   due_date: undefined,
+  due_time: "",
   estimated_hours: "",
   tags: [],
   project_id: "none",
@@ -52,7 +61,10 @@ export function taskFormToDb(f: TaskFormValue) {
     type: f.type,
     priority: f.priority,
     status: f.status,
-    assigned_to: f.assigned_to === "none" ? null : f.assigned_to,
+    assignee_ids: f.assignee_ids,
+    start_date: f.start_date ? format(f.start_date, "yyyy-MM-dd") : null,
+    start_time: f.start_date && f.start_time ? f.start_time : null,
+    due_time: f.due_date && f.due_time ? f.due_time : null,
     due_date: f.due_date ? format(f.due_date, "yyyy-MM-dd") : null,
     estimated_hours: f.estimated_hours.trim() ? Number(f.estimated_hours) : null,
     tags: f.tags,
@@ -148,20 +160,53 @@ export function TaskFormFields({
         </div>
 
         <div className="space-y-1.5">
-          <Label>Asignado</Label>
-          <Select value={value.assigned_to} onValueChange={(v) => onChange({ assigned_to: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Sin asignar</SelectItem>
-              {members.map((m) => (
-                <SelectItem key={m.user_id} value={m.user_id}>
-                  {m.full_name || m.email || m.user_id.slice(0, 6)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Asignados</Label>
+          <AssigneeMultiSelect
+            value={value.assignee_ids}
+            onChange={(ids) => onChange({ assignee_ids: ids })}
+            members={members}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Fecha de inicio</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start font-normal">
+                {value.start_date ? format(value.start_date, "PPP", { locale: es }) : "Sin fecha"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={value.start_date}
+                onSelect={(d) =>
+                  onChange({
+                    start_date: d ?? undefined,
+                    ...(d && value.due_date && d > value.due_date ? { due_date: d } : {}),
+                  })
+                }
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+              {value.start_date && (
+                <div className="border-t p-2">
+                  <Button variant="ghost" size="sm" className="w-full" onClick={() => onChange({ start_date: undefined })}>
+                    Quitar fecha
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+          <Input
+            type="time"
+            step={900}
+            value={value.start_time}
+            disabled={!value.start_date}
+            onChange={(e) => onChange({ start_time: e.target.value })}
+            aria-label="Fecha de inicio: hora (opcional)"
+            className="h-8"
+          />
         </div>
 
         <div className="space-y-1.5">
@@ -176,7 +221,12 @@ export function TaskFormFields({
               <Calendar
                 mode="single"
                 selected={value.due_date}
-                onSelect={(d) => onChange({ due_date: d ?? undefined })}
+                onSelect={(d) =>
+                  onChange({
+                    due_date: d ?? undefined,
+                    ...(d && value.start_date && d < value.start_date ? { start_date: d } : {}),
+                  })
+                }
                 initialFocus
                 className={cn("p-3 pointer-events-auto")}
               />
@@ -194,6 +244,15 @@ export function TaskFormFields({
               )}
             </PopoverContent>
           </Popover>
+          <Input
+            type="time"
+            step={900}
+            value={value.due_time}
+            disabled={!value.due_date}
+            onChange={(e) => onChange({ due_time: e.target.value })}
+            aria-label="Fecha límite: hora (opcional)"
+            className="h-8"
+          />
         </div>
 
         <div className="space-y-1.5">

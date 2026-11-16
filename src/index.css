@@ -110,3 +110,28 @@
     box-shadow: var(--shadow-subtle);
   }
 }
+
+/* Docs: callout blocks (see src/lib/doc-extensions.ts) */
+.ProseMirror div[data-callout] {
+  position: relative;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  margin: 1rem 0;
+  background: hsl(48 96% 89% / 0.6);
+}
+.ProseMirror div[data-callout]::before {
+  content: attr(data-emoji);
+  position: absolute;
+  left: 1rem;
+  top: 0.75rem;
+  line-height: 1.75;
+}
+.ProseMirror div[data-callout] > :first-child { margin-top: 0 !important; }
+.ProseMirror div[data-callout] > :last-child { margin-bottom: 0 !important; }
+.ProseMirror div[data-callout][data-variant="info"] { background: hsl(204 94% 94% / 0.7); }
+.ProseMirror div[data-callout][data-variant="warning"] { background: hsl(33 100% 92% / 0.7); }
+.ProseMirror div[data-callout][data-variant="success"] { background: hsl(141 79% 92% / 0.7); }
+.dark .ProseMirror div[data-callout] { background: hsl(48 96% 50% / 0.12); }
+.dark .ProseMirror div[data-callout][data-variant="info"] { background: hsl(204 94% 50% / 0.14); }
+.dark .ProseMirror div[data-callout][data-variant="warning"] { background: hsl(33 100% 50% / 0.14); }
+.dark .ProseMirror div[data-callout][data-variant="success"] { background: hsl(141 79% 40% / 0.16); }

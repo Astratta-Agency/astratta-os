@@ -1,3 +1,5 @@
+import { AssigneeAvatars } from "./assignee-avatars";
+import { AssigneeMultiSelect } from "./assignee-multi-select";
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -57,7 +59,7 @@ export function TaskSubtasks({ parent, members, onOpenSubtask }: Props) {
 
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
-  const [assignedTo, setAssignedTo] = useState<string>("none");
+  const [assignedTo, setAssignedTo] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState<Date | undefined>();
 
   const done = subtasks.filter((s) => s.status === "done").length;
@@ -65,7 +67,7 @@ export function TaskSubtasks({ parent, members, onOpenSubtask }: Props) {
 
   const resetForm = () => {
     setTitle("");
-    setAssignedTo("none");
+    setAssignedTo([]);
     setDueDate(undefined);
     setShowForm(false);
   };
@@ -80,7 +82,7 @@ export function TaskSubtasks({ parent, members, onOpenSubtask }: Props) {
         project_id: parent.project_id,
         client_id: parent.client_id,
         lead_id: parent.lead_id,
-        assigned_to: assignedTo !== "none" ? assignedTo : null,
+        assignee_ids: assignedTo,
         due_date: dueDate ? dueDate.toISOString().slice(0, 10) : null,
         priority: parent.priority,
         type: parent.type,
@@ -120,10 +122,6 @@ export function TaskSubtasks({ parent, members, onOpenSubtask }: Props) {
 
       <div className="space-y-1">
         {subtasks.map((s) => {
-          const assigned = s.assigned_to
-            ? members.find((m) => m.user_id === s.assigned_to)
-            : null;
-          const name = assigned?.full_name || assigned?.email || "";
           return (
             <div
               key={s.id}
@@ -157,11 +155,8 @@ export function TaskSubtasks({ parent, members, onOpenSubtask }: Props) {
                 </span>
               )}
 
-              {assigned && (
-                <Avatar className="h-5 w-5">
-                  {assigned.avatar_url && <AvatarImage src={assigned.avatar_url} alt={name} />}
-                  <AvatarFallback className="text-[9px]">{initialsOf(name)}</AvatarFallback>
-                </Avatar>
+              {s.assignee_ids.length > 0 && (
+                <AssigneeAvatars ids={s.assignee_ids} members={members} max={2} />
               )}
 
               <Button
@@ -201,19 +196,15 @@ export function TaskSubtasks({ parent, members, onOpenSubtask }: Props) {
             className="h-9"
           />
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={assignedTo} onValueChange={setAssignedTo}>
-              <SelectTrigger className="h-8 w-48 text-xs">
-                <SelectValue placeholder="Responsable" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin asignar</SelectItem>
-                {members.map((m) => (
-                  <SelectItem key={m.user_id} value={m.user_id}>
-                    {m.full_name || m.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-56">
+              <AssigneeMultiSelect
+                value={assignedTo}
+                onChange={setAssignedTo}
+                members={members}
+                placeholder="Responsables"
+                className="h-8 text-xs"
+              />
+            </div>
 
             <Popover>
               <PopoverTrigger asChild>

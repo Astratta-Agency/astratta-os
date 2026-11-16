@@ -184,8 +184,8 @@ async function syncConnection(admin: any, conn: any, cleanup: boolean) {
   // ---------- OUTBOUND: tasks assigned to this user, with a due date, not done ----------
   const { data: tasks } = await admin
     .from("tasks")
-    .select("id, title, description, due_date, status, priority, workspace_id")
-    .eq("assigned_to", conn.user_id)
+    .select("id, title, description, due_date, status, priority, workspace_id, task_assignees!inner(user_id)")
+    .eq("task_assignees.user_id", conn.user_id)
     .eq("workspace_id", conn.workspace_id)
     .not("due_date", "is", null)
     .neq("status", "done");

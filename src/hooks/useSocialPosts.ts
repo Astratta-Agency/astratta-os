@@ -17,6 +17,8 @@ export type SocialPostRow = {
   content_pillar: string | null;
   media_urls: string[];
   hashtags: string | null;
+  /** Free-form per-post flags, e.g. `hide_from_feed` for trial reels. */
+  format_meta: Record<string, unknown>;
   approved_at: string | null;
   rejected_at: string | null;
   rejection_reason: string | null;
@@ -61,7 +63,7 @@ export function useSocialPosts(opts: {
       let q = (supabase as any)
         .from("social_posts")
         .select(
-          "id, workspace_id, client_id, project_id, title, type, preview_url, caption, scheduled_for, status, channels, content_pillar, media_urls, hashtags, approved_at, rejected_at, rejection_reason, created_at, updated_at",
+          "id, workspace_id, client_id, project_id, title, type, preview_url, caption, scheduled_for, status, channels, content_pillar, media_urls, hashtags, format_meta, approved_at, rejected_at, rejection_reason, created_at, updated_at",
         )
         .eq("workspace_id", workspaceId)
         .order("scheduled_for", { ascending: true, nullsFirst: false });
@@ -99,6 +101,7 @@ export function useSocialPosts(opts: {
         ...r,
         channels: Array.isArray(r.channels) ? r.channels : [],
         media_urls: Array.isArray(r.media_urls) ? r.media_urls : [],
+        format_meta: r.format_meta && typeof r.format_meta === "object" ? r.format_meta : {},
       })) as SocialPostRow[];
     },
   });

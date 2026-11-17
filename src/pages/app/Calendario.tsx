@@ -38,6 +38,7 @@ import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
 import { CalendarChannelView } from "@/components/calendar/calendar-channel-view";
 import { CalendarKanbanView } from "@/components/calendar/calendar-kanban-view";
+import { InstagramFeedView } from "@/components/calendar/instagram-feed-view";
 import { PostEditorPanel } from "@/components/calendar/editor/post-editor-panel";
 import { PostQuickCreateDialog } from "@/components/calendar/post-quick-create-dialog";
 import { ManagePillarsDialog } from "@/components/calendar/manage-pillars-dialog";
@@ -116,8 +117,11 @@ export default function Calendario() {
   const allDates = params.get("periodo") === "todo" && view !== "mes" && view !== "semana";
 
   // Date range from view + anchor
+  // El feed de Instagram muestra el perfil completo del cliente, sin período.
+  const isFeed = view === "feed";
+
   const range = useMemo(() => {
-    if (allDates) return null;
+    if (allDates || isFeed) return null;
     if (view === "mes") {
       return {
         from: startOfWeek(startOfMonth(anchor), { weekStartsOn: 0 }),
@@ -132,7 +136,7 @@ export default function Calendario() {
     }
     // list — current month wide window
     return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
-  }, [allDates, view, anchor]);
+  }, [allDates, isFeed, view, anchor]);
 
   const [debouncedSearch] = useDebounce(search, 300);
 
@@ -140,7 +144,12 @@ export default function Calendario() {
     workspaceId,
     clientId,
     range,
-    filters: { channels, statuses, pillars, search: debouncedSearch },
+    filters: {
+      channels: isFeed ? ["instagram"] : channels,
+      statuses,
+      pillars,
+      search: debouncedSearch,
+    },
   });
 
   const { data: pillarOptions = [] } = useContentPillars(isAll ? undefined : clientId);
@@ -343,20 +352,22 @@ export default function Calendario() {
             <Settings2 className="mr-2 h-4 w-4" />
             Pilares
           </Button>
-          <CalendarNavigator
-            date={anchor}
-            view={view}
-            onChange={(d) => update({ anchor: d.toISOString(), periodo: null })}
-            allDates={allDates}
-            onClearAllDates={() => update({ periodo: null })}
-          />
+          {!isFeed && (
+            <CalendarNavigator
+              date={anchor}
+              view={view}
+              onChange={(d) => update({ anchor: d.toISOString(), periodo: null })}
+              allDates={allDates}
+              onClearAllDates={() => update({ periodo: null })}
+            />
+          )}
           {!postsLoading && (
             <span className="whitespace-nowrap rounded-md border px-2 py-1 text-xs text-muted-foreground">
               {posts.length} {posts.length === 1 ? "publicación" : "publicaciones"}
             </span>
           )}
           <div className="flex max-w-full overflow-x-auto rounded-md border md:ml-auto md:inline-flex">
-            {(["mes", "semana", "lista", "canal", "kanban"] as CalView[]).map((v) => (
+            {(["mes", "semana", "lista", "canal", "kanban", "feed"] as CalView[]).map((v) => (
               <Button
                 key={v}
                 variant={view === v ? "secondary" : "ghost"}
@@ -386,7 +397,29 @@ export default function Calendario() {
       />
 
       <CalendarClientsProvider value={isAll ? clientMap : null}>
-      {postsLoading ? (
+      {isFeed && isAll ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+          <CalendarPlus className="mb-3 h-10 w-10 text-muted-foreground" />
+          <p className="font-medium">Elige un cliente para ver su feed de Instagram</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            El feed muestra la cuadrícula del perfil con sus posts, carruseles y reels.
+          </p>
+        </div>
+      ) : isFeed && postsLoading ? (
+        <div className="mx-auto grid w-full max-w-[640px] grid-cols-3 gap-0.5">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-[3/4] rounded-none" />
+          ))}
+        </div>
+      ) : isFeed ? (
+        <InstagramFeedView
+          posts={posts}
+          client={
+            clientMap.get(clientId) ?? { name: "Cliente", logo_url: null, brand_primary_color: null }
+          }
+          onPostClick={(p) => openPost(p.id)}
+        />
+      ) : postsLoading ? (
         <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: 35 }).map((_, i) => (
             <Skeleton key={i} className="h-32" />

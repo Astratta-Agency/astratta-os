@@ -33,7 +33,7 @@ export function usePost(postId: string | null) {
       const { data: post, error } = await (supabase as any)
         .from("social_posts")
         .select(
-          "id, workspace_id, client_id, project_id, title, type, preview_url, caption, scheduled_for, status, channels, content_pillar, media_urls, hashtags, approved_at, rejected_at, rejection_reason, created_at, updated_at",
+          "id, workspace_id, client_id, project_id, title, type, preview_url, caption, scheduled_for, status, channels, content_pillar, media_urls, hashtags, format_meta, approved_at, rejected_at, rejection_reason, created_at, updated_at",
         )
         .eq("id", postId)
         .maybeSingle();
@@ -49,6 +49,7 @@ export function usePost(postId: string | null) {
         ...post,
         channels: Array.isArray(post.channels) ? post.channels : [],
         media_urls: Array.isArray(post.media_urls) ? post.media_urls : [],
+        format_meta: post.format_meta && typeof post.format_meta === "object" ? post.format_meta : {},
         variants: (variants ?? []).map((v: any) => ({
           ...v,
           mentions: Array.isArray(v.mentions) ? v.mentions : [],
@@ -68,6 +69,7 @@ export type PostPatch = Partial<{
   content_pillar: string | null;
   media_urls: string[];
   hashtags: string | null;
+  format_meta: Record<string, unknown>;
 }>;
 
 export function useUpdatePost(postId: string | null) {
@@ -172,7 +174,7 @@ export function useDuplicatePost() {
       const { data: src, error: e1 } = await (supabase as any)
         .from("social_posts")
         .select(
-          "workspace_id, client_id, project_id, title, type, caption, channels, content_pillar, media_urls, hashtags",
+          "workspace_id, client_id, project_id, title, type, caption, channels, content_pillar, media_urls, hashtags, format_meta",
         )
         .eq("id", postId)
         .maybeSingle();
@@ -193,6 +195,7 @@ export function useDuplicatePost() {
           content_pillar: src.content_pillar,
           media_urls: src.media_urls ?? [],
           hashtags: src.hashtags,
+          format_meta: src.format_meta ?? {},
           status: "draft",
           scheduled_for: null,
         })

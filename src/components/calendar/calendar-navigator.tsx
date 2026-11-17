@@ -3,7 +3,7 @@ import { es } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export type CalView = "mes" | "semana" | "lista" | "canal" | "kanban";
+export type CalView = "mes" | "semana" | "lista" | "canal" | "kanban" | "feed";
 
 interface Props {
   date: Date;

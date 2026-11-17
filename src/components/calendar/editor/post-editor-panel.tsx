@@ -57,6 +57,7 @@ type PostMeta = {
   content_pillar: string | null;
   channels: Channel[];
   media_urls: string[];
+  show_in_feed: boolean;
 };
 
 export function PostEditorPanel({
@@ -109,6 +110,7 @@ export function PostEditorPanel({
       content_pillar: post.content_pillar,
       channels: post.channels,
       media_urls: post.media_urls,
+      show_in_feed: post.format_meta?.hide_from_feed !== true,
     });
     const map: Record<string, VariantDraft> = {};
     const byChannel = new Map<Channel, PostVariantRow>();
@@ -134,6 +136,8 @@ export function PostEditorPanel({
         content_pillar: state.meta.content_pillar,
         channels: state.meta.channels,
         media_urls: state.meta.media_urls,
+        // Merge so other flags in format_meta survive; absent means "shown".
+        format_meta: { ...post.format_meta, hide_from_feed: !state.meta.show_in_feed },
       });
       await Promise.all(
         state.meta.channels.map((c) => {
@@ -416,6 +420,9 @@ export function PostEditorPanel({
                   pillar={meta.content_pillar}
                   onPillar={(p) => setMeta({ ...meta, content_pillar: p })}
                   pillarOptions={pillarOptions}
+                  showInFeed={meta.show_in_feed}
+                  onShowInFeed={(v) => setMeta({ ...meta, show_in_feed: v })}
+                  feedToggleVisible={meta.channels.includes("instagram") && meta.type !== "story"}
                 />
 
                 <PostFormatWarnings type={meta.type} />

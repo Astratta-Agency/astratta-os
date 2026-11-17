@@ -22,6 +22,7 @@ import { CalendarNavigator, type CalView } from "@/components/calendar/calendar-
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { CalendarListView } from "@/components/calendar/calendar-list-view";
+import { InstagramFeedView } from "@/components/calendar/instagram-feed-view";
 import {
   PortalCalendarFiltersBar,
   PORTAL_VISIBLE_STATUSES,
@@ -30,8 +31,8 @@ import { PostDetailDialog } from "@/components/portal/post-detail-dialog";
 
 const parseList = (v: string | null): string[] => (v ? v.split(",").filter(Boolean) : []);
 
-type PortalView = Extract<CalView, "mes" | "semana" | "lista">;
-const ALLOWED_VIEWS: PortalView[] = ["mes", "semana", "lista"];
+type PortalView = Extract<CalView, "mes" | "semana" | "lista" | "feed">;
+const ALLOWED_VIEWS: PortalView[] = ["mes", "semana", "lista", "feed"];
 
 export default function ClientCalendar() {
   const ctx = useOutletContext<PortalContext>();
@@ -64,7 +65,11 @@ export default function ClientCalendar() {
     setParams(p, { replace: true });
   };
 
+  // El feed de Instagram muestra el perfil completo, sin período.
+  const isFeed = view === "feed";
+
   const range = useMemo(() => {
+    if (isFeed) return null;
     if (view === "mes") {
       return {
         from: startOfWeek(startOfMonth(anchor), { weekStartsOn: 0 }),
@@ -78,7 +83,7 @@ export default function ClientCalendar() {
       };
     }
     return { from: startOfMonth(anchor), to: endOfMonth(anchor) };
-  }, [view, anchor]);
+  }, [isFeed, view, anchor]);
 
   // Enforce portal-visible statuses: intersect selected with allowed;
   // if none selected, hook still restricted to allowed via effectiveStatuses.
@@ -88,7 +93,7 @@ export default function ClientCalendar() {
     workspaceId: ctx.client.workspace_id,
     clientId: ctx.client.id,
     range,
-    filters: { channels, statuses: effectiveStatuses },
+    filters: { channels: isFeed ? ["instagram"] : channels, statuses: effectiveStatuses },
   });
 
   const { data: pillarOptions = [] } = useContentPillars(ctx.client.id);
@@ -123,11 +128,13 @@ export default function ClientCalendar() {
       </header>
 
       <div className="flex flex-col gap-2 rounded-lg border bg-card p-2 md:flex-row md:items-center">
-        <CalendarNavigator
-          date={anchor}
-          view={view}
-          onChange={(d) => update({ anchor: d.toISOString() })}
-        />
+        {!isFeed && (
+          <CalendarNavigator
+            date={anchor}
+            view={view}
+            onChange={(d) => update({ anchor: d.toISOString() })}
+          />
+        )}
         <div className="flex max-w-full overflow-x-auto rounded-md border md:ml-auto md:inline-flex">
           {ALLOWED_VIEWS.map((v) => (
             <Button
@@ -157,7 +164,22 @@ export default function ClientCalendar() {
         onClear={clearFilters}
       />
 
-      {postsLoading ? (
+      {isFeed ? (
+        postsLoading ? (
+          <div className="mx-auto grid w-full max-w-[640px] grid-cols-3 gap-0.5">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <Skeleton key={i} className="aspect-[3/4] rounded-none" />
+            ))}
+          </div>
+        ) : (
+          <InstagramFeedView
+            posts={posts}
+            client={ctx.client}
+            onPostClick={(p) => setSelectedPostId(p.id)}
+            accentColor="var(--portal-primary)"
+          />
+        )
+      ) : postsLoading ? (
         <div className="grid grid-cols-7 gap-1">
           {Array.from({ length: 35 }).map((_, i) => (
             <Skeleton key={i} className="h-24 md:h-32" />
@@ -197,8 +219,8 @@ export default function ClientCalendar() {
           pillarMap={pillarMap}
           onPostClick={(p) => setSelectedPostId(p.id)}
           clientName={ctx.client.name}
-          rangeFrom={range.from}
-          rangeTo={range.to}
+          rangeFrom={range?.from}
+          rangeTo={range?.to}
         />
       )}
 

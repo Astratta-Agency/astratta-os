@@ -1,6 +1,7 @@
 import { format as fmt } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ContentPillar } from "@/hooks/useSocialPosts";
 
@@ -24,6 +25,11 @@ interface Props {
   pillar: string | null;
   onPillar: (p: string | null) => void;
   pillarOptions: ContentPillar[];
+  /** Whether the post shows on the client's Instagram feed view. */
+  showInFeed: boolean;
+  onShowInFeed: (v: boolean) => void;
+  /** The switch only makes sense for Instagram posts that land on the grid. */
+  feedToggleVisible: boolean;
 }
 
 export function PostEditorMeta({
@@ -35,6 +41,9 @@ export function PostEditorMeta({
   pillar,
   onPillar,
   pillarOptions,
+  showInFeed,
+  onShowInFeed,
+  feedToggleVisible,
 }: Props) {
   const dtLocal = scheduledFor
     ? fmt(new Date(scheduledFor), "yyyy-MM-dd'T'HH:mm")
@@ -81,6 +90,20 @@ export function PostEditorMeta({
           ))}
         </div>
       </div>
+
+      {feedToggleVisible && (
+        <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
+          <div className="min-w-0">
+            <Label htmlFor="show-in-feed" className="text-sm font-medium">
+              Mostrar en el feed
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Desactívalo para trial reels u otras publicaciones que no aparecen en el perfil.
+            </p>
+          </div>
+          <Switch id="show-in-feed" checked={showInFeed} onCheckedChange={onShowInFeed} />
+        </div>
+      )}
 
       <div>
         <Label className="text-xs text-muted-foreground">Pilar de contenido</Label>
